@@ -278,12 +278,19 @@ html_parts = ['''<html>
             <option value="">Sélectionnez un compteur</option>
 ''']
 
-# Ajouter les options pour le dropdown
+# Ajouter les options groupées par arrondissement
+by_arrondissement = defaultdict(list)
 for instance in data.keys():
-    if data[instance]:  # Vérifier que la liste n'est pas vide
+    if data[instance]:
         first_row = data[instance][0]
-        location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
-        html_parts.append(f'<option value="{instance}">{instance} - {location}</option>')
+        by_arrondissement[first_row['arrondissement']].append((instance, first_row))
+
+for arrondissement in sorted(by_arrondissement.keys()):
+    html_parts.append(f'<optgroup label="{arrondissement}">')
+    for instance, row in sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2'])):
+        label = f"{row['rue_1']} & {row['rue_2']} — {row['direction']} ({instance})"
+        html_parts.append(f'<option value="{instance}">{label}</option>')
+    html_parts.append('</optgroup>')
 
 html_parts.append('''
         </select>
