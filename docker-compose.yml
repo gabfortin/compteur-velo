@@ -1,0 +1,7 @@
+services:
+  velo-updater:
+    build: .
+    env_file: .env
+    volumes:
+      - ./logs:/var/log
+    restart: unless-stopped

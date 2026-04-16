@@ -35,7 +35,7 @@ html_parts = ['''<html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passages Vélo par Compteur</title>
+    <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
     <style>
         * { box-sizing: border-box; }
