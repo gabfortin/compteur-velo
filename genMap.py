@@ -3,20 +3,34 @@ from collections import defaultdict
 import os
 from tqdm import tqdm
 import json
+from datetime import datetime, timedelta
 
 # Compter le nombre total de lignes pour la barre de progression
-total_lines = sum(1 for line in open('cyclistes.csv')) - 1  # Soustraire la ligne d'en-tête
+total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
 
 # Lire le fichier CSV et grouper par instance (compteur)
 data = defaultdict(list)
-with open('cyclistes.csv', 'r') as f:
+with open('cyclistes.csv', 'r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in tqdm(reader, total=total_lines, desc="Traitement des données"):
         data[row['instance']].append(row)
 
+# Filtrer les données pour garder seulement les 3 derniers mois
+def is_within_last_3_months(date_str):
+    try:
+        row_date = datetime.fromisoformat(date_str.replace('-05', '').replace('-04', ''))
+        cutoff_date = datetime.now() - timedelta(days=90)
+        return row_date >= cutoff_date
+    except:
+        return True
+
+for instance in data.keys():
+    data[instance] = [row for row in data[instance] if is_within_last_3_months(row['periode'])]
+
 # Générer le HTML
 html_parts = ['''<html>
 <head>
+    <meta charset="utf-8">
     <title>Passages Vélo par Compteur</title>
     <style>
         body {
@@ -63,28 +77,6 @@ html_parts = ['''<html>
             height: 300px;
             margin-bottom: 20px;
         }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 10px;
-            background: #fff;
-            border-radius: 5px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            font-weight: bold;
-        }
-        tr:hover {
-            background-color: #f5f5f5;
-        }
         p {
             margin: 10px 0;
             font-weight: bold;
@@ -101,36 +93,30 @@ html_parts = ['''<html>
 
 # Ajouter les options pour le dropdown
 for instance in data.keys():
-    first_row = data[instance][0]
-    location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
-    html_parts.append(f'<option value="{instance}">{instance} - {location}</option>')
+    if data[instance]:  # Vérifier que la liste n'est pas vide
+        first_row = data[instance][0]
+        location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
+        html_parts.append(f'<option value="{instance}">{instance} - {location}</option>')
 
 html_parts.append('''
         </select>
 ''')
 
 for instance, rows in tqdm(data.items(), desc="Génération HTML"):
-    # Informations du compteur
-    first_row = rows[0]
-    location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
-    html_parts.append(f'<div id="{instance}" class="table-container">')
-    html_parts.append(f'<h2>Compteur {instance}</h2>')
-    html_parts.append(f'<p><strong>Emplacement:</strong> {location}</p>')
-    
-    # Préparer les données pour le graphique
-    sorted_rows = sorted(rows, key=lambda x: x['periode'])
-    dates = json.dumps([row['periode'] for row in sorted_rows])
-    volumes = json.dumps([int(row['volume']) for row in sorted_rows])
-    html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
-    
-    html_parts.append('<table>')
-    html_parts.append('<tr><th>Date</th><th>Volume (passages)</th><th>Vitesse Moyenne (km/h)</th></tr>')
-    
-    for row in sorted_rows:
-        html_parts.append(f"<tr><td>{row['periode']}</td><td>{row['volume']}</td><td>{row['vitesseMoyenne']}</td></tr>")
-    
-    html_parts.append('</table>')
-    html_parts.append('</div>')
+    if rows:  # Vérifier que la liste n'est pas vide
+        # Informations du compteur
+        first_row = rows[0]
+        location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
+        html_parts.append(f'<div id="{instance}" class="table-container">')
+        html_parts.append(f'<h2>Compteur {instance}</h2>')
+        html_parts.append(f'<p><strong>Emplacement:</strong> {location}</p>')
+        
+        # Préparer les données pour le graphique
+        sorted_rows = sorted(rows, key=lambda x: x['periode'])
+        dates = json.dumps([row['periode'] for row in sorted_rows])
+        volumes = json.dumps([int(row['volume']) for row in sorted_rows])
+        html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
+        html_parts.append('</div>')
 
 html_parts.append('''
     </div>
@@ -141,10 +127,11 @@ html_parts.append('''
 
 # Ajouter les données des graphiques
 for instance, rows in data.items():
-    sorted_rows = sorted(rows, key=lambda x: x['periode'])
-    dates = json.dumps([row['periode'] for row in sorted_rows])
-    volumes = json.dumps([int(row['volume']) for row in sorted_rows])
-    html_parts.append(f"chartData['{instance}'] = {{ labels: {dates}, datasets: [{{ label: 'Passages', data: {volumes}, borderColor: 'rgba(102, 126, 234, 1)', backgroundColor: 'rgba(102, 126, 234, 0.2)', fill: true }}] }};")
+    if rows:  # Vérifier que la liste n'est pas vide
+        sorted_rows = sorted(rows, key=lambda x: x['periode'])
+        dates = json.dumps([row['periode'] for row in sorted_rows])
+        volumes = json.dumps([int(row['volume']) for row in sorted_rows])
+        html_parts.append(f"chartData['{instance}'] = {{ labels: {dates}, datasets: [{{ label: 'Passages', data: {volumes}, borderColor: 'rgba(102, 126, 234, 1)', backgroundColor: 'rgba(102, 126, 234, 0.2)', fill: true }}] }};\n")
 
 html_parts.append('''
         function createChart(id) {
@@ -196,7 +183,7 @@ html_parts.append('''
 html = ''.join(html_parts)
 
 # Écrire le fichier HTML
-with open('passages.html', 'w', encoding='utf-8') as f:
+with open('index.html', 'w', encoding='utf-8') as f:
     f.write(html)
 
 print("Fichier HTML généré : passages.html")
