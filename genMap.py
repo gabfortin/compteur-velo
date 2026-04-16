@@ -31,62 +31,76 @@ for instance in data.keys():
 html_parts = ['''<html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Passages Vélo par Compteur</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1DB860 0%, #0f6e3a 100%);
             color: #333;
             margin: 0;
-            padding: 20px;
+            padding: 12px;
             min-height: 100vh;
         }
         h1 {
             text-align: center;
             color: #fff;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            margin-bottom: 30px;
+            margin: 15px 0 20px 0;
+            font-size: 24px;
         }
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 10px;
-            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
         select {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             background: #fff;
             font-size: 16px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            cursor: pointer;
         }
         .table-container {
             display: none;
         }
         h2 {
             color: #1DB860;
-            margin-top: 20px;
+            margin: 16px 0 8px 0;
+            font-size: 18px;
         }
         canvas {
             max-width: 100%;
-            height: 300px;
-            margin-bottom: 20px;
+            height: 280px;
+            margin-bottom: 16px;
         }
         p {
-            margin: 10px 0;
-            font-weight: bold;
+            margin: 8px 0;
+            font-weight: normal;
+            font-size: 14px;
+        }
+        p strong {
+            color: #1DB860;
         }
         .watermark {
             text-align: center;
-            padding: 20px 10px;
+            padding: 16px 10px;
             color: rgba(29, 184, 96, 0.4);
-            font-size: 14px;
-            margin-top: 40px;
+            font-size: 12px;
+            margin-top: 30px;
             border-top: 1px solid rgba(0, 0, 0, 0.1);
         }
         .watermark a {
@@ -99,21 +113,25 @@ html_parts = ['''<html>
             text-decoration: underline;
         }
         .period-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 18px;
         }
         .period-btn {
-            padding: 10px 20px;
+            padding: 11px 12px;
             border: 2px solid rgba(29, 184, 96, 0.5);
             background: #fff;
             color: #1DB860;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 13px;
             transition: all 0.3s ease;
+            text-align: center;
+        }
+        .period-btn:active {
+            transform: scale(0.98);
         }
         .period-btn:hover {
             border-color: #1DB860;
@@ -123,6 +141,58 @@ html_parts = ['''<html>
             background: #1DB860;
             color: #fff;
             border-color: #1DB860;
+        }
+        
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 28px;
+                margin-bottom: 30px;
+            }
+            .container {
+                padding: 24px;
+            }
+            select {
+                padding: 12px;
+                font-size: 16px;
+                margin-bottom: 20px;
+            }
+            h2 {
+                font-size: 20px;
+                margin: 20px 0 10px 0;
+            }
+            canvas {
+                height: 300px;
+                margin-bottom: 20px;
+            }
+            p {
+                font-size: 15px;
+                margin: 10px 0;
+                font-weight: bold;
+            }
+            .watermark {
+                padding: 20px 10px;
+                font-size: 14px;
+                margin-top: 40px;
+            }
+            .period-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
+                margin-bottom: 20px;
+                grid-template-columns: unset;
+            }
+            .period-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                flex: 0 1 auto;
+            }
+            .period-btn:active {
+                transform: none;
+            }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
