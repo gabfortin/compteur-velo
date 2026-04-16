@@ -13,7 +13,8 @@ data = defaultdict(list)
 with open('cyclistes.csv', 'r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in tqdm(reader, total=total_lines, desc="Traitement des données"):
-        data[row['instance']].append(row)
+        if row['agg_code'] == 'h':
+            data[row['instance']].append(row)
 
 # Filtrer les données pour garder les 6 derniers mois
 def is_within_last_6_months(date_str):
@@ -45,12 +46,25 @@ html_parts = ['''<html>
             padding: 12px;
             min-height: 100vh;
         }
-        h1 {
+        .site-header {
             text-align: center;
+            padding: 24px 16px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
             color: #fff;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            margin: 15px 0 20px 0;
-            font-size: 24px;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin: 0 0 8px 0;
+        }
+        .subtitle {
+            color: rgba(255,255,255,0.75);
+            font-size: 13px;
+            margin: 0;
+            font-weight: 400;
+            line-height: 1.5;
         }
         .container {
             max-width: 1200px;
@@ -148,8 +162,10 @@ html_parts = ['''<html>
                 padding: 20px;
             }
             h1 {
-                font-size: 28px;
-                margin-bottom: 30px;
+                font-size: 32px;
+            }
+            .subtitle {
+                font-size: 14px;
             }
             .container {
                 padding: 24px;
@@ -198,9 +214,13 @@ html_parts = ['''<html>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
+    <div class="site-header">
         <h1>Compteurs Vélo Montréal</h1>
+        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de données ouvertes de la Ville.</p>
+    </div>
+    <div class="container">
         <div class="period-buttons">
+            <button class="period-btn" data-days="1">Dernier jour</button>
             <button class="period-btn active" data-days="7">7 derniers jours</button>
             <button class="period-btn" data-days="30">1 dernier mois</button>
             <button class="period-btn" data-days="90">3 derniers mois</button>
@@ -232,7 +252,7 @@ for instance, rows in tqdm(data.items(), desc="Génération HTML"):
         
         # Préparer les données pour le graphique
         sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'][:10] for row in sorted_rows])
+        dates = json.dumps([row['periode'][:16] for row in sorted_rows])
         volumes = json.dumps([int(row['volume']) for row in sorted_rows])
         html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
         html_parts.append('</div>')
@@ -249,44 +269,55 @@ html_parts.append('''
 for instance, rows in data.items():
     if rows:  # Vérifier que la liste n'est pas vide
         sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'][:10] for row in sorted_rows])
+        dates = json.dumps([row['periode'][:16] for row in sorted_rows])
         volumes = json.dumps([int(row['volume']) for row in sorted_rows])
         html_parts.append(f"allChartData['{instance}'] = {{ labels: {dates}, data: {volumes} }};\n")
 
 html_parts.append('''
+        function parseLabel(label) {
+            return new Date(label.replace(' ', 'T'));
+        }
+
+        function getMaxDate(labels) {
+            let max = null;
+            labels.forEach(label => {
+                const d = parseLabel(label);
+                if (!max || d > max) max = d;
+            });
+            return max;
+        }
+
+        function buildFilteredData(instance, days) {
+            const allLabels = allChartData[instance].labels;
+            const allVolumes = allChartData[instance].data;
+            const maxDate = getMaxDate(allLabels);
+            if (!maxDate) return { labels: [], datasets: [{ label: 'Passages', data: [], borderColor: 'rgba(29, 184, 96, 1)', backgroundColor: 'rgba(29, 184, 96, 0.2)', fill: true }] };
+
+            const cutoffDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate() - (days - 1));
+
+            const filteredLabels = [];
+            const filteredData = [];
+            allLabels.forEach((label, index) => {
+                const dataDate = parseLabel(label);
+                if (dataDate >= cutoffDate) {
+                    filteredLabels.push(label);
+                    filteredData.push(allVolumes[index]);
+                }
+            });
+
+            return {
+                labels: filteredLabels,
+                datasets: [{ label: 'Passages', data: filteredData, borderColor: 'rgba(29, 184, 96, 1)', backgroundColor: 'rgba(29, 184, 96, 0.2)', fill: true }]
+            };
+        }
+
         // Initialiser chartData avec les données filtrées pour 7 jours par défaut
         function initializeChartData() {
-            const now = new Date();
-            const cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            
             for (let instance in allChartData) {
-                const allLabels = allChartData[instance].labels;
-                const allVolumes = allChartData[instance].data;
-                
-                const filteredLabels = [];
-                const filteredData = [];
-                
-                allLabels.forEach((label, index) => {
-                    const dataDate = new Date(label + 'T00:00:00');
-                    if (dataDate >= cutoffDate) {
-                        filteredLabels.push(label);
-                        filteredData.push(allVolumes[index]);
-                    }
-                });
-                
-                chartData[instance] = {
-                    labels: filteredLabels,
-                    datasets: [{
-                        label: 'Passages',
-                        data: filteredData,
-                        borderColor: 'rgba(29, 184, 96, 1)',
-                        backgroundColor: 'rgba(29, 184, 96, 0.2)',
-                        fill: true
-                    }]
-                };
+                chartData[instance] = buildFilteredData(instance, 7);
             }
         }
-        
+
         // Initialiser au chargement
         initializeChartData();
         
@@ -299,18 +330,34 @@ html_parts.append('''
                         data: chartData[id],
                         options: {
                             responsive: true,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(items) {
+                                            const d = parseLabel(items[0].label);
+                                            return d.toLocaleDateString('fr-CA', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+                                                + ' · ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+                                        }
+                                    }
+                                }
+                            },
                             scales: {
                                 x: {
-                                    title: {
-                                        display: true,
-                                        text: 'Date'
+                                    title: { display: true, text: 'Date' },
+                                    ticks: {
+                                        maxTicksLimit: 10,
+                                        callback: function(value, index) {
+                                            const label = this.getLabelForValue(value);
+                                            const d = parseLabel(label);
+                                            if (currentPeriod === 1) {
+                                                return d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+                                            }
+                                            return d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });
+                                        }
                                     }
                                 },
                                 y: {
-                                    title: {
-                                        display: true,
-                                        text: 'Nombre de Passages'
-                                    },
+                                    title: { display: true, text: 'Nombre de Passages' },
                                     beginAtZero: true
                                 }
                             }
@@ -333,42 +380,12 @@ html_parts.append('''
         });
 
         let currentPeriod = 7;
-        
+
         function filterDataByPeriod(days) {
             currentPeriod = days;
-            const now = new Date();
-            const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-            
-            // Mettre à jour les données filtrées pour chaque instance
             for (let instance in allChartData) {
-                const allLabels = allChartData[instance].labels;
-                const allVolumes = allChartData[instance].data;
-                
-                const filteredLabels = [];
-                const filteredData = [];
-                
-                allLabels.forEach((label, index) => {
-                    const dataDate = new Date(label + 'T00:00:00');
-                    if (dataDate >= cutoffDate) {
-                        filteredLabels.push(label);
-                        filteredData.push(allVolumes[index]);
-                    }
-                });
-                
-                // Mettre à jour chartData avec les données filtrées
-                chartData[instance] = {
-                    labels: filteredLabels,
-                    datasets: [{
-                        label: 'Passages',
-                        data: filteredData,
-                        borderColor: 'rgba(29, 184, 96, 1)',
-                        backgroundColor: 'rgba(29, 184, 96, 0.2)',
-                        fill: true
-                    }]
-                };
+                chartData[instance] = buildFilteredData(instance, days);
             }
-            
-            // Redessiner le graphique actuel si un est affiché
             const selected = document.getElementById('counterSelect').value;
             if (selected && charts[selected]) {
                 charts[selected].destroy();
@@ -377,6 +394,18 @@ html_parts.append('''
             }
         }
         
+        // Sélectionner un compteur aléatoire par défaut
+        (function() {
+            const instances = Object.keys(allChartData);
+            if (instances.length > 0) {
+                const randomInstance = instances[Math.floor(Math.random() * instances.length)];
+                const select = document.getElementById('counterSelect');
+                select.value = randomInstance;
+                document.getElementById(randomInstance).style.display = 'block';
+                createChart(randomInstance);
+            }
+        })();
+
         // Ajouter les event listeners aux boutons de période
         document.querySelectorAll('.period-btn').forEach(btn => {
             btn.addEventListener('click', function() {
