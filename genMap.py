@@ -1,4 +1,5 @@
 import csv
+import re
 from collections import defaultdict
 import os
 from tqdm import tqdm
@@ -19,11 +20,12 @@ with open('cyclistes.csv', 'r', encoding='utf-8') as f:
 # Filtrer les données pour garder les 6 derniers mois
 def is_within_last_6_months(date_str):
     try:
-        row_date = datetime.fromisoformat(date_str.replace('-05', '').replace('-04', ''))
+        clean = re.sub(r'[+-]\d{2}$', '', date_str.strip('"').strip())
+        row_date = datetime.fromisoformat(clean)
         cutoff_date = datetime.now() - timedelta(days=180)
         return row_date >= cutoff_date
     except:
-        return True
+        return False
 
 for instance in data.keys():
     data[instance] = [row for row in data[instance] if is_within_last_6_months(row['periode'])]
