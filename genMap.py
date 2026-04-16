@@ -157,6 +157,14 @@ html_parts = ['''<html>
             letter-spacing: 0.6px;
             font-weight: 500;
         }
+        .day-label {
+            text-align: center;
+            font-size: 13px;
+            color: #1a9950;
+            font-weight: 600;
+            margin: -6px 0 14px 0;
+            animation: fadeIn 0.3s ease both;
+        }
         .table-container { display: none; }
         .table-container.visible {
             display: block;
@@ -275,6 +283,7 @@ html_parts = ['''<html>
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
         </div>
+        <div id="dayLabel" class="day-label" style="display:none"></div>
         <div class="select-wrapper">
         <select id="counterSelect">
             <option value="">Sélectionnez un compteur</option>
@@ -390,6 +399,20 @@ html_parts.append('''
         }
         initializeChartData();
 
+        function updateDayLabel(instance) {
+            const el = document.getElementById('dayLabel');
+            if (currentPeriod === 1 && instance && allChartData[instance]) {
+                const maxDate = getMaxDate(allChartData[instance].labels);
+                if (maxDate) {
+                    const s = maxDate.toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+                    el.style.display = 'block';
+                    return;
+                }
+            }
+            el.style.display = 'none';
+        }
+
         function animateCount(el, target) {
             if (!el) return;
             const duration = 700;
@@ -494,8 +517,10 @@ html_parts.append('''
                 document.getElementById(selected).classList.add('visible');
                 createChart(selected);
                 updateStats(selected);
+                updateDayLabel(selected);
             } else {
                 updateStats(null);
+                updateDayLabel(null);
             }
         });
 
@@ -512,6 +537,7 @@ html_parts.append('''
                 charts[selected] = null;
                 createChart(selected);
                 updateStats(selected);
+                updateDayLabel(selected);
             }
         }
 
@@ -524,6 +550,7 @@ html_parts.append('''
                 document.getElementById(randomInstance).classList.add('visible');
                 createChart(randomInstance);
                 updateStats(randomInstance);
+                updateDayLabel(randomInstance);
             }
         })();
 
