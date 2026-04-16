@@ -232,7 +232,7 @@ for instance, rows in tqdm(data.items(), desc="Génération HTML"):
         
         # Préparer les données pour le graphique
         sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'] for row in sorted_rows])
+        dates = json.dumps([row['periode'][:10] for row in sorted_rows])
         volumes = json.dumps([int(row['volume']) for row in sorted_rows])
         html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
         html_parts.append('</div>')
@@ -249,12 +249,47 @@ html_parts.append('''
 for instance, rows in data.items():
     if rows:  # Vérifier que la liste n'est pas vide
         sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'] for row in sorted_rows])
+        dates = json.dumps([row['periode'][:10] for row in sorted_rows])
         volumes = json.dumps([int(row['volume']) for row in sorted_rows])
         html_parts.append(f"allChartData['{instance}'] = {{ labels: {dates}, data: {volumes} }};\n")
-        html_parts.append(f"chartData['{instance}'] = {{ labels: {dates}, datasets: [{{ label: 'Passages', data: {volumes}, borderColor: 'rgba(29, 184, 96, 1)', backgroundColor: 'rgba(29, 184, 96, 0.2)', fill: true }}] }};\n")
 
 html_parts.append('''
+        // Initialiser chartData avec les données filtrées pour 7 jours par défaut
+        function initializeChartData() {
+            const now = new Date();
+            const cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            for (let instance in allChartData) {
+                const allLabels = allChartData[instance].labels;
+                const allVolumes = allChartData[instance].data;
+                
+                const filteredLabels = [];
+                const filteredData = [];
+                
+                allLabels.forEach((label, index) => {
+                    const dataDate = new Date(label + 'T00:00:00');
+                    if (dataDate >= cutoffDate) {
+                        filteredLabels.push(label);
+                        filteredData.push(allVolumes[index]);
+                    }
+                });
+                
+                chartData[instance] = {
+                    labels: filteredLabels,
+                    datasets: [{
+                        label: 'Passages',
+                        data: filteredData,
+                        borderColor: 'rgba(29, 184, 96, 1)',
+                        backgroundColor: 'rgba(29, 184, 96, 0.2)',
+                        fill: true
+                    }]
+                };
+            }
+        }
+        
+        // Initialiser au chargement
+        initializeChartData();
+        
         function createChart(id) {
             if (!charts[id]) {
                 const ctx = document.getElementById('chart-' + id);
@@ -313,8 +348,7 @@ html_parts.append('''
                 const filteredData = [];
                 
                 allLabels.forEach((label, index) => {
-                    const dateStr = label.split(' ')[0]; // Extraire la date (YYYY-MM-DD)
-                    const dataDate = new Date(dateStr + 'T00:00:00');
+                    const dataDate = new Date(label + 'T00:00:00');
                     if (dataDate >= cutoffDate) {
                         filteredLabels.push(label);
                         filteredData.push(allVolumes[index]);
