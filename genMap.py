@@ -34,6 +34,7 @@ html_parts = ['''<html>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Passages Vélo par Compteur</title>
+    <link rel="icon" type="image/png" href="favico.png">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -260,6 +261,7 @@ html_parts = ['''<html>
 </head>
 <body>
     <div class="site-header">
+        <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
         <h1>Compteurs Vélo Montréal</h1>
         <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de données ouvertes de la Ville.</p>
     </div>
