@@ -257,16 +257,23 @@ html_parts = ['''<html>
         }
         .desktop-only { display: none; }
         .mobile-only { display: block; }
+        #chart-map-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        #chart-area { min-width: 0; }
         #map {
             width: 100%;
-            height: 340px;
+            height: 300px;
             border-radius: 10px;
-            margin-top: 24px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.12);
             border: 1.5px solid rgba(29,184,96,0.18);
+            flex-shrink: 0;
         }
         @media (min-width: 768px) {
-            #map { height: 420px; }
+            #chart-map-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+            #map { height: 100%; min-height: 300px; }
         }
         .dir-toggle {
             display: flex;
@@ -404,6 +411,8 @@ html_parts.append('''
             <button class="dir-btn active" id="btnSeparate">Par direction</button>
             <button class="dir-btn" id="btnCombined">Combiné</button>
         </div>
+        <div id="chart-map-layout">
+        <div id="chart-area">
 ''')
 
 for instance, directions in tqdm(data.items(), desc="Génération HTML"):
@@ -417,11 +426,14 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
         html_parts.append('</div>')
 
 html_parts.append('''
+        </div>
+        <div id="map"></div>
+        </div>
     </div>
-    <div id="map"></div>
     <script>
         const allChartData = {};
         const markers = {};
+        let map;
         const chartData = {};
         const charts = {};
         const countersByArrondissement = {};
@@ -790,30 +802,32 @@ html_parts.append('''
         // ── Carte Leaflet ──
         const COLOR_DEFAULT  = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
-        const map = L.map('map').setView([45.53, -73.59], 11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-            maxZoom: 19
-        }).addTo(map);
 
         function markerStyle(selected) {
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : COLOR_DEFAULT, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
-        Object.entries(counterLocations).forEach(([instance, loc]) => {
-            const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
-                .addTo(map)
-                .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
-            m.on('click', () => setCounterFromMap(instance));
-            markers[instance] = m;
-        });
 
         function updateMapSelection(instance) {
             Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance)));
             if (instance && markers[instance]) markers[instance].bringToFront();
         }
 
-        // Synchroniser la sélection initiale maintenant que les markers existent
-        updateMapSelection(getSelectedCounter());
+        setTimeout(() => {
+            map = L.map('map').setView([45.53, -73.59], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(map);
+            Object.entries(counterLocations).forEach(([instance, loc]) => {
+                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
+                    .addTo(map)
+                    .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
+                m.on('click', () => setCounterFromMap(instance));
+                markers[instance] = m;
+            });
+            updateMapSelection(getSelectedCounter());
+            map.invalidateSize();
+        }, 0);
 
         function setCounterFromMap(instance) {
             // Mettre à jour le dropdown desktop

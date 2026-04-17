@@ -223,16 +223,23 @@
         }
         .desktop-only { display: none; }
         .mobile-only { display: block; }
+        #chart-map-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        #chart-area { min-width: 0; }
         #map {
             width: 100%;
-            height: 340px;
+            height: 300px;
             border-radius: 10px;
-            margin-top: 24px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.12);
             border: 1.5px solid rgba(29,184,96,0.18);
+            flex-shrink: 0;
         }
         @media (min-width: 768px) {
-            #map { height: 420px; }
+            #chart-map-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+            #map { height: 100%; min-height: 300px; }
         }
         .dir-toggle {
             display: flex;
@@ -337,12 +344,17 @@
             <button class="dir-btn active" id="btnSeparate">Par direction</button>
             <button class="dir-btn" id="btnCombined">Combiné</button>
         </div>
+        <div id="chart-map-layout">
+        <div id="chart-area">
 <div id="det-00077-01" class="table-container"><h2>Compteur det-00077-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Bourret & Décarie inter. Est</p><canvas id="chart-det-00077-01"></canvas></div><div id="det-00118-01" class="table-container"><h2>Compteur det-00118-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Girouard & Terrebonne</p><canvas id="chart-det-00118-01"></canvas></div><div id="det-00118-02" class="table-container"><h2>Compteur det-00118-02</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Girouard & Terrebonne</p><canvas id="chart-det-00118-02"></canvas></div><div id="det-00257-02" class="table-container"><h2>Compteur det-00257-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Saint-Jacques & Seigneurs</p><canvas id="chart-det-00257-02"></canvas></div><div id="det-00268-02" class="table-container"><h2>Compteur det-00268-02</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Louis-Hippolyte-La-Fontaine & Perras Inter. Est</p><canvas id="chart-det-00268-02"></canvas></div><div id="det-00268-03" class="table-container"><h2>Compteur det-00268-03</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Louis-Hippolyte-La-Fontaine & Perras Inter. Est</p><canvas id="chart-det-00268-03"></canvas></div><div id="det-00336-01" class="table-container"><h2>Compteur det-00336-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Maisonneuve & Saint-Marc</p><canvas id="chart-det-00336-01"></canvas></div><div id="det-00385-01" class="table-container"><h2>Compteur det-00385-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Canadiens-de-Montréal & Peel</p><canvas id="chart-det-00385-01"></canvas></div><div id="det-00399-01" class="table-container"><h2>Compteur det-00399-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Notre-Dame & Peel</p><canvas id="chart-det-00399-01"></canvas></div><div id="det-00399-02" class="table-container"><h2>Compteur det-00399-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Notre-Dame & Peel</p><canvas id="chart-det-00399-02"></canvas></div><div id="det-00401-01" class="table-container"><h2>Compteur det-00401-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Ottawa & Peel</p><canvas id="chart-det-00401-01"></canvas></div><div id="det-00401-02" class="table-container"><h2>Compteur det-00401-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Ottawa & Peel</p><canvas id="chart-det-00401-02"></canvas></div><div id="det-00402-01" class="table-container"><h2>Compteur det-00402-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & Saint-Antoine</p><canvas id="chart-det-00402-01"></canvas></div><div id="det-00402-02" class="table-container"><h2>Compteur det-00402-02</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & Saint-Antoine</p><canvas id="chart-det-00402-02"></canvas></div><div id="det-00421-01" class="table-container"><h2>Compteur det-00421-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & René-Lévesque</p><canvas id="chart-det-00421-01"></canvas></div><div id="det-00467-01" class="table-container"><h2>Compteur det-00467-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Saint-Urbain & Viger</p><canvas id="chart-det-00467-01"></canvas></div><div id="det-00523-01" class="table-container"><h2>Compteur det-00523-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Côte-Sainte-Catherine & Mont-Royal</p><canvas id="chart-det-00523-01"></canvas></div><div id="det-00523-02" class="table-container"><h2>Compteur det-00523-02</h2><p><strong>Emplacement:</strong> Ville-Marie - Côte-Sainte-Catherine & Mont-Royal</p><canvas id="chart-det-00523-02"></canvas></div><div id="det-00709-01" class="table-container"><h2>Compteur det-00709-01</h2><p><strong>Emplacement:</strong> Le Plateau-Mont-Royal - Papineau & Rachel</p><canvas id="chart-det-00709-01"></canvas></div><div id="det-00717-01" class="table-container"><h2>Compteur det-00717-01</h2><p><strong>Emplacement:</strong> Ville-Marie - De Lorimier/Viger & Notre-Dame</p><canvas id="chart-det-00717-01"></canvas></div><div id="det-00789-01" class="table-container"><h2>Compteur det-00789-01</h2><p><strong>Emplacement:</strong> Rosemont–La Petite-Patrie - Bourbonnière & Sherbrooke</p><canvas id="chart-det-00789-01"></canvas></div><div id="det-00967-13" class="table-container"><h2>Compteur det-00967-13</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Boucherville & Notre-Dame</p><canvas id="chart-det-00967-13"></canvas></div><div id="det-00970-01" class="table-container"><h2>Compteur det-00970-01</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Notre-Dame & Curatteau</p><canvas id="chart-det-00970-01"></canvas></div><div id="det-00974-01" class="table-container"><h2>Compteur det-00974-01</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Haig & Notre-Dame</p><canvas id="chart-det-00974-01"></canvas></div><div id="det-00976-02" class="table-container"><h2>Compteur det-00976-02</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Honoré-Beaugrand & Notre-Dame</p><canvas id="chart-det-00976-02"></canvas></div><div id="det-01020-01" class="table-container"><h2>Compteur det-01020-01</h2><p><strong>Emplacement:</strong> Villeray–Saint-Michel–Parc-Extension - Iberville & Jean-Talon</p><canvas id="chart-det-01020-01"></canvas></div><div id="det-01026-01" class="table-container"><h2>Compteur det-01026-01</h2><p><strong>Emplacement:</strong> Villeray–Saint-Michel–Parc-Extension - Iberville & Villeray</p><canvas id="chart-det-01026-01"></canvas></div><div id="det-01173-01" class="table-container"><h2>Compteur det-01173-01</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Berri & Louvain</p><canvas id="chart-det-01173-01"></canvas></div><div id="det-01194-02" class="table-container"><h2>Compteur det-01194-02</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Lajeunesse & Legendre</p><canvas id="chart-det-01194-02"></canvas></div><div id="det-01269-01" class="table-container"><h2>Compteur det-01269-01</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Christophe-Colomb & Henri-Bourassa</p><canvas id="chart-det-01269-01"></canvas></div><div id="det-01340-01" class="table-container"><h2>Compteur det-01340-01</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Montigny & Saint-Jean-Baptiste</p><canvas id="chart-det-01340-01"></canvas></div><div id="det-01340-02" class="table-container"><h2>Compteur det-01340-02</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Montigny & Saint-Jean-Baptiste</p><canvas id="chart-det-01340-02"></canvas></div><div id="det-01364-01" class="table-container"><h2>Compteur det-01364-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Charlevoix & Wellington</p><canvas id="chart-det-01364-01"></canvas></div><div id="det-01452-01" class="table-container"><h2>Compteur det-01452-01</h2><p><strong>Emplacement:</strong> Rosemont–La Petite-Patrie - Jean-Talon & Normanville</p><canvas id="chart-det-01452-01"></canvas></div><div id="det-01454-01" class="table-container"><h2>Compteur det-01454-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Darlington & Goyer</p><canvas id="chart-det-01454-01"></canvas></div><div id="det-01487-03" class="table-container"><h2>Compteur det-01487-03</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Nazareth & William</p><canvas id="chart-det-01487-03"></canvas></div><div id="det-01725-01" class="table-container"><h2>Compteur det-01725-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Gaétan-Laberge & Sortie A-15 Sud</p><canvas id="chart-det-01725-01"></canvas></div><div id="det-02047-01" class="table-container"><h2>Compteur det-02047-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Berri & de la Gauchetiere</p><canvas id="chart-det-02047-01"></canvas></div><div id="det-08888-01" class="table-container"><h2>Compteur det-08888-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Henri-Bourassa & Saint-Vital</p><canvas id="chart-det-08888-01"></canvas></div><div id="det-08888-02" class="table-container"><h2>Compteur det-08888-02</h2><p><strong>Emplacement:</strong> Montréal-Nord - Henri-Bourassa & Saint-Vital</p><canvas id="chart-det-08888-02"></canvas></div><div id="det-09500-01" class="table-container"><h2>Compteur det-09500-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Prieur & Saint-Michel</p><canvas id="chart-det-09500-01"></canvas></div><div id="det-10471-01" class="table-container"><h2>Compteur det-10471-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Amos d' & Jean-Meunier</p><canvas id="chart-det-10471-01"></canvas></div><div id="det-13259-02" class="table-container"><h2>Compteur det-13259-02</h2><p><strong>Emplacement:</strong> Saint-Laurent - Côte-de-Liesse & Lucerne</p><canvas id="chart-det-13259-02"></canvas></div><div id="det-13259-03" class="table-container"><h2>Compteur det-13259-03</h2><p><strong>Emplacement:</strong> Saint-Laurent - Côte-de-Liesse & Lucerne</p><canvas id="chart-det-13259-03"></canvas></div><div id="det-17649-01" class="table-container"><h2>Compteur det-17649-01</h2><p><strong>Emplacement:</strong> Lachine - 25 e Avenue & Victoria</p><canvas id="chart-det-17649-01"></canvas></div>
+        </div>
+        <div id="map"></div>
+        </div>
     </div>
-    <div id="map"></div>
     <script>
         const allChartData = {};
         const markers = {};
+        let map;
         const chartData = {};
         const charts = {};
         const countersByArrondissement = {};
@@ -726,30 +738,32 @@ const counterLocations = {"det-00077-01": {"lat": 45.488279, "lng": -73.63901615
         // ── Carte Leaflet ──
         const COLOR_DEFAULT  = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
-        const map = L.map('map').setView([45.53, -73.59], 11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-            maxZoom: 19
-        }).addTo(map);
 
         function markerStyle(selected) {
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : COLOR_DEFAULT, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
-        Object.entries(counterLocations).forEach(([instance, loc]) => {
-            const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
-                .addTo(map)
-                .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
-            m.on('click', () => setCounterFromMap(instance));
-            markers[instance] = m;
-        });
 
         function updateMapSelection(instance) {
             Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance)));
             if (instance && markers[instance]) markers[instance].bringToFront();
         }
 
-        // Synchroniser la sélection initiale maintenant que les markers existent
-        updateMapSelection(getSelectedCounter());
+        setTimeout(() => {
+            map = L.map('map').setView([45.53, -73.59], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(map);
+            Object.entries(counterLocations).forEach(([instance, loc]) => {
+                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
+                    .addTo(map)
+                    .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
+                m.on('click', () => setCounterFromMap(instance));
+                markers[instance] = m;
+            });
+            updateMapSelection(getSelectedCounter());
+            map.invalidateSize();
+        }, 0);
 
         function setCounterFromMap(instance) {
             // Mettre à jour le dropdown desktop
