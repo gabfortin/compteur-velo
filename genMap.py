@@ -35,6 +35,13 @@ for instance in data.keys():
 html_parts = ['''<html>
 <head>
     <meta charset="utf-8">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YGPDF0GH27"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-YGPDF0GH27');
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
