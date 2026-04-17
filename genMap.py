@@ -9,13 +9,13 @@ from datetime import datetime, timedelta
 # Compter le nombre total de lignes pour la barre de progression
 total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
 
-# Lire le fichier CSV et grouper par instance (compteur)
-data = defaultdict(list)
+# Lire le fichier CSV et grouper par instance puis par direction
+data = defaultdict(lambda: defaultdict(list))
 with open('cyclistes.csv', 'r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in tqdm(reader, total=total_lines, desc="Traitement des données"):
         if row['agg_code'] == 'h':
-            data[row['instance']].append(row)
+            data[row['instance']][row['direction']].append(row)
 
 # Filtrer les données pour garder les 6 derniers mois
 def is_within_last_6_months(date_str):
@@ -28,7 +28,8 @@ def is_within_last_6_months(date_str):
         return False
 
 for instance in data.keys():
-    data[instance] = [row for row in data[instance] if is_within_last_6_months(row['periode'])]
+    for direction in data[instance].keys():
+        data[instance][direction] = [row for row in data[instance][direction] if is_within_last_6_months(row['periode'])]
 
 # Générer le HTML
 html_parts = ['''<html>
@@ -245,7 +246,33 @@ html_parts = ['''<html>
             border-color: transparent;
             box-shadow: 0 3px 10px rgba(29,184,96,0.35);
         }
+        .desktop-only { display: none; }
+        .mobile-only { display: block; }
+        .dir-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            justify-content: flex-end;
+        }
+        .dir-btn {
+            padding: 5px 12px;
+            border: 1.5px solid rgba(29,184,96,0.35);
+            background: #fff;
+            color: #1DB860;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .dir-btn.active {
+            background: linear-gradient(135deg, #1DB860, #17a355);
+            color: #fff;
+            border-color: transparent;
+        }
         @media (min-width: 768px) {
+            .desktop-only { display: block; }
+            .mobile-only { display: none; }
             body { padding: 20px; }
             h1 { font-size: 32px; }
             .subtitle { font-size: 14px; }
@@ -270,10 +297,13 @@ html_parts = ['''<html>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <div style="text-align:right;padding:6px 12px;font-size:12px;">
+        <a href="https://www.gabfortin.com" style="color:rgba(255,255,255,0.7);text-decoration:none;" target="_blank">gabfortin.com</a>
+    </div>
     <div class="site-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
         <h1>Compteurs Vélo Montréal</h1>
-        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de données ouvertes de la Ville.</p>
+        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>.</p>
     </div>
     <div class="container">
         <div class="period-buttons">
@@ -284,27 +314,57 @@ html_parts = ['''<html>
             <button class="period-btn" data-days="180">6 derniers mois</button>
         </div>
         <div id="dayLabel" class="day-label" style="display:none"></div>
-        <div class="select-wrapper">
-        <select id="counterSelect">
+        <div class="select-wrapper desktop-only">
+        <select id="counterSelectDesktop">
             <option value="">Sélectionnez un compteur</option>
 ''']
 
-# Ajouter les options groupées par arrondissement
+# Grouper par arrondissement (prendre le premier row disponible toutes directions confondues)
+def first_row_for(instance):
+    for rows in data[instance].values():
+        if rows:
+            return rows[0]
+    return None
+
 by_arrondissement = defaultdict(list)
 for instance in data.keys():
-    if data[instance]:
-        first_row = data[instance][0]
-        by_arrondissement[first_row['arrondissement']].append((instance, first_row))
+    row = first_row_for(instance)
+    if row:
+        by_arrondissement[row['arrondissement']].append((instance, row))
+
+def counter_label(instance, row):
+    directions = sorted(data[instance].keys())
+    if len(directions) > 1:
+        return f"{row['rue_1']} & {row['rue_2']} ({instance})"
+    return f"{row['rue_1']} & {row['rue_2']} — {directions[0]} ({instance})"
 
 for arrondissement in sorted(by_arrondissement.keys()):
     html_parts.append(f'<optgroup label="{arrondissement}">')
     for instance, row in sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2'])):
-        label = f"{row['rue_1']} & {row['rue_2']} — {row['direction']} ({instance})"
+        label = counter_label(instance, row)
         html_parts.append(f'<option value="{instance}">{label}</option>')
     html_parts.append('</optgroup>')
 
 html_parts.append('''
         </select>
+        </div>
+        <div class="mobile-only">
+        <div class="select-wrapper">
+        <select id="arrondissementSelect">
+            <option value="">Sélectionnez un arrondissement</option>
+''')
+
+for arrondissement in sorted(by_arrondissement.keys()):
+    html_parts.append(f'<option value="{arrondissement}">{arrondissement}</option>')
+
+html_parts.append('''
+        </select>
+        </div>
+        <div class="select-wrapper" id="counterSelectWrapper" style="visibility:hidden">
+        <select id="counterSelectMobile">
+            <option value="">Sélectionnez un compteur</option>
+        </select>
+        </div>
         </div>
         <div class="stats-row" id="statsRow" style="display:none">
             <div class="stat-card">
@@ -320,21 +380,19 @@ html_parts.append('''
                 <div class="stat-label">Heure de pointe</div>
             </div>
         </div>
+        <div class="dir-toggle" id="dirToggle" style="display:none">
+            <button class="dir-btn active" id="btnSeparate">Par direction</button>
+            <button class="dir-btn" id="btnCombined">Combiné</button>
+        </div>
 ''')
 
-for instance, rows in tqdm(data.items(), desc="Génération HTML"):
-    if rows:  # Vérifier que la liste n'est pas vide
-        # Informations du compteur
-        first_row = rows[0]
-        location = f"{first_row['arrondissement']} - {first_row['rue_1']} {first_row['rue_2']} - Direction {first_row['direction']}"
+for instance, directions in tqdm(data.items(), desc="Génération HTML"):
+    row = first_row_for(instance)
+    if row:
+        location = f"{row['arrondissement']} - {row['rue_1']} & {row['rue_2']}"
         html_parts.append(f'<div id="{instance}" class="table-container">')
         html_parts.append(f'<h2>Compteur {instance}</h2>')
         html_parts.append(f'<p><strong>Emplacement:</strong> {location}</p>')
-        
-        # Préparer les données pour le graphique
-        sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'][:16] for row in sorted_rows])
-        volumes = json.dumps([int(row['volume']) for row in sorted_rows])
         html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
         html_parts.append('</div>')
 
@@ -344,15 +402,36 @@ html_parts.append('''
         const allChartData = {};
         const chartData = {};
         const charts = {};
+        const countersByArrondissement = {};
 ''')
 
-# Ajouter les données des graphiques
-for instance, rows in data.items():
-    if rows:  # Vérifier que la liste n'est pas vide
-        sorted_rows = sorted(rows, key=lambda x: x['periode'])
-        dates = json.dumps([row['periode'][:16] for row in sorted_rows])
-        volumes = json.dumps([int(row['volume']) for row in sorted_rows])
-        html_parts.append(f"allChartData['{instance}'] = {{ labels: {dates}, data: {volumes} }};\n")
+DIRECTION_COLORS = ['#1DB860', '#E8832A']
+DIRECTION_FILLS  = ['rgba(29,184,96,0.15)', 'rgba(232,131,42,0.15)']
+
+# Ajouter les données des graphiques et le mapping arrondissement → compteurs
+for instance, directions in data.items():
+    if not first_row_for(instance):
+        continue
+    all_dates = sorted(set(row['periode'][:16] for rows in directions.values() for row in rows))
+    datasets = []
+    for i, direction in enumerate(sorted(directions.keys())):
+        rows = directions[direction]
+        if not rows:
+            continue
+        date_vol = {row['periode'][:16]: int(row['volume']) for row in rows}
+        volumes = [date_vol.get(d) for d in all_dates]
+        datasets.append({
+            'label': direction,
+            'color': DIRECTION_COLORS[i % len(DIRECTION_COLORS)],
+            'fill':  DIRECTION_FILLS[i % len(DIRECTION_FILLS)],
+            'data':  volumes
+        })
+    html_parts.append(f"allChartData['{instance}'] = {{ labels: {json.dumps(all_dates)}, datasets: {json.dumps(datasets)} }};\n")
+
+for arrondissement in sorted(by_arrondissement.keys()):
+    counters = sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2']))
+    entries = [{"value": inst, "label": counter_label(inst, row)} for inst, row in counters]
+    html_parts.append(f"countersByArrondissement[{json.dumps(arrondissement)}] = {json.dumps(entries)};\n")
 
 html_parts.append('''
         function parseLabel(label) {
@@ -368,27 +447,45 @@ html_parts.append('''
             return max;
         }
 
+        let displayMode = 'separate';
+
         function buildFilteredData(instance, days) {
             const allLabels = allChartData[instance].labels;
-            const allVolumes = allChartData[instance].data;
+            const allDatasets = allChartData[instance].datasets;
             const maxDate = getMaxDate(allLabels);
-            if (!maxDate) return { labels: [], datasets: [{ label: 'Passages', data: [], borderColor: '#1DB860', backgroundColor: 'rgba(29,184,96,0.15)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }] };
+            if (!maxDate) return { labels: [], datasets: [] };
 
             const cutoffDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate() - (days - 1));
+            const indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
+            const filteredLabels = indices.map(i => allLabels[i]);
 
-            const filteredLabels = [];
-            const filteredData = [];
-            allLabels.forEach((label, index) => {
-                const dataDate = parseLabel(label);
-                if (dataDate >= cutoffDate) {
-                    filteredLabels.push(label);
-                    filteredData.push(allVolumes[index]);
-                }
-            });
+            const isMulti = allDatasets.length > 1;
+            const showCombined = isMulti && displayMode === 'combined';
 
+            if (showCombined) {
+                const combined = indices.map(i =>
+                    allDatasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
+                );
+                return {
+                    labels: filteredLabels,
+                    datasets: [{ label: 'Combiné', data: combined, borderColor: '#1DB860', backgroundColor: 'rgba(29,184,96,0.15)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }]
+                };
+            }
+
+            const isSingle = !isMulti;
             return {
                 labels: filteredLabels,
-                datasets: [{ label: 'Passages', data: filteredData, borderColor: '#1DB860', backgroundColor: 'rgba(29,184,96,0.15)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }]
+                datasets: allDatasets.map(ds => ({
+                    label: ds.label,
+                    data: indices.map(i => ds.data[i]),
+                    borderColor: ds.color,
+                    backgroundColor: ds.fill,
+                    fill: isSingle,
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointHoverRadius: 5
+                }))
             };
         }
 
@@ -430,15 +527,18 @@ html_parts.append('''
         function updateStats(instance) {
             const statsRow = document.getElementById('statsRow');
             if (!instance || !chartData[instance]) { statsRow.style.display = 'none'; return; }
-            const volumes = chartData[instance].datasets[0].data;
-            const labels  = chartData[instance].labels;
-            const total   = volumes.reduce((a, b) => a + b, 0);
+            const labels = chartData[instance].labels;
+            // Combine all directions
+            const combined = labels.map((_, i) =>
+                chartData[instance].datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
+            );
+            const total = combined.reduce((a, b) => a + b, 0);
             const uniqueDays = new Set(labels.map(l => l.slice(0, 10))).size;
             const avg = uniqueDays > 0 ? Math.round(total / uniqueDays) : 0;
             const hourTotals = {};
             labels.forEach((label, i) => {
                 const h = label.slice(11, 13);
-                if (h) hourTotals[h] = (hourTotals[h] || 0) + volumes[i];
+                if (h) hourTotals[h] = (hourTotals[h] || 0) + combined[i];
             });
             const peak = Object.entries(hourTotals).sort((a, b) => b[1] - a[1])[0];
             statsRow.style.display = 'grid';
@@ -451,10 +551,13 @@ html_parts.append('''
             if (!charts[id]) {
                 const ctx = document.getElementById('chart-' + id);
                 if (ctx) {
-                    const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 380);
-                    gradient.addColorStop(0, 'rgba(29,184,96,0.28)');
-                    gradient.addColorStop(1, 'rgba(29,184,96,0)');
-                    chartData[id].datasets[0].backgroundColor = gradient;
+                    const isSingle = chartData[id].datasets.length === 1;
+                    if (isSingle && chartData[id].datasets[0].fill) {
+                        const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 380);
+                        gradient.addColorStop(0, 'rgba(29,184,96,0.28)');
+                        gradient.addColorStop(1, 'rgba(29,184,96,0)');
+                        chartData[id].datasets[0].backgroundColor = gradient;
+                    }
                     charts[id] = new Chart(ctx, {
                         type: 'line',
                         data: chartData[id],
@@ -462,7 +565,7 @@ html_parts.append('''
                             responsive: true,
                             animation: { duration: 500, easing: 'easeInOutQuart' },
                             plugins: {
-                                legend: { display: false },
+                                legend: { display: !isSingle },
                                 tooltip: {
                                     backgroundColor: 'rgba(10,40,20,0.88)',
                                     titleColor: '#7ee8a2',
@@ -510,28 +613,101 @@ html_parts.append('''
             }
         }
 
-        document.getElementById('counterSelect').addEventListener('change', function() {
-            const selected = this.value;
+        function updateDirToggle(instance) {
+            const toggle = document.getElementById('dirToggle');
+            if (instance && allChartData[instance] && allChartData[instance].datasets.length > 1) {
+                toggle.style.display = 'flex';
+            } else {
+                toggle.style.display = 'none';
+            }
+        }
+
+        function selectCounter(instance) {
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
-            if (selected) {
-                document.getElementById(selected).classList.add('visible');
-                createChart(selected);
-                updateStats(selected);
-                updateDayLabel(selected);
+            if (instance) {
+                document.getElementById(instance).classList.add('visible');
+                createChart(instance);
+                updateStats(instance);
+                updateDayLabel(instance);
+                updateDirToggle(instance);
             } else {
                 updateStats(null);
                 updateDayLabel(null);
+                updateDirToggle(null);
+            }
+        }
+
+        document.getElementById('btnSeparate').addEventListener('click', function() {
+            if (displayMode === 'separate') return;
+            displayMode = 'separate';
+            document.getElementById('btnSeparate').classList.add('active');
+            document.getElementById('btnCombined').classList.remove('active');
+            const instance = getSelectedCounter();
+            if (instance) {
+                chartData[instance] = buildFilteredData(instance, currentPeriod);
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+                updateStats(instance);
             }
         });
 
+        document.getElementById('btnCombined').addEventListener('click', function() {
+            if (displayMode === 'combined') return;
+            displayMode = 'combined';
+            document.getElementById('btnCombined').classList.add('active');
+            document.getElementById('btnSeparate').classList.remove('active');
+            const instance = getSelectedCounter();
+            if (instance) {
+                chartData[instance] = buildFilteredData(instance, currentPeriod);
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+                updateStats(instance);
+            }
+        });
+
+        document.getElementById('counterSelectDesktop').addEventListener('change', function() {
+            selectCounter(this.value);
+        });
+
+        document.getElementById('arrondissementSelect').addEventListener('change', function() {
+            const arr = this.value;
+            const wrapper = document.getElementById('counterSelectWrapper');
+            const mobileSelect = document.getElementById('counterSelectMobile');
+            selectCounter(null);
+            mobileSelect.innerHTML = '<option value="">Sélectionnez un compteur</option>';
+            if (arr && countersByArrondissement[arr]) {
+                countersByArrondissement[arr].forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.value;
+                    opt.textContent = c.label;
+                    mobileSelect.appendChild(opt);
+                });
+                wrapper.style.visibility = 'visible';
+            } else {
+                wrapper.style.visibility = 'hidden';
+            }
+        });
+
+        document.getElementById('counterSelectMobile').addEventListener('change', function() {
+            selectCounter(this.value);
+        });
+
         let currentPeriod = 7;
+
+        function getSelectedCounter() {
+            if (window.innerWidth >= 768) {
+                return document.getElementById('counterSelectDesktop').value;
+            } else {
+                return document.getElementById('counterSelectMobile').value;
+            }
+        }
 
         function filterDataByPeriod(days) {
             currentPeriod = days;
             for (let instance in allChartData) {
                 chartData[instance] = buildFilteredData(instance, days);
             }
-            const selected = document.getElementById('counterSelect').value;
+            const selected = getSelectedCounter();
             if (selected && charts[selected]) {
                 charts[selected].destroy();
                 charts[selected] = null;
@@ -542,16 +718,28 @@ html_parts.append('''
         }
 
         (function() {
-            const instances = Object.keys(allChartData);
-            if (instances.length > 0) {
-                const randomInstance = instances[Math.floor(Math.random() * instances.length)];
-                const select = document.getElementById('counterSelect');
-                select.value = randomInstance;
-                document.getElementById(randomInstance).classList.add('visible');
-                createChart(randomInstance);
-                updateStats(randomInstance);
-                updateDayLabel(randomInstance);
-            }
+            const arrondissements = Object.keys(countersByArrondissement).sort();
+            if (!arrondissements.length) return;
+            const defaultArr = arrondissements[0];
+            const defaultCounter = countersByArrondissement[defaultArr][0].value;
+
+            // Desktop
+            document.getElementById('counterSelectDesktop').value = defaultCounter;
+
+            // Mobile
+            const arrSelect = document.getElementById('arrondissementSelect');
+            arrSelect.value = defaultArr;
+            const mobileSelect = document.getElementById('counterSelectMobile');
+            countersByArrondissement[defaultArr].forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.value;
+                opt.textContent = c.label;
+                mobileSelect.appendChild(opt);
+            });
+            document.getElementById('counterSelectWrapper').style.visibility = 'visible';
+            mobileSelect.value = defaultCounter;
+
+            selectCounter(defaultCounter);
         })();
 
         document.querySelectorAll('.period-btn').forEach(btn => {
