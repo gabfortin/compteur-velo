@@ -412,8 +412,8 @@ html_parts.append('''
         const countersByArrondissement = {};
 ''')
 
-DIRECTION_COLORS = ['#1DB860', '#E8832A']
-DIRECTION_FILLS  = ['rgba(29,184,96,0.15)', 'rgba(232,131,42,0.15)']
+DIRECTION_COLORS = ['#1DB860', '#29ABE2']
+DIRECTION_FILLS  = ['rgba(29,184,96,0.15)', 'rgba(41,171,226,0.15)']
 
 # Ajouter les données des graphiques et le mapping arrondissement → compteurs
 for instance, directions in data.items():
