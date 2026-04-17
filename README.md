@@ -1,6 +1,6 @@
 # Compteurs Vélo Montréal
 
-Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique horaire par compteur, avec filtres de période et statistiques dynamiques.
+Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique horaire par compteur, avec filtres de période, statistiques dynamiques, et une carte OpenStreetMap.
 
 ---
 
@@ -36,26 +36,26 @@ python3 genMap.py
 
 ## Source de données — `cyclistes.csv`
 
-Fichier CSV téléchargé depuis le portail de données ouvertes de la Ville de Montréal.
+Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/cyclistes).
 
-**1 423 501 lignes**, colonnes :
+Colonnes :
 
-| Colonne         | Description                                              |
-|-----------------|----------------------------------------------------------|
-| `agg_code`      | Niveau d'agrégation : `h` (heure), `d` (jour), `m` (mois), `y` (année), `f` (total) |
-| `instance`      | Identifiant unique du compteur (ex. `det-00077-01`)      |
-| `longitude`     | Longitude GPS                                            |
-| `latitude`      | Latitude GPS                                             |
-| `arrondissement`| Arrondissement de Montréal                               |
-| `rue_1`         | Rue principale                                           |
-| `rue_2`         | Rue secondaire / intersection                            |
-| `numeroVoie`    | Numéro de voie du compteur                               |
-| `direction`     | Direction comptée (Nord, Sud, Est, Ouest)                |
-| `periode`       | Horodatage ISO avec fuseau horaire (ex. `2025-11-04 14:00:00-05`) |
-| `volume`        | Nombre de passages sur la période                        |
-| `vitesseMoyenne`| Vitesse moyenne des cyclistes (km/h)                     |
+| Colonne          | Description                                                                           |
+|------------------|---------------------------------------------------------------------------------------|
+| `agg_code`       | Niveau d'agrégation : `h` (heure), `d` (jour), `m` (mois), `y` (année), `f` (total) |
+| `instance`       | Identifiant unique du compteur (ex. `det-00077-01`)                                   |
+| `longitude`      | Longitude GPS                                                                         |
+| `latitude`       | Latitude GPS                                                                          |
+| `arrondissement` | Arrondissement de Montréal                                                            |
+| `rue_1`          | Rue principale                                                                        |
+| `rue_2`          | Rue secondaire / intersection                                                         |
+| `numeroVoie`     | Numéro de voie du compteur                                                            |
+| `direction`      | Direction comptée (Nord, Sud, Est, Ouest)                                             |
+| `periode`        | Horodatage ISO avec fuseau horaire (ex. `2025-11-04 14:00:00-05`)                    |
+| `volume`         | Nombre de passages sur la période                                                     |
+| `vitesseMoyenne` | Vitesse moyenne des cyclistes (km/h)                                                  |
 
-Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par le site.
+Seules les lignes `agg_code = "h"` (données horaires) sont utilisées.
 
 ---
 
@@ -63,130 +63,149 @@ Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par le si
 
 ### Étape 1 — Lecture et filtrage du CSV
 
-```python
-# Garde uniquement les lignes horaires
-if row['agg_code'] == 'h':
-    data[row['instance']].append(row)
-```
+Les données sont groupées par instance **et par direction** :
 
 ```python
-# Garde uniquement les 180 derniers jours
+data[row['instance']][row['direction']].append(row)
+```
+
+18 des 45 compteurs ont deux directions (ex. Est + Ouest). Les regrouper séparément évite les timestamps dupliqués et les volumes gonflés.
+
+Les données sont ensuite filtrées pour ne garder que les 180 derniers jours :
+
+```python
 def is_within_last_6_months(date_str):
     clean = re.sub(r'[+-]\d{2}$', '', date_str.strip('"').strip())
     row_date = datetime.fromisoformat(clean)
     return row_date >= datetime.now() - timedelta(days=180)
 ```
 
-> **Note importante** : le fuseau horaire (`-05` / `-04`) est retiré avec une regex qui cible uniquement la fin de la chaîne. Un simple `.replace('-05', '')` corrompt les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
-
-Résultat : un dictionnaire `data` — `instance → [rows]` — avec 45 compteurs et ~180 jours × 24h de données chacun.
+> **Note** : le fuseau horaire (`-05` / `-04`) est retiré avec une regex ciblant la fin de la chaîne. Un simple `.replace('-05', '')` corromprait les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
 
 ### Étape 2 — Génération du HTML
 
-Le HTML est construit par concaténation de chaînes dans `html_parts`, puis écrit dans `index.html`.
+Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `index.html`.
 
 **Structure HTML produite :**
 
 ```
 <html>
-  <head>              ← CSS inline + Chart.js (CDN)
+  <head>                 ← CSS inline + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + Google Analytics
   <body>
-    .site-header      ← Logo, titre, sous-titre
+    .site-header         ← Logo, titre, sous-titre (lien vers données ouvertes), lien gabfortin.com
     .container
-      .period-buttons ← Boutons de filtre (1j / 7j / 30j / 90j / 180j)
-      .select-wrapper
-        <select>      ← Dropdown groupé par arrondissement (<optgroup>)
-      .stats-row      ← 3 cartes de stats (masquées par défaut)
-      [N × .table-container]  ← Un div par compteur (masqué par défaut)
-        <h2>          ← Nom du compteur
-        <p>           ← Emplacement
-        <canvas>      ← Graphique Chart.js
-    <script>          ← Données + logique JS inline
+      .period-buttons    ← Filtres de période (1j / 7j / 30j / 90j / 180j)
+      .select-wrapper.desktop-only
+        <select>         ← Dropdown unique groupé par arrondissement (desktop)
+      .mobile-only
+        <select>         ← Dropdown arrondissement (mobile)
+        <select>         ← Dropdown compteur (mobile, peuplé dynamiquement)
+      .stats-row         ← 3 cartes : passages totaux, moyenne/jour, heure de pointe
+      .dir-toggle        ← Toggle "Par direction / Combiné" (bi-directionnels uniquement)
+      #chart-map-layout  ← Grid 2 colonnes sur desktop, empilé sur mobile
+        #chart-area      ← Div contenant les table-containers
+          [N × .table-container]  ← Un div par compteur (masqué par défaut)
+        #map             ← Carte Leaflet
+    <script>             ← Données + logique JS inline
     .watermark
 ```
 
-**Génération du dropdown :**
-
-Les options sont groupées par arrondissement (`<optgroup>`) et triées alphabétiquement. Format de chaque option :
-
-```
-Rue1 & Rue2 — Direction (det-XXXXX-XX)
-```
-
-**Injection des données dans le JS :**
-
-Toutes les données sont injectées dans le HTML comme objet JavaScript global :
+**Données injectées dans le JS :**
 
 ```javascript
+// Données horaires par instance et direction
 allChartData['det-00077-01'] = {
-    labels: ["2025-11-04 14:00", "2025-11-04 15:00", ...],
-    data:   [4, 8, ...]
+    labels: ["2025-11-04 14:00", ...],
+    datasets: [
+        { label: 'Ouest', color: '#1DB860', fill: 'rgba(...)', data: [4, 8, ...] },
+        { label: 'Est',   color: '#29ABE2', fill: 'rgba(...)', data: [7, 12, ...] }
+    ]
 };
-```
 
-Les labels sont tronqués à 16 caractères (`periode[:16]`) pour obtenir le format `YYYY-MM-DD HH:MM`.
+// Compteurs par arrondissement (pour le dropdown mobile)
+countersByArrondissement["Le Plateau-Mont-Royal"] = [
+    { value: "det-00709-01", label: "Papineau & Rachel (det-00709-01)" }
+];
+
+// Coordonnées GPS pour la carte
+counterLocations['det-00709-01'] = { lat: 45.53, lng: -73.57, label: '...', arrondissement: '...' };
+```
 
 ---
 
 ## Logique JavaScript — `index.html`
 
-Tout le JavaScript est inline dans le HTML généré. Il n'y a aucun fichier `.js` séparé.
+Tout le JavaScript est inline dans le HTML généré.
 
-### Données
+### Variables globales
 
-| Variable      | Contenu                                                            |
-|---------------|--------------------------------------------------------------------|
-| `allChartData`| Toutes les données brutes des 6 derniers mois, par instance        |
-| `chartData`   | Données filtrées pour la période active, par instance              |
-| `charts`      | Instances Chart.js créées, par instance (cache)                    |
-| `currentPeriod` | Nombre de jours de la période active (défaut : `7`)              |
+| Variable                    | Contenu                                                              |
+|-----------------------------|----------------------------------------------------------------------|
+| `allChartData`              | Données brutes des 6 derniers mois, par instance                     |
+| `chartData`                 | Données filtrées pour la période active, par instance                |
+| `charts`                    | Instances Chart.js créées (cache)                                    |
+| `markers`                   | Markers Leaflet, par instance                                        |
+| `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)         |
+| `counterLocations`          | Coordonnées GPS et métadonnées par instance                          |
+| `currentPeriod`             | Nombre de jours de la période active (défaut : `7`)                  |
+| `displayMode`               | `'separate'` ou `'combined'` (toggle bi-directionnel)                |
+| `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                  |
 
 ### Fonctions principales
 
-#### `parseLabel(label)`
-Convertit un label `"YYYY-MM-DD HH:MM"` en objet `Date` JS.
-```javascript
-// L'espace doit être remplacé par T pour que new Date() parse correctement
-return new Date(label.replace(' ', 'T'));
-```
-
-#### `getMaxDate(labels)`
-Retourne la date la plus récente d'un tableau de labels. Utilisée comme ancre pour le filtre de période.
-
 #### `buildFilteredData(instance, days)`
-Filtre les données d'une instance pour ne garder que les `days` derniers jours **à partir de la date la plus récente disponible** (et non à partir d'aujourd'hui). Cela garantit que le bouton "Dernier jour" affiche toujours des données, même si le CSV n'est pas à jour.
+Filtre les données pour la période active **à partir de la date la plus récente disponible** (pas d'aujourd'hui). Garantit l'affichage même si le CSV n'est pas à jour.
 
-```javascript
-const cutoffDate = new Date(
-    maxDate.getFullYear(),
-    maxDate.getMonth(),
-    maxDate.getDate() - (days - 1)   // minuit du premier jour inclus
-);
-```
+Selon `displayMode` :
+- `'separate'` : retourne un dataset par direction (vert / bleu ciel)
+- `'combined'` : somme toutes les directions en un seul dataset vert
 
-#### `createChart(id)`
-Crée un graphique Chart.js pour un compteur. Le graphique est mis en cache dans `charts[id]` et n'est créé qu'une seule fois par instance. À la création, un dégradé vertical est appliqué comme couleur de fond.
+#### `selectCounter(instance)`
+Affiche le graphique du compteur sélectionné, met à jour les stats, le toggle directionnel, et la carte.
 
-#### `filterDataByPeriod(days)`
-Change la période active : reconstruit `chartData` pour toutes les instances, détruit et recrée le graphique actif.
+#### `updateMapSelection(instance)`
+Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`) et les autres en vert (`#1DB860`).
+
+#### `setCounterFromMap(instance)`
+Appelé lors d'un clic sur un marker. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
 
 #### `updateStats(instance)`
-Calcule et affiche les 3 statistiques pour la période active :
+Calcule les 3 statistiques en combinant toutes les directions :
 - **Passages totaux** : somme des volumes filtrés
-- **Moyenne par jour** : total ÷ nombre de jours uniques
-- **Heure de pointe** : heure (0–23h) cumulant le plus de passages
+- **Moyenne par jour** : total ÷ jours uniques
+- **Heure de pointe** : heure cumulant le plus de passages
 
-Les valeurs numériques sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
+Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
 
-#### Sélection aléatoire au chargement
-Une IIFE choisit un compteur au hasard parmi les 45 et l'affiche au chargement de la page.
+#### `filterDataByPeriod(days)`
+Change la période active : reconstruit `chartData` pour toutes les instances (en tenant compte de `displayMode`), détruit et recrée le graphique actif.
+
+### Sélection responsive des compteurs
+
+| Contexte | Interface |
+|----------|-----------|
+| Desktop (≥ 768px) | Un seul dropdown avec `<optgroup>` par arrondissement |
+| Mobile (< 768px)  | Deux dropdowns en cascade : arrondissement → compteur |
+
+Au chargement, un arrondissement et un compteur sont choisis **aléatoirement**.
+
+### Graphiques bi-directionnels
+
+Pour les 18 compteurs avec deux directions :
+- Par défaut : **2 lignes** sur le graphique (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
+- Mode combiné : **1 ligne** verte avec fill dégradé, somme des deux directions
+- Un toggle "Par direction / Combiné" apparaît uniquement pour ces compteurs
+
+### Carte Leaflet
+
+Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se calculer avant que Leaflet mesure la hauteur du conteneur. Sur desktop, la carte occupe 320px de large et s'aligne en hauteur avec le graphique via `display: grid`.
 
 ### Comportement de l'axe X
 
-| Période active | Axe X affiche     | Tooltip affiche                    |
-|----------------|-------------------|------------------------------------|
-| Dernier jour   | `14:00`, `15:00`… | `mer. 4 nov. 2025 · 14:00`         |
-| Autres         | `4 nov.`, `5 nov.`…| `mer. 4 nov. 2025 · 14:00`        |
+| Période active | Axe X           | Tooltip                            |
+|----------------|-----------------|------------------------------------|
+| Dernier jour   | `14:00`, `15:00`… | `mer. 4 nov. 2025 · 14:00`       |
+| Autres         | `4 nov.`, `5 nov.`… | `mer. 4 nov. 2025 · 14:00`     |
 
 ---
 
@@ -198,28 +217,13 @@ Suite de validation qui compare directement le CSV et `index.html`.
 python3 test_data.py
 ```
 
-### Tests exécutés
-
-| Catégorie           | Test                                                      |
-|---------------------|-----------------------------------------------------------|
-| Couverture          | Toutes les instances CSV sont présentes dans le HTML      |
-| Couverture          | Aucune instance dans le HTML absente du CSV               |
-| Données par instance| Nombre de points identique (CSV vs HTML)                  |
-| Données par instance| Labels identiques et dans le même ordre                   |
-| Données par instance| Volumes identiques point par point                        |
-| Données par instance| Format des labels (`YYYY-MM-DD HH:MM`)                    |
-| Données par instance| Aucune donnée hors de la fenêtre 6 mois                   |
-| Données par instance| Somme des volumes cohérente                               |
-| Dropdown            | Label de chaque option contient `rue_1`, `rue_2`, direction |
-| Optgroups           | Tous les arrondissements sont présents comme `<optgroup>` |
-
 Les tests doivent être relancés après chaque regénération du HTML.
 
 ---
 
 ## Déploiement
 
-Le site est hébergé sur **GitHub Pages**. Le fichier `CNAME` définit le domaine personnalisé. Seul `index.html` (et `favico.png`) sont servis — tout est statique, sans backend.
+Le site est hébergé sur **GitHub Pages**. Le fichier `CNAME` définit le domaine personnalisé (`compteur.gabfortin.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
 
 Après une mise à jour du CSV :
 
