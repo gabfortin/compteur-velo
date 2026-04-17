@@ -43,6 +43,8 @@ html_parts = ['''<html>
       gtag('config', 'G-YGPDF0GH27');
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
     <style>
@@ -255,6 +257,17 @@ html_parts = ['''<html>
         }
         .desktop-only { display: none; }
         .mobile-only { display: block; }
+        #map {
+            width: 100%;
+            height: 340px;
+            border-radius: 10px;
+            margin-top: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            border: 1.5px solid rgba(29,184,96,0.18);
+        }
+        @media (min-width: 768px) {
+            #map { height: 420px; }
+        }
         .dir-toggle {
             display: flex;
             gap: 6px;
@@ -301,7 +314,7 @@ html_parts = ['''<html>
             .stat-label { font-size: 11px; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div style="text-align:right;padding:6px 12px;font-size:12px;">
@@ -405,8 +418,10 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
 
 html_parts.append('''
     </div>
+    <div id="map"></div>
     <script>
         const allChartData = {};
+        const markers = {};
         const chartData = {};
         const charts = {};
         const countersByArrondissement = {};
@@ -439,6 +454,19 @@ for arrondissement in sorted(by_arrondissement.keys()):
     counters = sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2']))
     entries = [{"value": inst, "label": counter_label(inst, row)} for inst, row in counters]
     html_parts.append(f"countersByArrondissement[{json.dumps(arrondissement)}] = {json.dumps(entries)};\n")
+
+# Localisation des compteurs pour la carte
+counter_locations = {}
+for instance in data.keys():
+    row = first_row_for(instance)
+    if row:
+        counter_locations[instance] = {
+            'lat': float(row['latitude']),
+            'lng': float(row['longitude']),
+            'label': counter_label(instance, row),
+            'arrondissement': row['arrondissement']
+        }
+html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 
 html_parts.append('''
         function parseLabel(label) {
@@ -642,6 +670,7 @@ html_parts.append('''
                 updateDayLabel(null);
                 updateDirToggle(null);
             }
+            if (typeof markers !== 'undefined') updateMapSelection(instance);
         }
 
         document.getElementById('btnSeparate').addEventListener('click', function() {
@@ -725,10 +754,11 @@ html_parts.append('''
         }
 
         (function() {
-            const arrondissements = Object.keys(countersByArrondissement).sort();
+            const arrondissements = Object.keys(countersByArrondissement);
             if (!arrondissements.length) return;
-            const defaultArr = arrondissements[0];
-            const defaultCounter = countersByArrondissement[defaultArr][0].value;
+            const defaultArr = arrondissements[Math.floor(Math.random() * arrondissements.length)];
+            const counters = countersByArrondissement[defaultArr];
+            const defaultCounter = counters[Math.floor(Math.random() * counters.length)].value;
 
             // Desktop
             document.getElementById('counterSelectDesktop').value = defaultCounter;
@@ -756,6 +786,58 @@ html_parts.append('''
                 filterDataByPeriod(parseInt(this.getAttribute('data-days')));
             });
         });
+
+        // ── Carte Leaflet ──
+        const COLOR_DEFAULT  = '#1DB860';
+        const COLOR_SELECTED = '#29ABE2';
+        const map = L.map('map').setView([45.53, -73.59], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19
+        }).addTo(map);
+
+        function markerStyle(selected) {
+            return { radius: 9, fillColor: selected ? COLOR_SELECTED : COLOR_DEFAULT, color: '#fff', weight: 2, fillOpacity: 0.92 };
+        }
+        Object.entries(counterLocations).forEach(([instance, loc]) => {
+            const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
+                .addTo(map)
+                .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
+            m.on('click', () => setCounterFromMap(instance));
+            markers[instance] = m;
+        });
+
+        function updateMapSelection(instance) {
+            Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance)));
+            if (instance && markers[instance]) markers[instance].bringToFront();
+        }
+
+        // Synchroniser la sélection initiale maintenant que les markers existent
+        updateMapSelection(getSelectedCounter());
+
+        function setCounterFromMap(instance) {
+            // Mettre à jour le dropdown desktop
+            document.getElementById('counterSelectDesktop').value = instance;
+
+            // Mettre à jour les dropdowns mobile
+            const arr = counterLocations[instance].arrondissement;
+            const arrSelect = document.getElementById('arrondissementSelect');
+            arrSelect.value = arr;
+            const mobileSelect = document.getElementById('counterSelectMobile');
+            mobileSelect.innerHTML = '<option value="">Sélectionnez un compteur</option>';
+            if (countersByArrondissement[arr]) {
+                countersByArrondissement[arr].forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.value; opt.textContent = c.label;
+                    mobileSelect.appendChild(opt);
+                });
+                document.getElementById('counterSelectWrapper').style.visibility = 'visible';
+            }
+            mobileSelect.value = instance;
+
+            selectCounter(instance);
+            map.panTo([counterLocations[instance].lat, counterLocations[instance].lng]);
+        }
     </script>
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>

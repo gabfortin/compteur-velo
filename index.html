@@ -9,6 +9,8 @@
       gtag('config', 'G-YGPDF0GH27');
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
     <style>
@@ -221,6 +223,17 @@
         }
         .desktop-only { display: none; }
         .mobile-only { display: block; }
+        #map {
+            width: 100%;
+            height: 340px;
+            border-radius: 10px;
+            margin-top: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            border: 1.5px solid rgba(29,184,96,0.18);
+        }
+        @media (min-width: 768px) {
+            #map { height: 420px; }
+        }
         .dir-toggle {
             display: flex;
             gap: 6px;
@@ -267,7 +280,7 @@
             .stat-label { font-size: 11px; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div style="text-align:right;padding:6px 12px;font-size:12px;">
@@ -326,8 +339,10 @@
         </div>
 <div id="det-00077-01" class="table-container"><h2>Compteur det-00077-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Bourret & Décarie inter. Est</p><canvas id="chart-det-00077-01"></canvas></div><div id="det-00118-01" class="table-container"><h2>Compteur det-00118-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Girouard & Terrebonne</p><canvas id="chart-det-00118-01"></canvas></div><div id="det-00118-02" class="table-container"><h2>Compteur det-00118-02</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Girouard & Terrebonne</p><canvas id="chart-det-00118-02"></canvas></div><div id="det-00257-02" class="table-container"><h2>Compteur det-00257-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Saint-Jacques & Seigneurs</p><canvas id="chart-det-00257-02"></canvas></div><div id="det-00268-02" class="table-container"><h2>Compteur det-00268-02</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Louis-Hippolyte-La-Fontaine & Perras Inter. Est</p><canvas id="chart-det-00268-02"></canvas></div><div id="det-00268-03" class="table-container"><h2>Compteur det-00268-03</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Louis-Hippolyte-La-Fontaine & Perras Inter. Est</p><canvas id="chart-det-00268-03"></canvas></div><div id="det-00336-01" class="table-container"><h2>Compteur det-00336-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Maisonneuve & Saint-Marc</p><canvas id="chart-det-00336-01"></canvas></div><div id="det-00385-01" class="table-container"><h2>Compteur det-00385-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Canadiens-de-Montréal & Peel</p><canvas id="chart-det-00385-01"></canvas></div><div id="det-00399-01" class="table-container"><h2>Compteur det-00399-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Notre-Dame & Peel</p><canvas id="chart-det-00399-01"></canvas></div><div id="det-00399-02" class="table-container"><h2>Compteur det-00399-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Notre-Dame & Peel</p><canvas id="chart-det-00399-02"></canvas></div><div id="det-00401-01" class="table-container"><h2>Compteur det-00401-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Ottawa & Peel</p><canvas id="chart-det-00401-01"></canvas></div><div id="det-00401-02" class="table-container"><h2>Compteur det-00401-02</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Ottawa & Peel</p><canvas id="chart-det-00401-02"></canvas></div><div id="det-00402-01" class="table-container"><h2>Compteur det-00402-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & Saint-Antoine</p><canvas id="chart-det-00402-01"></canvas></div><div id="det-00402-02" class="table-container"><h2>Compteur det-00402-02</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & Saint-Antoine</p><canvas id="chart-det-00402-02"></canvas></div><div id="det-00421-01" class="table-container"><h2>Compteur det-00421-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Peel & René-Lévesque</p><canvas id="chart-det-00421-01"></canvas></div><div id="det-00467-01" class="table-container"><h2>Compteur det-00467-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Saint-Urbain & Viger</p><canvas id="chart-det-00467-01"></canvas></div><div id="det-00523-01" class="table-container"><h2>Compteur det-00523-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Côte-Sainte-Catherine & Mont-Royal</p><canvas id="chart-det-00523-01"></canvas></div><div id="det-00523-02" class="table-container"><h2>Compteur det-00523-02</h2><p><strong>Emplacement:</strong> Ville-Marie - Côte-Sainte-Catherine & Mont-Royal</p><canvas id="chart-det-00523-02"></canvas></div><div id="det-00709-01" class="table-container"><h2>Compteur det-00709-01</h2><p><strong>Emplacement:</strong> Le Plateau-Mont-Royal - Papineau & Rachel</p><canvas id="chart-det-00709-01"></canvas></div><div id="det-00717-01" class="table-container"><h2>Compteur det-00717-01</h2><p><strong>Emplacement:</strong> Ville-Marie - De Lorimier/Viger & Notre-Dame</p><canvas id="chart-det-00717-01"></canvas></div><div id="det-00789-01" class="table-container"><h2>Compteur det-00789-01</h2><p><strong>Emplacement:</strong> Rosemont–La Petite-Patrie - Bourbonnière & Sherbrooke</p><canvas id="chart-det-00789-01"></canvas></div><div id="det-00967-13" class="table-container"><h2>Compteur det-00967-13</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Boucherville & Notre-Dame</p><canvas id="chart-det-00967-13"></canvas></div><div id="det-00970-01" class="table-container"><h2>Compteur det-00970-01</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Notre-Dame & Curatteau</p><canvas id="chart-det-00970-01"></canvas></div><div id="det-00974-01" class="table-container"><h2>Compteur det-00974-01</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Haig & Notre-Dame</p><canvas id="chart-det-00974-01"></canvas></div><div id="det-00976-02" class="table-container"><h2>Compteur det-00976-02</h2><p><strong>Emplacement:</strong> Mercier–Hochelaga-Maisonneuve - Honoré-Beaugrand & Notre-Dame</p><canvas id="chart-det-00976-02"></canvas></div><div id="det-01020-01" class="table-container"><h2>Compteur det-01020-01</h2><p><strong>Emplacement:</strong> Villeray–Saint-Michel–Parc-Extension - Iberville & Jean-Talon</p><canvas id="chart-det-01020-01"></canvas></div><div id="det-01026-01" class="table-container"><h2>Compteur det-01026-01</h2><p><strong>Emplacement:</strong> Villeray–Saint-Michel–Parc-Extension - Iberville & Villeray</p><canvas id="chart-det-01026-01"></canvas></div><div id="det-01173-01" class="table-container"><h2>Compteur det-01173-01</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Berri & Louvain</p><canvas id="chart-det-01173-01"></canvas></div><div id="det-01194-02" class="table-container"><h2>Compteur det-01194-02</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Lajeunesse & Legendre</p><canvas id="chart-det-01194-02"></canvas></div><div id="det-01269-01" class="table-container"><h2>Compteur det-01269-01</h2><p><strong>Emplacement:</strong> Ahuntsic-Cartierville - Christophe-Colomb & Henri-Bourassa</p><canvas id="chart-det-01269-01"></canvas></div><div id="det-01340-01" class="table-container"><h2>Compteur det-01340-01</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Montigny & Saint-Jean-Baptiste</p><canvas id="chart-det-01340-01"></canvas></div><div id="det-01340-02" class="table-container"><h2>Compteur det-01340-02</h2><p><strong>Emplacement:</strong> Rivière-des-Prairies–Pointe-aux-Trembles - Montigny & Saint-Jean-Baptiste</p><canvas id="chart-det-01340-02"></canvas></div><div id="det-01364-01" class="table-container"><h2>Compteur det-01364-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Charlevoix & Wellington</p><canvas id="chart-det-01364-01"></canvas></div><div id="det-01452-01" class="table-container"><h2>Compteur det-01452-01</h2><p><strong>Emplacement:</strong> Rosemont–La Petite-Patrie - Jean-Talon & Normanville</p><canvas id="chart-det-01452-01"></canvas></div><div id="det-01454-01" class="table-container"><h2>Compteur det-01454-01</h2><p><strong>Emplacement:</strong> Côte-des-Neiges–Notre-Dame-de-Grâce - Darlington & Goyer</p><canvas id="chart-det-01454-01"></canvas></div><div id="det-01487-03" class="table-container"><h2>Compteur det-01487-03</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Nazareth & William</p><canvas id="chart-det-01487-03"></canvas></div><div id="det-01725-01" class="table-container"><h2>Compteur det-01725-01</h2><p><strong>Emplacement:</strong> Le Sud-Ouest - Gaétan-Laberge & Sortie A-15 Sud</p><canvas id="chart-det-01725-01"></canvas></div><div id="det-02047-01" class="table-container"><h2>Compteur det-02047-01</h2><p><strong>Emplacement:</strong> Ville-Marie - Berri & de la Gauchetiere</p><canvas id="chart-det-02047-01"></canvas></div><div id="det-08888-01" class="table-container"><h2>Compteur det-08888-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Henri-Bourassa & Saint-Vital</p><canvas id="chart-det-08888-01"></canvas></div><div id="det-08888-02" class="table-container"><h2>Compteur det-08888-02</h2><p><strong>Emplacement:</strong> Montréal-Nord - Henri-Bourassa & Saint-Vital</p><canvas id="chart-det-08888-02"></canvas></div><div id="det-09500-01" class="table-container"><h2>Compteur det-09500-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Prieur & Saint-Michel</p><canvas id="chart-det-09500-01"></canvas></div><div id="det-10471-01" class="table-container"><h2>Compteur det-10471-01</h2><p><strong>Emplacement:</strong> Montréal-Nord - Amos d' & Jean-Meunier</p><canvas id="chart-det-10471-01"></canvas></div><div id="det-13259-02" class="table-container"><h2>Compteur det-13259-02</h2><p><strong>Emplacement:</strong> Saint-Laurent - Côte-de-Liesse & Lucerne</p><canvas id="chart-det-13259-02"></canvas></div><div id="det-13259-03" class="table-container"><h2>Compteur det-13259-03</h2><p><strong>Emplacement:</strong> Saint-Laurent - Côte-de-Liesse & Lucerne</p><canvas id="chart-det-13259-03"></canvas></div><div id="det-17649-01" class="table-container"><h2>Compteur det-17649-01</h2><p><strong>Emplacement:</strong> Lachine - 25 e Avenue & Victoria</p><canvas id="chart-det-17649-01"></canvas></div>
     </div>
+    <div id="map"></div>
     <script>
         const allChartData = {};
+        const markers = {};
         const chartData = {};
         const charts = {};
         const countersByArrondissement = {};
@@ -388,6 +403,7 @@ countersByArrondissement["Rosemont\u2013La Petite-Patrie"] = [{"value": "det-007
 countersByArrondissement["Saint-Laurent"] = [{"value": "det-13259-02", "label": "C\u00f4te-de-Liesse & Lucerne \u2014 Sud (det-13259-02)"}, {"value": "det-13259-03", "label": "C\u00f4te-de-Liesse & Lucerne \u2014 Nord (det-13259-03)"}];
 countersByArrondissement["Ville-Marie"] = [{"value": "det-02047-01", "label": "Berri & de la Gauchetiere (det-02047-01)"}, {"value": "det-00385-01", "label": "Canadiens-de-Montr\u00e9al & Peel (det-00385-01)"}, {"value": "det-00523-01", "label": "C\u00f4te-Sainte-Catherine & Mont-Royal \u2014 Ouest (det-00523-01)"}, {"value": "det-00523-02", "label": "C\u00f4te-Sainte-Catherine & Mont-Royal \u2014 Est (det-00523-02)"}, {"value": "det-00717-01", "label": "De Lorimier/Viger & Notre-Dame \u2014 Est (det-00717-01)"}, {"value": "det-00336-01", "label": "Maisonneuve & Saint-Marc (det-00336-01)"}, {"value": "det-00421-01", "label": "Peel & Ren\u00e9-L\u00e9vesque (det-00421-01)"}, {"value": "det-00402-01", "label": "Peel & Saint-Antoine \u2014 Nord (det-00402-01)"}, {"value": "det-00402-02", "label": "Peel & Saint-Antoine \u2014 Sud (det-00402-02)"}, {"value": "det-00467-01", "label": "Saint-Urbain & Viger (det-00467-01)"}];
 countersByArrondissement["Villeray\u2013Saint-Michel\u2013Parc-Extension"] = [{"value": "det-01020-01", "label": "Iberville & Jean-Talon \u2014 Est (det-01020-01)"}, {"value": "det-01026-01", "label": "Iberville & Villeray \u2014 Est (det-01026-01)"}];
+const counterLocations = {"det-00077-01": {"lat": 45.488279, "lng": -73.63901615, "label": "Bourret & D\u00e9carie inter. Est (det-00077-01)", "arrondissement": "C\u00f4te-des-Neiges\u2013Notre-Dame-de-Gr\u00e2ce"}, "det-00118-01": {"lat": 45.47833835, "lng": -73.62487067, "label": "Girouard & Terrebonne \u2014 Ouest (det-00118-01)", "arrondissement": "C\u00f4te-des-Neiges\u2013Notre-Dame-de-Gr\u00e2ce"}, "det-00118-02": {"lat": 45.47833835, "lng": -73.62487067, "label": "Girouard & Terrebonne (det-00118-02)", "arrondissement": "C\u00f4te-des-Neiges\u2013Notre-Dame-de-Gr\u00e2ce"}, "det-00257-02": {"lat": 45.489232, "lng": -73.572125, "label": "Saint-Jacques & Seigneurs \u2014 Est (det-00257-02)", "arrondissement": "Le Sud-Ouest"}, "det-00268-02": {"lat": 45.62989831, "lng": -73.61126282, "label": "Louis-Hippolyte-La-Fontaine & Perras Inter. Est \u2014 Est (det-00268-02)", "arrondissement": "Rivi\u00e8re-des-Prairies\u2013Pointe-aux-Trembles"}, "det-00268-03": {"lat": 45.62989831, "lng": -73.61126282, "label": "Louis-Hippolyte-La-Fontaine & Perras Inter. Est \u2014 Ouest (det-00268-03)", "arrondissement": "Rivi\u00e8re-des-Prairies\u2013Pointe-aux-Trembles"}, "det-00336-01": {"lat": 45.493845, "lng": -73.581329, "label": "Maisonneuve & Saint-Marc (det-00336-01)", "arrondissement": "Ville-Marie"}, "det-00385-01": {"lat": 45.498135, "lng": -73.56921, "label": "Canadiens-de-Montr\u00e9al & Peel (det-00385-01)", "arrondissement": "Ville-Marie"}, "det-00399-01": {"lat": 45.49541721, "lng": -73.56298671, "label": "Notre-Dame & Peel \u2014 Sud (det-00399-01)", "arrondissement": "Le Sud-Ouest"}, "det-00399-02": {"lat": 45.49541721, "lng": -73.56298671, "label": "Notre-Dame & Peel \u2014 Nord (det-00399-02)", "arrondissement": "Le Sud-Ouest"}, "det-00401-01": {"lat": 45.493823, "lng": -73.558916, "label": "Ottawa & Peel \u2014 Nord (det-00401-01)", "arrondissement": "Le Sud-Ouest"}, "det-00401-02": {"lat": 45.493701, "lng": -73.558396, "label": "Ottawa & Peel \u2014 Sud (det-00401-02)", "arrondissement": "Le Sud-Ouest"}, "det-00402-01": {"lat": 45.496564, "lng": -73.565945, "label": "Peel & Saint-Antoine \u2014 Nord (det-00402-01)", "arrondissement": "Ville-Marie"}, "det-00402-02": {"lat": 45.496712, "lng": -73.566559, "label": "Peel & Saint-Antoine \u2014 Sud (det-00402-02)", "arrondissement": "Ville-Marie"}, "det-00421-01": {"lat": 45.499119, "lng": -73.57081, "label": "Peel & Ren\u00e9-L\u00e9vesque (det-00421-01)", "arrondissement": "Ville-Marie"}, "det-00467-01": {"lat": 45.506221, "lng": -73.560055, "label": "Saint-Urbain & Viger (det-00467-01)", "arrondissement": "Ville-Marie"}, "det-00523-01": {"lat": 45.51577934, "lng": -73.590263, "label": "C\u00f4te-Sainte-Catherine & Mont-Royal \u2014 Ouest (det-00523-01)", "arrondissement": "Ville-Marie"}, "det-00523-02": {"lat": 45.51577934, "lng": -73.590263, "label": "C\u00f4te-Sainte-Catherine & Mont-Royal \u2014 Est (det-00523-02)", "arrondissement": "Ville-Marie"}, "det-00709-01": {"lat": 45.53055038, "lng": -73.56949746, "label": "Papineau & Rachel (det-00709-01)", "arrondissement": "Le Plateau-Mont-Royal"}, "det-00717-01": {"lat": 45.523579, "lng": -73.545473, "label": "De Lorimier/Viger & Notre-Dame \u2014 Est (det-00717-01)", "arrondissement": "Ville-Marie"}, "det-00789-01": {"lat": 45.55174068, "lng": -73.55484615, "label": "Bourbonni\u00e8re & Sherbrooke (det-00789-01)", "arrondissement": "Rosemont\u2013La Petite-Patrie"}, "det-00967-13": {"lat": 45.583635, "lng": -73.509491, "label": "Boucherville & Notre-Dame (det-00967-13)", "arrondissement": "Mercier\u2013Hochelaga-Maisonneuve"}, "det-00970-01": {"lat": 45.585309, "lng": -73.508203, "label": "Notre-Dame & Curatteau (det-00970-01)", "arrondissement": "Mercier\u2013Hochelaga-Maisonneuve"}, "det-00974-01": {"lat": 45.577387, "lng": -73.514824, "label": "Haig & Notre-Dame (det-00974-01)", "arrondissement": "Mercier\u2013Hochelaga-Maisonneuve"}, "det-00976-02": {"lat": 45.588384, "lng": -73.508827, "label": "Honor\u00e9-Beaugrand & Notre-Dame (det-00976-02)", "arrondissement": "Mercier\u2013Hochelaga-Maisonneuve"}, "det-01020-01": {"lat": 45.55361831, "lng": -73.60202333, "label": "Iberville & Jean-Talon \u2014 Est (det-01020-01)", "arrondissement": "Villeray\u2013Saint-Michel\u2013Parc-Extension"}, "det-01026-01": {"lat": 45.55669933, "lng": -73.60896466, "label": "Iberville & Villeray \u2014 Est (det-01026-01)", "arrondissement": "Villeray\u2013Saint-Michel\u2013Parc-Extension"}, "det-01173-01": {"lat": 45.549271, "lng": -73.650118, "label": "Berri & Louvain \u2014 Sud (det-01173-01)", "arrondissement": "Ahuntsic-Cartierville"}, "det-01194-02": {"lat": 45.548574, "lng": -73.645547, "label": "Lajeunesse & Legendre \u2014 Sud (det-01194-02)", "arrondissement": "Ahuntsic-Cartierville"}, "det-01269-01": {"lat": 45.562217, "lng": -73.661524, "label": "Christophe-Colomb & Henri-Bourassa (det-01269-01)", "arrondissement": "Ahuntsic-Cartierville"}, "det-01340-01": {"lat": 45.642491, "lng": -73.505879, "label": "Montigny & Saint-Jean-Baptiste \u2014 Nord (det-01340-01)", "arrondissement": "Rivi\u00e8re-des-Prairies\u2013Pointe-aux-Trembles"}, "det-01340-02": {"lat": 45.642491, "lng": -73.505879, "label": "Montigny & Saint-Jean-Baptiste \u2014 Sud (det-01340-02)", "arrondissement": "Rivi\u00e8re-des-Prairies\u2013Pointe-aux-Trembles"}, "det-01364-01": {"lat": 45.473739, "lng": -73.561977, "label": "Charlevoix & Wellington (det-01364-01)", "arrondissement": "Le Sud-Ouest"}, "det-01452-01": {"lat": 45.54389198, "lng": -73.61071833, "label": "Jean-Talon & Normanville \u2014 Sud (det-01452-01)", "arrondissement": "Rosemont\u2013La Petite-Patrie"}, "det-01454-01": {"lat": 45.50985432, "lng": -73.63049393, "label": "Darlington & Goyer \u2014 Est (det-01454-01)", "arrondissement": "C\u00f4te-des-Neiges\u2013Notre-Dame-de-Gr\u00e2ce"}, "det-01487-03": {"lat": 45.496943, "lng": -73.559387, "label": "Nazareth & William \u2014 Ouest (det-01487-03)", "arrondissement": "Le Sud-Ouest"}, "det-01725-01": {"lat": 45.4712685, "lng": -73.56046209, "label": "Ga\u00e9tan-Laberge & Sortie A-15 Sud (det-01725-01)", "arrondissement": "Le Sud-Ouest"}, "det-02047-01": {"lat": 45.512964, "lng": -73.556138, "label": "Berri & de la Gauchetiere (det-02047-01)", "arrondissement": "Ville-Marie"}, "det-08888-01": {"lat": 45.590608, "lng": -73.647116, "label": "Henri-Bourassa & Saint-Vital \u2014 Ouest (det-08888-01)", "arrondissement": "Montr\u00e9al-Nord"}, "det-08888-02": {"lat": 45.590333, "lng": -73.646846, "label": "Henri-Bourassa & Saint-Vital \u2014 Est (det-08888-02)", "arrondissement": "Montr\u00e9al-Nord"}, "det-09500-01": {"lat": 45.58138196, "lng": -73.64629999, "label": "Prieur & Saint-Michel (det-09500-01)", "arrondissement": "Montr\u00e9al-Nord"}, "det-10471-01": {"lat": 45.6041431, "lng": -73.62223853, "label": "Amos d' & Jean-Meunier \u2014 Est (det-10471-01)", "arrondissement": "Montr\u00e9al-Nord"}, "det-13259-02": {"lat": 45.507889, "lng": -73.663422, "label": "C\u00f4te-de-Liesse & Lucerne \u2014 Sud (det-13259-02)", "arrondissement": "Saint-Laurent"}, "det-13259-03": {"lat": 45.508068, "lng": -73.663324, "label": "C\u00f4te-de-Liesse & Lucerne \u2014 Nord (det-13259-03)", "arrondissement": "Saint-Laurent"}, "det-17649-01": {"lat": 45.43582657, "lng": -73.68651791, "label": "25 e Avenue & Victoria (det-17649-01)", "arrondissement": "Lachine"}};
 
         function parseLabel(label) {
             return new Date(label.replace(' ', 'T'));
@@ -590,6 +606,7 @@ countersByArrondissement["Villeray\u2013Saint-Michel\u2013Parc-Extension"] = [{"
                 updateDayLabel(null);
                 updateDirToggle(null);
             }
+            if (typeof markers !== 'undefined') updateMapSelection(instance);
         }
 
         document.getElementById('btnSeparate').addEventListener('click', function() {
@@ -673,10 +690,11 @@ countersByArrondissement["Villeray\u2013Saint-Michel\u2013Parc-Extension"] = [{"
         }
 
         (function() {
-            const arrondissements = Object.keys(countersByArrondissement).sort();
+            const arrondissements = Object.keys(countersByArrondissement);
             if (!arrondissements.length) return;
-            const defaultArr = arrondissements[0];
-            const defaultCounter = countersByArrondissement[defaultArr][0].value;
+            const defaultArr = arrondissements[Math.floor(Math.random() * arrondissements.length)];
+            const counters = countersByArrondissement[defaultArr];
+            const defaultCounter = counters[Math.floor(Math.random() * counters.length)].value;
 
             // Desktop
             document.getElementById('counterSelectDesktop').value = defaultCounter;
@@ -704,6 +722,58 @@ countersByArrondissement["Villeray\u2013Saint-Michel\u2013Parc-Extension"] = [{"
                 filterDataByPeriod(parseInt(this.getAttribute('data-days')));
             });
         });
+
+        // ── Carte Leaflet ──
+        const COLOR_DEFAULT  = '#1DB860';
+        const COLOR_SELECTED = '#29ABE2';
+        const map = L.map('map').setView([45.53, -73.59], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19
+        }).addTo(map);
+
+        function markerStyle(selected) {
+            return { radius: 9, fillColor: selected ? COLOR_SELECTED : COLOR_DEFAULT, color: '#fff', weight: 2, fillOpacity: 0.92 };
+        }
+        Object.entries(counterLocations).forEach(([instance, loc]) => {
+            const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
+                .addTo(map)
+                .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
+            m.on('click', () => setCounterFromMap(instance));
+            markers[instance] = m;
+        });
+
+        function updateMapSelection(instance) {
+            Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance)));
+            if (instance && markers[instance]) markers[instance].bringToFront();
+        }
+
+        // Synchroniser la sélection initiale maintenant que les markers existent
+        updateMapSelection(getSelectedCounter());
+
+        function setCounterFromMap(instance) {
+            // Mettre à jour le dropdown desktop
+            document.getElementById('counterSelectDesktop').value = instance;
+
+            // Mettre à jour les dropdowns mobile
+            const arr = counterLocations[instance].arrondissement;
+            const arrSelect = document.getElementById('arrondissementSelect');
+            arrSelect.value = arr;
+            const mobileSelect = document.getElementById('counterSelectMobile');
+            mobileSelect.innerHTML = '<option value="">Sélectionnez un compteur</option>';
+            if (countersByArrondissement[arr]) {
+                countersByArrondissement[arr].forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.value; opt.textContent = c.label;
+                    mobileSelect.appendChild(opt);
+                });
+                document.getElementById('counterSelectWrapper').style.visibility = 'visible';
+            }
+            mobileSelect.value = instance;
+
+            selectCounter(instance);
+            map.panTo([counterLocations[instance].lat, counterLocations[instance].lng]);
+        }
     </script>
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
