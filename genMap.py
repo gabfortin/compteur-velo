@@ -675,7 +675,7 @@ html_parts.append('''
                                         callback: function(value) {
                                             const label = this.getLabelForValue(value);
                                             const d = parseLabel(label);
-                                            if (currentPeriod === 1) {
+                                            if (currentPeriod === 0) {
                                                 return d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
                                             }
                                             return d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });

@@ -611,7 +611,7 @@ const counterLocations = {"det-00077-01": {"lat": 45.488279, "lng": -73.63901615
                                         callback: function(value) {
                                             const label = this.getLabelForValue(value);
                                             const d = parseLabel(label);
-                                            if (currentPeriod === 1) {
+                                            if (currentPeriod === 0) {
                                                 return d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
                                             }
                                             return d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });
