@@ -218,7 +218,28 @@ html_parts = ['''<html>
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 8px;
+            margin-bottom: 10px;
+        }
+        #datepickerWrapper {
+            text-align: center;
             margin-bottom: 18px;
+            display: none;
+        }
+        #specificDatePicker {
+            padding: 10px 16px;
+            border: 1.5px solid #1DB860;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1DB860;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+            box-shadow: 0 3px 10px rgba(29,184,96,0.2);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        #specificDatePicker:focus {
+            box-shadow: 0 0 0 3px rgba(29,184,96,0.15);
         }
         .period-btn {
             padding: 11px 12px;
@@ -334,12 +355,13 @@ html_parts = ['''<html>
     </div>
     <div class="container">
         <div class="period-buttons">
-            <button class="period-btn" data-days="1">Dernier jour</button>
+            <button class="period-btn" data-days="0">Jour spécifique</button>
             <button class="period-btn active" data-days="7">7 derniers jours</button>
             <button class="period-btn" data-days="30">1 dernier mois</button>
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
         </div>
+        <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
         <div id="dayLabel" class="day-label" style="display:none"></div>
         <div class="select-wrapper desktop-only">
         <select id="counterSelectDesktop">
@@ -437,6 +459,7 @@ html_parts.append('''
         const chartData = {};
         const charts = {};
         const countersByArrondissement = {};
+        let specificDate = null;
 ''')
 
 DIRECTION_COLORS = ['#1DB860', '#29ABE2']
@@ -496,14 +519,29 @@ html_parts.append('''
 
         let displayMode = 'separate';
 
+        function maxDateStr(instance) {
+            const maxDate = getMaxDate(allChartData[instance].labels);
+            if (!maxDate) return null;
+            const yyyy = maxDate.getFullYear();
+            const mm = String(maxDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(maxDate.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
         function buildFilteredData(instance, days) {
             const allLabels = allChartData[instance].labels;
             const allDatasets = allChartData[instance].datasets;
-            const maxDate = getMaxDate(allLabels);
-            if (!maxDate) return { labels: [], datasets: [] };
 
-            const cutoffDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate() - (days - 1));
-            const indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
+            let indices;
+            if (days === 0) {
+                if (!specificDate) return { labels: [], datasets: [] };
+                indices = allLabels.map((l, i) => l.startsWith(specificDate) ? i : -1).filter(i => i >= 0);
+            } else {
+                const maxDate = getMaxDate(allLabels);
+                if (!maxDate) return { labels: [], datasets: [] };
+                const cutoffDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate() - (days - 1));
+                indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
+            }
             const filteredLabels = indices.map(i => allLabels[i]);
 
             const isMulti = allDatasets.length > 1;
@@ -545,14 +583,12 @@ html_parts.append('''
 
         function updateDayLabel(instance) {
             const el = document.getElementById('dayLabel');
-            if (currentPeriod === 1 && instance && allChartData[instance]) {
-                const maxDate = getMaxDate(allChartData[instance].labels);
-                if (maxDate) {
-                    const s = maxDate.toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                    el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
-                    el.style.display = 'block';
-                    return;
-                }
+            if (currentPeriod === 0 && specificDate) {
+                const d = new Date(specificDate + 'T12:00:00');
+                const s = d.toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+                el.style.display = 'block';
+                return;
             }
             el.style.display = 'none';
         }
@@ -752,6 +788,17 @@ html_parts.append('''
 
         function filterDataByPeriod(days) {
             currentPeriod = days;
+            const wrapper = document.getElementById('datepickerWrapper');
+            if (days === 0) {
+                const instance = getSelectedCounter();
+                if (instance && allChartData[instance]) {
+                    specificDate = maxDateStr(instance);
+                    document.getElementById('specificDatePicker').value = specificDate;
+                }
+                wrapper.style.display = 'block';
+            } else {
+                wrapper.style.display = 'none';
+            }
             for (let instance in allChartData) {
                 chartData[instance] = buildFilteredData(instance, days);
             }
@@ -797,6 +844,21 @@ html_parts.append('''
                 this.classList.add('active');
                 filterDataByPeriod(parseInt(this.getAttribute('data-days')));
             });
+        });
+
+        document.getElementById('specificDatePicker').addEventListener('change', function() {
+            specificDate = this.value;
+            for (let instance in allChartData) {
+                chartData[instance] = buildFilteredData(instance, 0);
+            }
+            const selected = getSelectedCounter();
+            if (selected && charts[selected]) {
+                charts[selected].destroy();
+                charts[selected] = null;
+                createChart(selected);
+                updateStats(selected);
+                updateDayLabel(selected);
+            }
         });
 
         // ── Carte Leaflet ──
