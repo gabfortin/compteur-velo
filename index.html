@@ -485,7 +485,8 @@ const counterLocations = {"det-00077-01": {"lat": 45.488279, "lng": -73.63901615
                 const maxDate = getMaxDate(allChartData[instance].labels);
                 if (maxDate) {
                     const s = maxDate.toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                    el.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+                    const h = maxDate.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+                    el.textContent = s.charAt(0).toUpperCase() + s.slice(1) + " · données jusqu’à " + h;
                     el.style.display = 'block';
                     return;
                 }
