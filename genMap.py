@@ -31,6 +31,30 @@ for instance in data.keys():
     for direction in data[instance].keys():
         data[instance][direction] = [row for row in data[instance][direction] if is_within_last_6_months(row['periode'])]
 
+# Détecter les compteurs avec des lacunes significatives dans les données
+def has_significant_gaps(instance_data, gap_days=14, missing_ratio=0.20):
+    all_dates = set()
+    for rows in instance_data.values():
+        for row in rows:
+            try:
+                all_dates.add(datetime.fromisoformat(row['periode'][:10]).date())
+            except:
+                pass
+    if len(all_dates) < 14:
+        return False
+    min_date, max_date = min(all_dates), max(all_dates)
+    total_days = (max_date - min_date).days + 1
+    if total_days < 14:
+        return False
+    if (total_days - len(all_dates)) / total_days > missing_ratio:
+        return True
+    for a, b in zip(sorted(all_dates), sorted(all_dates)[1:]):
+        if (b - a).days > gap_days:
+            return True
+    return False
+
+gappy_instances = {inst for inst, dirs in data.items() if has_significant_gaps(dirs)}
+
 # Générer le HTML
 html_parts = ['''<html>
 <head>
@@ -318,6 +342,20 @@ html_parts = ['''<html>
             color: #fff;
             border-color: transparent;
         }
+        #dataWarning {
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            background: rgba(245,158,11,0.08);
+            border: 1.5px solid rgba(245,158,11,0.35);
+            border-radius: 8px;
+            color: #92620a;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        #dataWarning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
         #noDataMsg {
             display: none;
             flex-direction: column;
@@ -459,6 +497,7 @@ html_parts.append('''
         </div>
         <div id="chart-map-layout">
         <div id="chart-area">
+        <div id="dataWarning"><span class="warn-icon">⚠️</span><span>Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence.</span></div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
 
@@ -527,6 +566,7 @@ for instance in data.keys():
             'arrondissement': row['arrondissement']
         }
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
+html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 
 html_parts.append('''
         function parseLabel(label) {
@@ -814,6 +854,7 @@ html_parts.append('''
                 document.getElementById(instance).classList.add('visible');
                 const hasData = hasDataForPeriod(instance);
                 noDataMsg.style.display = hasData ? 'none' : 'flex';
+                document.getElementById('dataWarning').style.display = gappyCounters.has(instance) ? 'flex' : 'none';
                 const canvas = document.getElementById('chart-' + instance);
                 if (canvas) canvas.style.display = hasData ? '' : 'none';
                 if (hasData) createChart(instance);
@@ -822,6 +863,7 @@ html_parts.append('''
                 updateDirToggle(instance);
             } else {
                 noDataMsg.style.display = 'none';
+                document.getElementById('dataWarning').style.display = 'none';
                 updateStats(null);
                 updateDayLabel(null);
                 updateDirToggle(null);
@@ -1014,13 +1056,15 @@ html_parts.append('''
         // ── Carte Leaflet ──
         const COLOR_DEFAULT  = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
+        const COLOR_GAPPY    = '#F59E0B';
 
-        function markerStyle(selected) {
-            return { radius: 9, fillColor: selected ? COLOR_SELECTED : COLOR_DEFAULT, color: '#fff', weight: 2, fillOpacity: 0.92 };
+        function markerStyle(selected, gappy) {
+            const base = gappy ? COLOR_GAPPY : COLOR_DEFAULT;
+            return { radius: 9, fillColor: selected ? COLOR_SELECTED : base, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
 
         function updateMapSelection(instance) {
-            Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance)));
+            Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance, gappyCounters.has(id))));
             if (instance && markers[instance]) markers[instance].bringToFront();
         }
 
@@ -1031,9 +1075,10 @@ html_parts.append('''
                 maxZoom: 19
             }).addTo(map);
             Object.entries(counterLocations).forEach(([instance, loc]) => {
-                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false))
+                const gappy = gappyCounters.has(instance);
+                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy))
                     .addTo(map)
-                    .bindTooltip(loc.label, { direction: 'top', offset: [0, -6] });
+                    .bindTooltip((gappy ? '⚠ ' : '') + loc.label, { direction: 'top', offset: [0, -6] });
                 m.on('click', () => setCounterFromMap(instance));
                 markers[instance] = m;
             });
