@@ -92,6 +92,8 @@ def is_within_last_6_months(date_str):
 
 > **Note** : le fuseau horaire (`-05` / `-04`) est retiré avec une regex ciblant la fin de la chaîne. Un simple `.replace('-05', '')` corromprait les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
 
+Après le filtrage, `has_significant_gaps` analyse chaque compteur pour détecter les lacunes importantes (voir section [Qualité des données](#qualité-des-données--compteurs-avec-lacunes)).
+
 ### Étape 2 — Génération du HTML
 
 Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `index.html`.
@@ -141,6 +143,9 @@ countersByArrondissement["Le Plateau-Mont-Royal"] = [
 
 // Coordonnées GPS pour la carte
 counterLocations['det-00709-01'] = { lat: 45.53, lng: -73.57, label: '...', arrondissement: '...' };
+
+// Compteurs avec lacunes significatives (calculé par has_significant_gaps)
+const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
 ```
 
 ---
@@ -151,9 +156,9 @@ Tout le JavaScript est inline dans le HTML généré.
 
 ### Variables globales
 
-| Variable                    | Contenu                                                                        |
-|-----------------------------|--------------------------------------------------------------------------------|
-| `allChartData`              | Données brutes des 6 derniers mois, par instance                               |
+| Variable                    | Contenu                                                                              |
+|-----------------------------|--------------------------------------------------------------------------------------|
+| `allChartData`              | Données brutes des 6 derniers mois, par instance                                     |
 | `chartData`                 | Données filtrées pour la période active, par instance                          |
 | `charts`                    | Instances Chart.js créées (cache)                                              |
 | `markers`                   | Markers Leaflet, par instance                                                  |
@@ -164,7 +169,8 @@ Tout le JavaScript est inline dans le HTML généré.
 | `displayMode`               | `'separate'` ou `'combined'` (toggle bi-directionnel)                          |
 | `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)               |
 | `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)              |
-| `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                            |
+| `gappyCounters`             | `Set` des instances avec lacunes significatives — injecté par `genMap.py`            |
+| `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                                  |
 
 ### Fonctions principales
 
@@ -214,7 +220,7 @@ Calcule les 3 statistiques en combinant toutes les directions :
 Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
 
 #### `updateMapSelection(instance)`
-Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`) et les autres en vert (`#1DB860`).
+Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`), les compteurs normaux en vert (`#1DB860`), et les compteurs avec lacunes en amber (`#F59E0B`).
 
 #### `setCounterFromMap(instance)`
 Appelé lors d'un clic sur un marker Leaflet. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
@@ -254,6 +260,37 @@ Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se cal
 | Dans le temps | Jour spécifique | `14:00`, `15:00`…       | `mer. 4 nov. 2025 · 14:00`          |
 | Dans le temps | Autres          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025 · 14:00`          |
 | Par jour      | Toutes          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025`                  |
+
+---
+
+## Qualité des données — compteurs avec lacunes
+
+Certains compteurs présentent des interruptions prolongées dans leurs données (compteur hors service, maintenance, etc.). Ces compteurs sont identifiés automatiquement à la génération et signalés visuellement dans l'interface.
+
+### Détection — `has_significant_gaps()`
+
+Exécutée en Python dans `genMap.py` après le filtrage des 6 derniers mois. Un compteur est flaggé si **l'une ou l'autre** condition est vraie dans sa plage active (première à dernière donnée) :
+
+| Critère | Seuil |
+|---------|-------|
+| Trou consécutif | > 14 jours sans aucune donnée |
+| Ratio de jours manquants | > 20 % des jours de la plage active |
+
+> **Pourquoi 14 jours ?** L'analyse du CSV révèle que la quasi-totalité des compteurs ont exactement 7 jours consécutifs manquants — une lacune systémique dans la source de données, non spécifique à un compteur. Le seuil de 14 jours permet d'ignorer ce bruit et de ne signaler que les interruptions réellement significatives.
+
+Les instances flaggées sont injectées dans le JS sous forme de `Set` :
+
+```javascript
+const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
+```
+
+### Signalisation visuelle
+
+| Élément | Comportement |
+|---------|-------------|
+| Marker carte | Amber (`#F59E0B`) au lieu du vert, avec `⚠` dans le tooltip au survol |
+| Marker sélectionné | Bleu ciel (`#29ABE2`) comme les autres (comportement inchangé) |
+| Bannière `#dataWarning` | S'affiche sous le titre du compteur avec le message : *"Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence."* |
 
 ---
 
