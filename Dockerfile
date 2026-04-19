@@ -1,10 +1,13 @@
 FROM python:3.11-slim
 
+ENV TZ=America/Montreal
+
 # Dépendances système
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     cron \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Dépendances Python
@@ -15,8 +18,8 @@ WORKDIR /app
 COPY update.sh entrypoint.sh /app/
 RUN chmod +x /app/update.sh /app/entrypoint.sh
 
-# Cron : tous les jours à 06h00 UTC
-RUN echo "0 6 * * * root . /etc/environment && /app/update.sh >> /var/log/update.log 2>&1" \
+# Cron : tous les jours à 08h15 heure de Montréal (America/Montreal)
+RUN echo "15 8 * * * root . /etc/environment && /app/update.sh >> /var/log/update.log 2>&1" \
     > /etc/cron.d/velo-cron \
     && chmod 0644 /etc/cron.d/velo-cron
 

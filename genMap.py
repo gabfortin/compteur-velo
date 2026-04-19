@@ -352,6 +352,7 @@ html_parts = ['''<html>
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
         <h1>Compteurs Vélo Montréal</h1>
         <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>.</p>
+        <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal. Certaines valeurs peuvent être incomplètes ou erronées.</p>
     </div>
     <div class="container">
         <div class="period-buttons">

@@ -21,6 +21,29 @@ git config user.email "$GIT_EMAIL"
 git config user.name "$GIT_NAME"
 git remote set-url origin "https://$GITHUB_TOKEN@github.com/$GITHUB_REPO.git"
 
+# ── Trouver l'URL du CSV sur le portail de données ouvertes ───────────────────
+echo "$LOG Recherche de l'URL du CSV..."
+CSV_URL=$(python3 - <<'EOF'
+import urllib.request, re, sys
+try:
+    html = urllib.request.urlopen("https://donnees.montreal.ca/dataset/cyclistes").read().decode("utf-8")
+    m = re.search(r'href="([^"]+)"[^>]*title="T\u00e9l\u00e9charger"', html, re.DOTALL)
+    if not m:
+        # Essai avec l'attribut dans l'autre ordre
+        m = re.search(r'title="T\u00e9l\u00e9charger"[^>]*href="([^"]+)"', html, re.DOTALL)
+    if m:
+        print(m.group(1))
+    else:
+        print("", end="")
+        sys.stderr.write("URL du CSV introuvable sur la page.\n")
+        sys.exit(1)
+except Exception as e:
+    sys.stderr.write(f"Erreur lors du scraping : {e}\n")
+    sys.exit(1)
+EOF
+)
+echo "$LOG URL trouvée : $CSV_URL"
+
 # ── Télécharger le nouveau CSV ─────────────────────────────────────────────────
 echo "$LOG Téléchargement du CSV..."
 curl -fsSL "$CSV_URL" -o cyclistes.csv
