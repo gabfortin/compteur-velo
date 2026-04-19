@@ -1,6 +1,8 @@
 # Compteurs Vélo Montréal
 
-Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique horaire par compteur, avec filtres de période, statistiques dynamiques, et une carte OpenStreetMap.
+Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique par compteur avec filtres de période, vue temporelle ou journalière, statistiques dynamiques, et une carte OpenStreetMap.
+
+> ⚠️ Les données proviennent directement du portail de données ouvertes de la Ville de Montréal. Certaines valeurs peuvent être incomplètes ou erronées.
 
 ---
 
@@ -8,12 +10,19 @@ Visualisation interactive des passages de cyclistes à Montréal, à partir des 
 
 ```
 compteur-velo/
-├── cyclistes.csv     # Source de données (portail données ouvertes Montréal)
-├── genMap.py         # Script de génération du site HTML
-├── index.html        # Site généré (ne pas modifier manuellement)
-├── favico.png        # Icône de l'application
-├── test_data.py      # Suite de tests de validation des données
-└── CNAME             # Domaine personnalisé GitHub Pages
+├── cyclistes.csv        # Source de données (portail données ouvertes Montréal) — ignoré par git
+├── genMap.py            # Script de génération du site HTML
+├── index.html           # Site généré (ne pas modifier manuellement)
+├── favico.png           # Icône de l'application
+├── test_data.py         # Suite de tests de validation des données
+├── update.sh            # Script de mise à jour automatique (télécharge CSV → génère HTML → publie)
+├── Dockerfile           # Image Docker pour l'automatisation (cron quotidien)
+├── docker-compose.yml   # Orchestration du conteneur d'automatisation
+├── entrypoint.sh        # Point d'entrée Docker (injecte les variables dans l'environnement cron)
+├── .env                 # Variables d'environnement locales (ignoré par git)
+├── .env.example         # Modèle de configuration
+├── .gitignore           # Exclut cyclistes.csv et .env
+└── CNAME                # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
 ```
 
 ---
@@ -21,15 +30,16 @@ compteur-velo/
 ## Flux de génération
 
 ```
-cyclistes.csv  →  genMap.py  →  index.html
+cyclistes.csv  →  genMap.py  →  index.html  →  GitHub Pages
 ```
 
 `genMap.py` lit le CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
 
-Pour régénérer le site après une mise à jour du CSV :
+Pour régénérer le site manuellement après une mise à jour du CSV :
 
 ```bash
 python3 genMap.py
+python3 test_data.py   # Valide les données après génération
 ```
 
 ---
@@ -55,7 +65,7 @@ Colonnes :
 | `volume`         | Nombre de passages sur la période                                                     |
 | `vitesseMoyenne` | Vitesse moyenne des cyclistes (km/h)                                                  |
 
-Seules les lignes `agg_code = "h"` (données horaires) sont utilisées.
+Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par `genMap.py`.
 
 ---
 
@@ -92,18 +102,20 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
 <html>
   <head>                 ← CSS inline + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + Google Analytics
   <body>
-    .site-header         ← Logo, titre, sous-titre (lien vers données ouvertes), lien gabfortin.com
+    .site-header         ← Logo, titre, sous-titre (lien vers données ouvertes), avertissement qualité, lien gabfortin.com
     .container
-      .period-buttons    ← Filtres de période (1j / 7j / 30j / 90j / 180j)
+      .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / Tout)
       .select-wrapper.desktop-only
         <select>         ← Dropdown unique groupé par arrondissement (desktop)
       .mobile-only
         <select>         ← Dropdown arrondissement (mobile)
         <select>         ← Dropdown compteur (mobile, peuplé dynamiquement)
       .stats-row         ← 3 cartes : passages totaux, moyenne/jour, heure de pointe
-      .dir-toggle        ← Toggle "Par direction / Combiné" (bi-directionnels uniquement)
+      #viewToggle        ← Toggle "Dans le temps / Par jour" (masqué pour Jour spécifique uniquement)
+      #dirToggle         ← Toggle "Par direction / Combiné" (bi-directionnels uniquement)
       #chart-map-layout  ← Grid 2 colonnes sur desktop, empilé sur mobile
-        #chart-area      ← Div contenant les table-containers
+        #chart-area
+          #noDataMsg     ← Message "Aucune donnée disponible" (affiché si période vide)
           [N × .table-container]  ← Un div par compteur (masqué par défaut)
         #map             ← Carte Leaflet
     <script>             ← Données + logique JS inline
@@ -139,35 +151,59 @@ Tout le JavaScript est inline dans le HTML généré.
 
 ### Variables globales
 
-| Variable                    | Contenu                                                              |
-|-----------------------------|----------------------------------------------------------------------|
-| `allChartData`              | Données brutes des 6 derniers mois, par instance                     |
-| `chartData`                 | Données filtrées pour la période active, par instance                |
-| `charts`                    | Instances Chart.js créées (cache)                                    |
-| `markers`                   | Markers Leaflet, par instance                                        |
-| `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)         |
-| `counterLocations`          | Coordonnées GPS et métadonnées par instance                          |
-| `currentPeriod`             | Nombre de jours de la période active (défaut : `7`)                  |
-| `displayMode`               | `'separate'` ou `'combined'` (toggle bi-directionnel)                |
-| `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                  |
+| Variable                    | Contenu                                                                        |
+|-----------------------------|--------------------------------------------------------------------------------|
+| `allChartData`              | Données brutes des 6 derniers mois, par instance                               |
+| `chartData`                 | Données filtrées pour la période active, par instance                          |
+| `charts`                    | Instances Chart.js créées (cache)                                              |
+| `markers`                   | Markers Leaflet, par instance                                                  |
+| `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)                   |
+| `counterLocations`          | Coordonnées GPS et métadonnées par instance                                    |
+| `globalMaxDate`             | Date la plus récente parmi tous les compteurs — référence commune pour filtrer |
+| `currentPeriod`             | Nombre de jours de la période active (`-1` = tout, défaut : `7`)               |
+| `displayMode`               | `'separate'` ou `'combined'` (toggle bi-directionnel)                          |
+| `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)               |
+| `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)              |
+| `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                            |
 
 ### Fonctions principales
 
 #### `buildFilteredData(instance, days)`
-Filtre les données pour la période active **à partir de la date la plus récente disponible** (pas d'aujourd'hui). Garantit l'affichage même si le CSV n'est pas à jour.
+Filtre les données horaires pour la période active en se basant sur `globalMaxDate` (pas la date du système). Garantit qu'un compteur avec un CSV en retard affiche quand même ses données récentes.
+
+- `days = 0` : filtre sur `specificDate` uniquement
+- `days = -1` : retourne toutes les données sans filtre
+- `days > 0` : retourne les N derniers jours à partir de `globalMaxDate`
 
 Selon `displayMode` :
-- `'separate'` : retourne un dataset par direction (vert / bleu ciel)
-- `'combined'` : somme toutes les directions en un seul dataset vert
+- `'separate'` : un dataset par direction (vert / bleu ciel)
+- `'combined'` : somme de toutes les directions en un seul dataset vert
+
+#### `buildDailyData(instance, days)`
+Agrège les données horaires en totaux journaliers pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
+
+#### `hasDataForPeriod(instance)`
+Retourne `true` si `chartData[instance]` contient au moins un label pour la période active. Utilisé pour décider d'afficher le graphique ou le message "aucune donnée".
 
 #### `selectCounter(instance)`
-Affiche le graphique du compteur sélectionné, met à jour les stats, le toggle directionnel, et la carte.
+Affiche le graphique du compteur sélectionné. Si `hasDataForPeriod` est faux, masque le canvas et affiche `#noDataMsg` à la place. Met aussi à jour les stats, les toggles, et la carte.
 
-#### `updateMapSelection(instance)`
-Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`) et les autres en vert (`#1DB860`).
+#### `filterDataByPeriod(days)`
+Change la période active : reconstruit `chartData` pour toutes les instances, bascule `viewMode` automatiquement, et recrée le graphique actif.
 
-#### `setCounterFromMap(instance)`
-Appelé lors d'un clic sur un marker. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
+Règle de basculement automatique du `viewMode` :
+
+| Période        | `viewMode` par défaut |
+|----------------|-----------------------|
+| Jour spécifique | `'timeline'`         |
+| 7 derniers jours | `'timeline'`        |
+| 30j / 90j / 180j / Tout | `'daily'`  |
+
+#### `updateViewToggle()`
+Affiche ou masque `#viewToggle`. Le toggle est **masqué uniquement pour "Jour spécifique"** (`currentPeriod === 0`). Pour toutes les autres périodes, il est visible et permet de choisir entre courbe horaire et barres journalières.
+
+#### `updateDirToggle(instance)`
+Affiche `#dirToggle` uniquement pour les compteurs bi-directionnels (18 sur 45).
 
 #### `updateStats(instance)`
 Calcule les 3 statistiques en combinant toutes les directions :
@@ -177,8 +213,11 @@ Calcule les 3 statistiques en combinant toutes les directions :
 
 Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
 
-#### `filterDataByPeriod(days)`
-Change la période active : reconstruit `chartData` pour toutes les instances (en tenant compte de `displayMode`), détruit et recrée le graphique actif.
+#### `updateMapSelection(instance)`
+Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`) et les autres en vert (`#1DB860`).
+
+#### `setCounterFromMap(instance)`
+Appelé lors d'un clic sur un marker Leaflet. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
 
 ### Sélection responsive des compteurs
 
@@ -192,43 +231,97 @@ Au chargement, un arrondissement et un compteur sont choisis **aléatoirement**.
 ### Graphiques bi-directionnels
 
 Pour les 18 compteurs avec deux directions :
-- Par défaut : **2 lignes** sur le graphique (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
+- Par défaut : **2 lignes** (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
 - Mode combiné : **1 ligne** verte avec fill dégradé, somme des deux directions
-- Un toggle "Par direction / Combiné" apparaît uniquement pour ces compteurs
+- Le toggle "Par direction / Combiné" est visible uniquement pour ces compteurs
+- Le mode direction fonctionne identiquement en vue "Dans le temps" et "Par jour"
+
+### Message "aucune donnée"
+
+Quand un compteur n'a aucune donnée dans la fenêtre temporelle sélectionnée (ex. compteur inactif depuis 4 mois, période choisie = "3 derniers mois") :
+- Le canvas est masqué
+- `#noDataMsg` s'affiche à sa place avec le message *"Aucune donnée disponible pour cette période."*
+- La référence de temps est `globalMaxDate`, commune à tous les compteurs, pour garantir une cohérence entre eux
 
 ### Carte Leaflet
 
-Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se calculer avant que Leaflet mesure la hauteur du conteneur. Sur desktop, la carte occupe 320px de large et s'aligne en hauteur avec le graphique via `display: grid`.
+Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se calculer avant que Leaflet mesure la hauteur du conteneur. Sur desktop, la carte occupe 320 px de large et s'aligne en hauteur avec le graphique via `display: grid`.
 
 ### Comportement de l'axe X
 
-| Période active | Axe X           | Tooltip                            |
-|----------------|-----------------|------------------------------------|
-| Dernier jour   | `14:00`, `15:00`… | `mer. 4 nov. 2025 · 14:00`       |
-| Autres         | `4 nov.`, `5 nov.`… | `mer. 4 nov. 2025 · 14:00`     |
+| Mode         | Période active   | Axe X                   | Tooltip                              |
+|--------------|------------------|-------------------------|--------------------------------------|
+| Dans le temps | Jour spécifique | `14:00`, `15:00`…       | `mer. 4 nov. 2025 · 14:00`          |
+| Dans le temps | Autres          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025 · 14:00`          |
+| Par jour      | Toutes          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025`                  |
 
 ---
 
 ## Tests — `test_data.py`
 
-Suite de validation qui compare directement le CSV et `index.html`.
+Suite de validation qui compare directement le CSV et `index.html`. À relancer après chaque régénération du HTML.
 
 ```bash
 python3 test_data.py
 ```
 
-Les tests doivent être relancés après chaque regénération du HTML.
+---
+
+## Automatisation — Docker
+
+Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Montréal** via cron. Il clone ou met à jour le dépôt GitHub, télécharge le CSV depuis le portail de données ouvertes, régénère `index.html`, valide les données, puis publie si des changements sont détectés.
+
+### Fichiers impliqués
+
+| Fichier            | Rôle                                                                 |
+|--------------------|----------------------------------------------------------------------|
+| `Dockerfile`       | Image `python:3.11-slim` + git + cron + tqdm. Cron configuré à 08h15 |
+| `docker-compose.yml` | Monte `./logs` dans `/var/log`, charge `.env`, redémarre toujours  |
+| `entrypoint.sh`    | Exporte les variables d'env vers `/etc/environment` pour que cron y ait accès, puis lance `cron -f` |
+| `update.sh`        | Pipeline complet : clone/pull → scrape URL CSV → télécharge CSV → `genMap.py` → `test_data.py` → commit + push |
+
+### Variables d'environnement — `.env`
+
+Copier `.env.example` vers `.env` et remplir les valeurs :
+
+```bash
+cp .env.example .env
+```
+
+| Variable       | Description                                                     |
+|----------------|-----------------------------------------------------------------|
+| `GITHUB_TOKEN` | Token GitHub avec permission "Contents: Read & Write"           |
+| `GITHUB_REPO`  | Dépôt cible, format `utilisateur/nom-du-depot`                  |
+| `GIT_EMAIL`    | Email pour les commits automatiques                             |
+| `GIT_NAME`     | Nom pour les commits automatiques                               |
+
+### Démarrer le conteneur
+
+```bash
+docker compose up -d          # Démarre en arrière-plan
+docker compose logs -f        # Suit les logs en temps réel
+```
+
+Les logs d'exécution sont persistés dans `./logs/update.log`.
+
+### Forcer une mise à jour immédiate
+
+```bash
+docker compose exec velo-updater /app/update.sh
+```
 
 ---
 
-## Déploiement
+## Déploiement — GitHub Pages
 
-Le site est hébergé sur **GitHub Pages**. Le fichier `CNAME` définit le domaine personnalisé (`compteur.gabfortin.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
+Le site est hébergé sur **GitHub Pages** (branche `main`). Le fichier `CNAME` définit le domaine personnalisé (`compteur.gabfortin.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
 
-Après une mise à jour du CSV :
+Chaque `push` sur `main` déclenche automatiquement le déploiement. En production, c'est `update.sh` qui s'en charge. En développement local :
 
 ```bash
-python3 genMap.py        # Regénère index.html
+python3 genMap.py        # Régénère index.html
 python3 test_data.py     # Valide les données
-# Puis commit + push → déploiement automatique
+git add index.html
+git commit -m "Mise à jour manuelle"
+git push
 ```

@@ -318,6 +318,22 @@ html_parts = ['''<html>
             color: #fff;
             border-color: transparent;
         }
+        #noDataMsg {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 48px 24px;
+            border: 2px dashed rgba(29,184,96,0.25);
+            border-radius: 10px;
+            color: #aaa;
+            font-size: 15px;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        #noDataMsg span.icon { font-size: 36px; }
         @media (min-width: 768px) {
             .desktop-only { display: block; }
             .mobile-only { display: none; }
@@ -361,6 +377,7 @@ html_parts = ['''<html>
             <button class="period-btn" data-days="30">1 dernier mois</button>
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
+            <button class="period-btn" data-days="-1">Tout</button>
         </div>
         <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
         <div id="dayLabel" class="day-label" style="display:none"></div>
@@ -430,12 +447,19 @@ html_parts.append('''
                 <div class="stat-label">Heure de pointe</div>
             </div>
         </div>
-        <div class="dir-toggle" id="dirToggle" style="display:none">
-            <button class="dir-btn active" id="btnSeparate">Par direction</button>
-            <button class="dir-btn" id="btnCombined">Combiné</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;min-height:30px;">
+            <div id="viewToggle" style="display:none;flex-direction:row;gap:6px;">
+                <button class="dir-btn active" id="btnTimeline">Dans le temps</button>
+                <button class="dir-btn" id="btnDaily">Par jour</button>
+            </div>
+            <div id="dirToggle" style="display:none;flex-direction:row;gap:6px;margin-left:auto;">
+                <button class="dir-btn active" id="btnSeparate">Par direction</button>
+                <button class="dir-btn" id="btnCombined">Combiné</button>
+            </div>
         </div>
         <div id="chart-map-layout">
         <div id="chart-area">
+        <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
 
 for instance, directions in tqdm(data.items(), desc="Génération HTML"):
@@ -519,6 +543,7 @@ html_parts.append('''
         }
 
         let displayMode = 'separate';
+        let viewMode = 'timeline';
 
         function maxDateStr(instance) {
             const maxDate = getMaxDate(allChartData[instance].labels);
@@ -537,10 +562,11 @@ html_parts.append('''
             if (days === 0) {
                 if (!specificDate) return { labels: [], datasets: [] };
                 indices = allLabels.map((l, i) => l.startsWith(specificDate) ? i : -1).filter(i => i >= 0);
+            } else if (days === -1) {
+                indices = allLabels.map((_, i) => i);
             } else {
-                const maxDate = getMaxDate(allLabels);
-                if (!maxDate) return { labels: [], datasets: [] };
-                const cutoffDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate() - (days - 1));
+                if (!globalMaxDate) return { labels: [], datasets: [] };
+                const cutoffDate = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - (days - 1));
                 indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
             }
             const filteredLabels = indices.map(i => allLabels[i]);
@@ -574,6 +600,51 @@ html_parts.append('''
                 }))
             };
         }
+
+        function buildDailyData(instance, days) {
+            const allLabels = allChartData[instance].labels;
+            const allDatasets = allChartData[instance].datasets;
+            let indices;
+            if (days === -1) {
+                indices = allLabels.map((_, i) => i);
+            } else {
+                if (!globalMaxDate) return { labels: [], datasets: [] };
+                const cutoff = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - (days - 1));
+                indices = allLabels.map((l, i) => parseLabel(l) >= cutoff ? i : -1).filter(i => i >= 0);
+            }
+            const daySet = {};
+            indices.forEach(i => { daySet[allLabels[i].slice(0, 10)] = true; });
+            const dayList = Object.keys(daySet).sort();
+            const isMulti = allDatasets.length > 1;
+            const showCombined = isMulti && displayMode === 'combined';
+            if (!isMulti || showCombined) {
+                const totals = {};
+                dayList.forEach(d => totals[d] = 0);
+                indices.forEach(i => {
+                    const day = allLabels[i].slice(0, 10);
+                    allDatasets.forEach(ds => { totals[day] += (ds.data[i] || 0); });
+                });
+                return { labels: dayList, datasets: [{ label: showCombined ? 'Combiné' : allDatasets[0].label, data: dayList.map(d => totals[d]), backgroundColor: 'rgba(29,184,96,0.75)', borderColor: '#1DB860', borderWidth: 1, borderRadius: 4 }] };
+            }
+            return {
+                labels: dayList,
+                datasets: allDatasets.map((ds, i) => {
+                    const totals = {};
+                    dayList.forEach(d => totals[d] = 0);
+                    indices.forEach(idx => { totals[allLabels[idx].slice(0, 10)] += (ds.data[idx] || 0); });
+                    return { label: ds.label, data: dayList.map(d => totals[d]), backgroundColor: i === 0 ? 'rgba(29,184,96,0.75)' : 'rgba(41,171,226,0.75)', borderColor: ds.color, borderWidth: 1, borderRadius: 4 };
+                })
+            };
+        }
+
+        const globalMaxDate = (function() {
+            let max = null;
+            for (let inst in allChartData) {
+                const d = getMaxDate(allChartData[inst].labels);
+                if (d && (!max || d > max)) max = d;
+            }
+            return max;
+        })();
 
         function initializeChartData() {
             for (let instance in allChartData) {
@@ -635,16 +706,19 @@ html_parts.append('''
             if (!charts[id]) {
                 const ctx = document.getElementById('chart-' + id);
                 if (ctx) {
-                    const isSingle = chartData[id].datasets.length === 1;
-                    if (isSingle && chartData[id].datasets[0].fill) {
+                    const isDaily = viewMode === 'daily';
+                    const data = isDaily ? buildDailyData(id, currentPeriod) : chartData[id];
+                    const type = isDaily ? 'bar' : 'line';
+                    const isSingle = data.datasets.length === 1;
+                    if (!isDaily && isSingle && data.datasets[0].fill) {
                         const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 380);
                         gradient.addColorStop(0, 'rgba(29,184,96,0.28)');
                         gradient.addColorStop(1, 'rgba(29,184,96,0)');
-                        chartData[id].datasets[0].backgroundColor = gradient;
+                        data.datasets[0].backgroundColor = gradient;
                     }
                     charts[id] = new Chart(ctx, {
-                        type: 'line',
-                        data: chartData[id],
+                        type: type,
+                        data: data,
                         options: {
                             responsive: true,
                             animation: { duration: 500, easing: 'easeInOutQuart' },
@@ -658,7 +732,12 @@ html_parts.append('''
                                     cornerRadius: 8,
                                     callbacks: {
                                         title: function(items) {
-                                            const d = parseLabel(items[0].label);
+                                            const label = items[0].label;
+                                            if (isDaily) {
+                                                const d = new Date(label + 'T12:00:00');
+                                                return d.toLocaleDateString('fr-CA', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                                            }
+                                            const d = parseLabel(label);
                                             return d.toLocaleDateString('fr-CA', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
                                                 + ' · ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
                                         }
@@ -675,6 +754,10 @@ html_parts.append('''
                                         maxTicksLimit: 10,
                                         callback: function(value) {
                                             const label = this.getLabelForValue(value);
+                                            if (isDaily) {
+                                                const d = new Date(label + 'T12:00:00');
+                                                return d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });
+                                            }
                                             const d = parseLabel(label);
                                             if (currentPeriod === 0) {
                                                 return d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
@@ -697,6 +780,20 @@ html_parts.append('''
             }
         }
 
+        function updateViewToggle() {
+            const toggle = document.getElementById('viewToggle');
+            if (currentPeriod >= 7 || currentPeriod === -1) {
+                toggle.style.display = 'flex';
+            } else {
+                toggle.style.display = 'none';
+                if (viewMode !== 'timeline') {
+                    viewMode = 'timeline';
+                    document.getElementById('btnTimeline').classList.add('active');
+                    document.getElementById('btnDaily').classList.remove('active');
+                }
+            }
+        }
+
         function updateDirToggle(instance) {
             const toggle = document.getElementById('dirToggle');
             if (instance && allChartData[instance] && allChartData[instance].datasets.length > 1) {
@@ -706,21 +803,55 @@ html_parts.append('''
             }
         }
 
+        function hasDataForPeriod(instance) {
+            return instance && chartData[instance] && chartData[instance].labels.length > 0;
+        }
+
         function selectCounter(instance) {
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
+            const noDataMsg = document.getElementById('noDataMsg');
             if (instance) {
                 document.getElementById(instance).classList.add('visible');
-                createChart(instance);
+                const hasData = hasDataForPeriod(instance);
+                noDataMsg.style.display = hasData ? 'none' : 'flex';
+                const canvas = document.getElementById('chart-' + instance);
+                if (canvas) canvas.style.display = hasData ? '' : 'none';
+                if (hasData) createChart(instance);
                 updateStats(instance);
                 updateDayLabel(instance);
                 updateDirToggle(instance);
             } else {
+                noDataMsg.style.display = 'none';
                 updateStats(null);
                 updateDayLabel(null);
                 updateDirToggle(null);
             }
             if (typeof markers !== 'undefined') updateMapSelection(instance);
         }
+
+        document.getElementById('btnTimeline').addEventListener('click', function() {
+            if (viewMode === 'timeline') return;
+            viewMode = 'timeline';
+            document.getElementById('btnTimeline').classList.add('active');
+            document.getElementById('btnDaily').classList.remove('active');
+            const instance = getSelectedCounter();
+            if (instance) {
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+            }
+        });
+
+        document.getElementById('btnDaily').addEventListener('click', function() {
+            if (viewMode === 'daily') return;
+            viewMode = 'daily';
+            document.getElementById('btnDaily').classList.add('active');
+            document.getElementById('btnTimeline').classList.remove('active');
+            const instance = getSelectedCounter();
+            if (instance) {
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+            }
+        });
 
         document.getElementById('btnSeparate').addEventListener('click', function() {
             if (displayMode === 'separate') return;
@@ -800,14 +931,28 @@ html_parts.append('''
             } else {
                 wrapper.style.display = 'none';
             }
+            updateViewToggle();
+            if (days >= 30 || days === -1) {
+                viewMode = 'daily';
+                document.getElementById('btnDaily').classList.add('active');
+                document.getElementById('btnTimeline').classList.remove('active');
+            } else {
+                viewMode = 'timeline';
+                document.getElementById('btnTimeline').classList.add('active');
+                document.getElementById('btnDaily').classList.remove('active');
+            }
             for (let instance in allChartData) {
                 chartData[instance] = buildFilteredData(instance, days);
             }
             const selected = getSelectedCounter();
-            if (selected && charts[selected]) {
-                charts[selected].destroy();
-                charts[selected] = null;
-                createChart(selected);
+            if (selected) {
+                if (charts[selected]) { charts[selected].destroy(); charts[selected] = null; }
+                const hasData = hasDataForPeriod(selected);
+                const noDataMsg = document.getElementById('noDataMsg');
+                noDataMsg.style.display = hasData ? 'none' : 'flex';
+                const canvas = document.getElementById('chart-' + selected);
+                if (canvas) canvas.style.display = hasData ? '' : 'none';
+                if (hasData) createChart(selected);
                 updateStats(selected);
                 updateDayLabel(selected);
             }
@@ -853,10 +998,14 @@ html_parts.append('''
                 chartData[instance] = buildFilteredData(instance, 0);
             }
             const selected = getSelectedCounter();
-            if (selected && charts[selected]) {
-                charts[selected].destroy();
-                charts[selected] = null;
-                createChart(selected);
+            if (selected) {
+                if (charts[selected]) { charts[selected].destroy(); charts[selected] = null; }
+                const hasData = hasDataForPeriod(selected);
+                const noDataMsg = document.getElementById('noDataMsg');
+                noDataMsg.style.display = hasData ? 'none' : 'flex';
+                const canvas = document.getElementById('chart-' + selected);
+                if (canvas) canvas.style.display = hasData ? '' : 'none';
+                if (hasData) createChart(selected);
                 updateStats(selected);
                 updateDayLabel(selected);
             }
