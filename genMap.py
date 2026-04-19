@@ -395,6 +395,40 @@ html_parts = ['''<html>
             .stat-value { font-size: 24px; }
             .stat-label { font-size: 11px; }
         }
+        /* ── Thème REV ─────────────────────────────────────────────────────── */
+        body, .container, .period-btn, .dir-btn, select, .stat-card,
+        .stat-value, h2, .watermark, #specificDatePicker {
+            transition: background 0.35s ease, background-color 0.35s ease,
+                        border-color 0.35s ease, color 0.35s ease,
+                        box-shadow 0.35s ease;
+        }
+        body.rev-mode {
+            background: linear-gradient(160deg, #1a8fd1 0%, #003d7a 100%);
+        }
+        body.rev-mode .container          { border-top-color: #0072BC; }
+        body.rev-mode .select-wrapper::after { border-top-color: #0072BC; }
+        body.rev-mode select              { border-color: rgba(0,114,188,0.25); }
+        body.rev-mode select:focus        { border-color: #0072BC; box-shadow: 0 0 0 3px rgba(0,114,188,0.15); }
+        body.rev-mode .stat-card          { background: linear-gradient(135deg, rgba(0,114,188,0.07), rgba(0,114,188,0.02)); border-color: rgba(0,114,188,0.18); }
+        body.rev-mode .stat-card:hover    { border-color: rgba(0,114,188,0.4); box-shadow: 0 4px 12px rgba(0,114,188,0.12); }
+        body.rev-mode .stat-value         { color: #0072BC; }
+        body.rev-mode .day-label          { color: #005a96; }
+        body.rev-mode h2                  { color: #004f85; }
+        body.rev-mode h2::before          { background: linear-gradient(to bottom, #0072BC, #005a96); }
+        body.rev-mode .period-btn         { border-color: rgba(0,114,188,0.35); color: #0072BC; }
+        body.rev-mode .period-btn::before { background: radial-gradient(circle, rgba(0,114,188,0.15) 0%, transparent 70%); }
+        body.rev-mode .period-btn:hover   { border-color: #0072BC; box-shadow: 0 3px 8px rgba(0,114,188,0.2); }
+        body.rev-mode .period-btn.active  { background: linear-gradient(135deg, #0072BC, #005a96); box-shadow: 0 3px 10px rgba(0,114,188,0.35); }
+        body.rev-mode #specificDatePicker { border-color: #0072BC; color: #0072BC; box-shadow: 0 3px 10px rgba(0,114,188,0.2); }
+        body.rev-mode #specificDatePicker:focus { box-shadow: 0 0 0 3px rgba(0,114,188,0.15); }
+        body.rev-mode .dir-btn            { border-color: rgba(0,114,188,0.35); color: #0072BC; }
+        body.rev-mode .dir-btn.active     { background: linear-gradient(135deg, #0072BC, #005a96); }
+        body.rev-mode .watermark          { color: rgba(0,114,188,0.4); }
+        body.rev-mode .watermark a        { color: rgba(0,114,188,0.6); }
+        body.rev-mode .watermark a:hover  { color: #0072BC; }
+        body.rev-mode #noDataMsg          { border-color: rgba(0,114,188,0.25); }
+        #themeToggleBtn:hover             { transform: scale(1.07); }
+        #themeToggleBtn:active            { transform: scale(0.96); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
@@ -403,7 +437,7 @@ html_parts = ['''<html>
         <a href="https://www.gabfortin.com" style="color:rgba(255,255,255,0.7);text-decoration:none;" target="_blank">gabfortin.com</a>
     </div>
     <div class="site-header">
-        <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
+        <img src="favico.png" alt="Logo" id="themeToggleBtn" title="Basculer vers le thème REV" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.15s ease;">
         <h1>Compteurs Vélo Montréal</h1>
         <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>.</p>
         <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal. Certaines valeurs peuvent être incomplètes ou erronées.</p>
@@ -1054,7 +1088,7 @@ html_parts.append('''
         });
 
         // ── Carte Leaflet ──
-        const COLOR_DEFAULT  = '#1DB860';
+        let COLOR_DEFAULT  = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
         const COLOR_GAPPY    = '#F59E0B';
 
@@ -1109,6 +1143,24 @@ html_parts.append('''
             selectCounter(instance);
             map.panTo([counterLocations[instance].lat, counterLocations[instance].lng]);
         }
+
+        // ── Thème REV ──
+        const REV_COLOR = '#0072BC';
+        const GREEN_COLOR = '#1DB860';
+
+        if (localStorage.getItem('theme') === 'rev') {
+            document.body.classList.add('rev-mode');
+            COLOR_DEFAULT = REV_COLOR;
+            document.getElementById('themeToggleBtn').title = 'Revenir au thème Montréal';
+        }
+
+        document.getElementById('themeToggleBtn').addEventListener('click', function() {
+            const isRev = document.body.classList.toggle('rev-mode');
+            COLOR_DEFAULT = isRev ? REV_COLOR : GREEN_COLOR;
+            this.title = isRev ? 'Revenir au thème Montréal' : 'Basculer vers le thème REV';
+            localStorage.setItem('theme', isRev ? 'rev' : 'green');
+            updateMapSelection(getSelectedCounter());
+        });
     </script>
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
