@@ -418,11 +418,11 @@ html_parts = ['''<html>
         body.rev-mode .period-btn         { border-color: rgba(0,114,188,0.35); color: #0072BC; }
         body.rev-mode .period-btn::before { background: radial-gradient(circle, rgba(0,114,188,0.15) 0%, transparent 70%); }
         body.rev-mode .period-btn:hover   { border-color: #0072BC; box-shadow: 0 3px 8px rgba(0,114,188,0.2); }
-        body.rev-mode .period-btn.active  { background: linear-gradient(135deg, #0072BC, #005a96); box-shadow: 0 3px 10px rgba(0,114,188,0.35); }
+        body.rev-mode .period-btn.active  { background: linear-gradient(135deg, #0072BC, #005a96); box-shadow: 0 3px 10px rgba(0,114,188,0.35); color: #fff; }
         body.rev-mode #specificDatePicker { border-color: #0072BC; color: #0072BC; box-shadow: 0 3px 10px rgba(0,114,188,0.2); }
         body.rev-mode #specificDatePicker:focus { box-shadow: 0 0 0 3px rgba(0,114,188,0.15); }
         body.rev-mode .dir-btn            { border-color: rgba(0,114,188,0.35); color: #0072BC; }
-        body.rev-mode .dir-btn.active     { background: linear-gradient(135deg, #0072BC, #005a96); }
+        body.rev-mode .dir-btn.active     { background: linear-gradient(135deg, #0072BC, #005a96); color: #fff; }
         body.rev-mode .watermark          { color: rgba(0,114,188,0.4); }
         body.rev-mode .watermark a        { color: rgba(0,114,188,0.6); }
         body.rev-mode .watermark a:hover  { color: #0072BC; }
