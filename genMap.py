@@ -503,10 +503,10 @@ html_parts = ['''<html>
             align-items: flex-start;
             gap: 10px;
             padding: 10px 14px;
-            background: rgba(239,68,68,0.07);
-            border: 1.5px solid rgba(239,68,68,0.3);
+            background: rgba(245,158,11,0.08);
+            border: 1.5px solid rgba(245,158,11,0.35);
             border-radius: 8px;
-            color: #991b1b;
+            color: #92620a;
             font-size: 13px;
             line-height: 1.5;
             margin-bottom: 14px;
@@ -521,8 +521,8 @@ html_parts = ['''<html>
             min-width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: rgba(239,68,68,0.15);
-            color: #991b1b;
+            background: rgba(245,158,11,0.2);
+            color: #92620a;
             font-size: 11px;
             font-weight: 700;
             flex-shrink: 0;
@@ -722,7 +722,7 @@ html_parts.append('''
         <div id="chart-area">
         <div id="dataWarning"><span class="warn-icon">⚠️</span><span>Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence.</span></div>
         <div id="anomalyWarning">
-            <span class="warn-icon">🔴</span>
+            <span class="warn-icon">⚠️</span>
             <div class="anomaly-body">
                 <strong>Données potentiellement erronées</strong> — volumes anormalement bas détectés :<br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
@@ -876,15 +876,15 @@ html_parts.append('''
                     const showCombined = isMulti && displayMode === 'combined';
                     if (showCombined) {
                         return { labels: fullHours, datasets: [{ label: 'Combiné',
-                            data: fullHours.map(lbl => lbl in labelToIdx ? allDatasets.reduce((s, ds) => s + (ds.data[labelToIdx[lbl]] || 0), 0) : null),
+                            data: fullHours.map(lbl => lbl in labelToIdx ? allDatasets.reduce((s, ds) => s + (ds.data[labelToIdx[lbl]] || 0), 0) : 0),
                             borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'),
-                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, spanGaps: false }] };
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }] };
                     }
                     return { labels: fullHours, datasets: allDatasets.map(ds => ({
                         label: ds.label,
-                        data: fullHours.map(lbl => lbl in labelToIdx ? ds.data[labelToIdx[lbl]] : null),
+                        data: fullHours.map(lbl => lbl in labelToIdx ? ds.data[labelToIdx[lbl]] : 0),
                         borderColor: themeColor(ds.color), backgroundColor: themeColor(ds.fill),
-                        fill: !isMulti, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, spanGaps: false
+                        fill: !isMulti, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5
                     })) };
                 }
             }
@@ -1189,6 +1189,7 @@ html_parts.append('''
                 if (hasData) createChart(instance);
                 updateStats(instance);
                 updateDayLabel(instance);
+                updateViewToggle();
                 updateDirToggle(instance);
                 updateAnomalyWarning(instance);
             } else {
