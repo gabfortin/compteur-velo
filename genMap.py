@@ -427,8 +427,18 @@ html_parts = ['''<html>
         body.rev-mode .watermark a        { color: rgba(0,114,188,0.6); }
         body.rev-mode .watermark a:hover  { color: #0072BC; }
         body.rev-mode #noDataMsg          { border-color: rgba(0,114,188,0.25); }
+        body.rev-mode p strong            { color: #0072BC; }
         #themeToggleBtn:hover             { transform: scale(1.07); }
         #themeToggleBtn:active            { transform: scale(0.96); }
+        @keyframes spinIcon {
+            from { transform: rotate(0deg) scale(1); }
+            50%  { transform: rotate(180deg) scale(1.12); }
+            to   { transform: rotate(360deg) scale(1); }
+        }
+        #themeToggleBtn.spinning {
+            animation: spinIcon 0.55s cubic-bezier(0.42, 0, 0.58, 1) forwards;
+            pointer-events: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
@@ -603,6 +613,20 @@ html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n"
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 
 html_parts.append('''
+        const COLOR_MAP_REV = {
+            '#1DB860': '#0072BC',
+            '#29ABE2': '#1DB860',
+            'rgba(29,184,96,0.15)':  'rgba(0,114,188,0.15)',
+            'rgba(41,171,226,0.15)': 'rgba(29,184,96,0.15)',
+            'rgba(29,184,96,0.75)':  'rgba(0,114,188,0.75)',
+            'rgba(41,171,226,0.75)': 'rgba(29,184,96,0.75)',
+            'rgba(29,184,96,0.28)':  'rgba(0,114,188,0.28)',
+        };
+        function themeColor(color) {
+            if (!document.body.classList.contains('rev-mode')) return color;
+            return COLOR_MAP_REV[color] || color;
+        }
+
         function parseLabel(label) {
             return new Date(label.replace(' ', 'T'));
         }
@@ -654,7 +678,7 @@ html_parts.append('''
                 );
                 return {
                     labels: filteredLabels,
-                    datasets: [{ label: 'Combiné', data: combined, borderColor: '#1DB860', backgroundColor: 'rgba(29,184,96,0.15)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }]
+                    datasets: [{ label: 'Combiné', data: combined, borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'), fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }]
                 };
             }
 
@@ -664,8 +688,8 @@ html_parts.append('''
                 datasets: allDatasets.map(ds => ({
                     label: ds.label,
                     data: indices.map(i => ds.data[i]),
-                    borderColor: ds.color,
-                    backgroundColor: ds.fill,
+                    borderColor: themeColor(ds.color),
+                    backgroundColor: themeColor(ds.fill),
                     fill: isSingle,
                     tension: 0.3,
                     borderWidth: 2,
@@ -698,7 +722,7 @@ html_parts.append('''
                     const day = allLabels[i].slice(0, 10);
                     allDatasets.forEach(ds => { totals[day] += (ds.data[i] || 0); });
                 });
-                return { labels: dayList, datasets: [{ label: showCombined ? 'Combiné' : allDatasets[0].label, data: dayList.map(d => totals[d]), backgroundColor: 'rgba(29,184,96,0.75)', borderColor: '#1DB860', borderWidth: 1, borderRadius: 4 }] };
+                return { labels: dayList, datasets: [{ label: showCombined ? 'Combiné' : allDatasets[0].label, data: dayList.map(d => totals[d]), backgroundColor: themeColor('rgba(29,184,96,0.75)'), borderColor: themeColor('#1DB860'), borderWidth: 1, borderRadius: 4 }] };
             }
             return {
                 labels: dayList,
@@ -706,7 +730,7 @@ html_parts.append('''
                     const totals = {};
                     dayList.forEach(d => totals[d] = 0);
                     indices.forEach(idx => { totals[allLabels[idx].slice(0, 10)] += (ds.data[idx] || 0); });
-                    return { label: ds.label, data: dayList.map(d => totals[d]), backgroundColor: i === 0 ? 'rgba(29,184,96,0.75)' : 'rgba(41,171,226,0.75)', borderColor: ds.color, borderWidth: 1, borderRadius: 4 };
+                    return { label: ds.label, data: dayList.map(d => totals[d]), backgroundColor: themeColor(i === 0 ? 'rgba(29,184,96,0.75)' : 'rgba(41,171,226,0.75)'), borderColor: themeColor(ds.color), borderWidth: 1, borderRadius: 4 };
                 })
             };
         }
@@ -786,8 +810,8 @@ html_parts.append('''
                     const isSingle = data.datasets.length === 1;
                     if (!isDaily && isSingle && data.datasets[0].fill) {
                         const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 380);
-                        gradient.addColorStop(0, 'rgba(29,184,96,0.28)');
-                        gradient.addColorStop(1, 'rgba(29,184,96,0)');
+                        gradient.addColorStop(0, themeColor('rgba(29,184,96,0.28)'));
+                        gradient.addColorStop(1, 'rgba(0,0,0,0)');
                         data.datasets[0].backgroundColor = gradient;
                     }
                     charts[id] = new Chart(ctx, {
@@ -1155,11 +1179,22 @@ html_parts.append('''
         }
 
         document.getElementById('themeToggleBtn').addEventListener('click', function() {
-            const isRev = document.body.classList.toggle('rev-mode');
-            COLOR_DEFAULT = isRev ? REV_COLOR : GREEN_COLOR;
-            this.title = isRev ? 'Revenir au thème Montréal' : 'Basculer vers le thème REV';
-            localStorage.setItem('theme', isRev ? 'rev' : 'green');
-            updateMapSelection(getSelectedCounter());
+            if (this.classList.contains('spinning')) return;
+            this.classList.add('spinning');
+            this.addEventListener('animationend', () => {
+                this.classList.remove('spinning');
+                const isRev = document.body.classList.toggle('rev-mode');
+                COLOR_DEFAULT = isRev ? REV_COLOR : GREEN_COLOR;
+                this.title = isRev ? 'Revenir au thème Montréal' : 'Basculer vers le thème REV';
+                localStorage.setItem('theme', isRev ? 'rev' : 'green');
+                updateMapSelection(getSelectedCounter());
+                const selected = getSelectedCounter();
+                if (selected && hasDataForPeriod(selected)) {
+                    chartData[selected] = buildFilteredData(selected, currentPeriod);
+                    if (charts[selected]) { charts[selected].destroy(); charts[selected] = null; }
+                    createChart(selected);
+                }
+            }, { once: true });
         });
     </script>
     <div class="watermark">
