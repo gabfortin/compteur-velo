@@ -170,6 +170,7 @@ Tout le JavaScript est inline dans le HTML généré.
 | `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)               |
 | `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)              |
 | `gappyCounters`             | `Set` des instances avec lacunes significatives — injecté par `genMap.py`            |
+| `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` des jours anormaux — injecté par `genMap.py` |
 | `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                                  |
 
 ### Fonctions principales
@@ -218,6 +219,9 @@ Calcule les 3 statistiques en combinant toutes les directions :
 - **Heure de pointe** : heure cumulant le plus de passages
 
 Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
+
+#### `updateAnomalyWarning(instance)`
+Affiche ou masque `#anomalyWarning` selon que des anomalies tombent dans la période visible. Filtre `anomalyDays[instance]` en intersectant les dates avec les labels actifs de `chartData[instance]`. Appelée lors de chaque changement de compteur ou de période.
 
 #### `updateMapSelection(instance)`
 Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`), les compteurs normaux en vert (`#1DB860`), et les compteurs avec lacunes en amber (`#F59E0B`).
@@ -291,6 +295,61 @@ const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
 | Marker carte | Amber (`#F59E0B`) au lieu du vert, avec `⚠` dans le tooltip au survol |
 | Marker sélectionné | Bleu ciel (`#29ABE2`) comme les autres (comportement inchangé) |
 | Bannière `#dataWarning` | S'affiche sous le titre du compteur avec le message : *"Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence."* |
+
+---
+
+## Qualité des données — détection d'anomalies
+
+En plus des lacunes, `genMap.py` détecte les jours dont le volume de passages est anormalement bas par rapport à l'historique du même jour de semaine. Ces jours correspondent probablement à un dysfonctionnement du capteur.
+
+### Détection — `detect_anomalies()`
+
+Exécutée après le filtrage des 6 derniers mois. Pour chaque instance, les totaux journaliers sont calculés en agrégeant toutes les directions et toutes les heures. Seuls les jours avec **≥ 18 heures de données** sont inclus (pour exclure les jours partiels en début/fin de fenêtre).
+
+Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes suivantes est déclenchée :
+
+**Méthode 1 — Z-score par jour de semaine** (robuste aux tendances long terme) :
+
+| Critère | Formule | Seuil |
+|---------|---------|-------|
+| Score Z négatif | `z = (taux − μ) / σ` | `z < −2,5` |
+| Taux trop faible | `taux / μ` | `< 50 %` de la moyenne |
+
+Où `taux = passages / heures_enregistrées`, `μ` et `σ` calculés sur les jours complets (≥ 18 h) du même jour de semaine.
+
+**Méthode 2 — Jours adjacents** (robuste à la saisonnalité) :
+
+| Critère | Seuil |
+|---------|-------|
+| Taux vs moyenne ±6 jours | `< 20 %` de la moyenne des jours complets adjacents |
+| Cohérence des références | CV (σ/μ) des jours adjacents `< 0,6` |
+| Nombre de références | ≥ 4 jours complets dans la fenêtre |
+
+**Jours entièrement absents** : tout jour sans aucune donnée dans la plage active du compteur (entre sa première et sa dernière mesure) est automatiquement signalé si le volume attendu dépasse 50 passages/jour.
+
+**Minimum attendu** : `≥ 50 passages` pour qu'un jour soit signalé (évite le bruit sur les compteurs peu fréquentés).
+
+Les anomalies détectées sont injectées dans le JS :
+
+```javascript
+const anomalyDays = {
+    "det-00709-01": {
+        "2026-04-17": { "total": 45, "expected": 892, "z_score": -3.8 },
+        "2026-04-18": { "total": 62, "expected": 876, "z_score": -3.5 }
+    }
+};
+```
+
+### Signalisation visuelle
+
+| Élément | Comportement |
+|---------|-------------|
+| Bannière `#anomalyWarning` | S'affiche en rouge pour les vues **Jour spécifique** et **7 derniers jours** uniquement, avec la liste des dates suspectes, le volume observé vs attendu (et z-score si applicable). Les jours sans données indiquent "données manquantes". |
+| Bouton `ℹ` (hover) | Tooltip expliquant les deux méthodes de calcul et la détection des jours manquants |
+| Barres rouges (vue Par jour) | Dans la vue journalière 7 jours, les barres correspondant à des jours anomaux (incluant les jours à 0) apparaissent en rouge |
+| Gaps (vue Dans le temps) | Dans la vue horaire 7 jours, les jours sans données apparaissent comme des interruptions (gaps) dans la courbe |
+
+La bannière se met à jour dynamiquement à chaque changement de période ou de compteur. Pour les périodes > 7 jours, les anomalies ponctuelles sont diluées et le warning n'est pas affiché.
 
 ---
 

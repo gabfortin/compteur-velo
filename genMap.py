@@ -5,6 +5,7 @@ import os
 from tqdm import tqdm
 import json
 from datetime import datetime, timedelta
+from statistics import mean, stdev, median
 
 # Compter le nombre total de lignes pour la barre de progression
 total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
@@ -54,6 +55,131 @@ def has_significant_gaps(instance_data, gap_days=14, missing_ratio=0.20):
     return False
 
 gappy_instances = {inst for inst, dirs in data.items() if has_significant_gaps(dirs)}
+
+# Détecter les jours avec un volume anormalement bas (dysfonctionnement probable du compteur)
+def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4,
+                     ratio_threshold=0.5, adj_ratio_threshold=0.2, adj_window=6,
+                     min_expected_total=50):
+    """
+    Détecte les jours avec un taux horaire anormalement bas par deux méthodes
+    complémentaires, et signale si l'une ou l'autre est déclenchée :
+
+    1. Jour de semaine (z-score) : compare le taux horaire (passages/h) du jour
+       à la moyenne (μ) et l'écart-type (σ) des jours complets (≥18h) du même
+       jour de semaine. Signale si taux < μ − 2,5σ ET < 50% de μ.
+
+    2. Jours adjacents : compare le taux horaire aux jours complets dans une
+       fenêtre de ±adj_window jours. Signale si taux < 25% de la moyenne des
+       jours adjacents (≥3 jours de référence requis). Robuste à la saisonnalité.
+    """
+    daily = defaultdict(lambda: {"total": 0, "hours": 0})
+    for rows in instance_data.values():
+        for row in rows:
+            try:
+                d = row['periode'][:10]
+                daily[d]["total"] += int(row['volume'])
+                daily[d]["hours"] += 1
+            except:
+                pass
+
+    candidates = {d: v for d, v in daily.items() if v["hours"] >= min_hours}
+    full_days  = {d: v for d, v in daily.items() if v["hours"] >= 18}
+    if len(full_days) < min_ref_days:
+        return {}
+
+    typical_hours = median(v["hours"] for v in full_days.values())
+
+    anomalies = {}
+    for d_str, v in candidates.items():
+        rate = v["total"] / v["hours"]
+        try:
+            d_date = datetime.fromisoformat(d_str)
+            dow = d_date.weekday()
+        except:
+            continue
+
+        # Méthode 1 : même jour de semaine
+        dow_refs = [fd["total"] / fd["hours"] for ds, fd in full_days.items()
+                    if ds != d_str and datetime.fromisoformat(ds).weekday() == dow]
+        flagged_dow = False
+        mu_dow = 0.0
+        if len(dow_refs) >= min_ref_days:
+            mu_dow = mean(dow_refs)
+            if mu_dow > 0 and rate < mu_dow * ratio_threshold:
+                sigma = stdev(dow_refs) if len(dow_refs) >= 2 else 0
+                z = (rate - mu_dow) / sigma if sigma > 0 else -99.0
+                flagged_dow = z < -z_threshold
+
+        # Méthode 2 : jours adjacents (±adj_window jours)
+        adj_refs = []
+        for ds, fd in full_days.items():
+            if ds == d_str:
+                continue
+            try:
+                delta = abs((datetime.fromisoformat(ds) - d_date).days)
+                if delta <= adj_window:
+                    adj_refs.append(fd["total"] / fd["hours"])
+            except:
+                pass
+        flagged_adj = False
+        mu_adj = 0.0
+        if len(adj_refs) >= 4:
+            mu_adj = mean(adj_refs)
+            cv_adj = stdev(adj_refs) / mu_adj if mu_adj > 0 and len(adj_refs) >= 2 else 1.0
+            flagged_adj = mu_adj > 0 and rate < mu_adj * adj_ratio_threshold and cv_adj < 0.6
+
+        if flagged_dow or flagged_adj:
+            mu_ref = mu_adj if flagged_adj else mu_dow
+            expected_total = round(mu_ref * typical_hours)
+            if expected_total < min_expected_total:
+                continue
+            z_val = -99.0
+            if len(dow_refs) >= 2:
+                s = stdev(dow_refs)
+                if s > 0:
+                    z_val = (rate - mu_dow) / s
+            anomalies[d_str] = {
+                "total": v["total"],
+                "expected": expected_total,
+                "z_score": round(z_val, 1)
+            }
+
+    # Détecter les journées entièrement absentes dans la plage active du compteur
+    all_dates = set(daily.keys())
+    if all_dates:
+        first_date = min(all_dates)
+        last_date  = max(all_dates)
+        d_iter = datetime.fromisoformat(first_date)
+        end_iter = datetime.fromisoformat(last_date)
+        while d_iter <= end_iter:
+            d_str = d_iter.strftime('%Y-%m-%d')
+            if d_str not in all_dates and d_str not in anomalies:
+                try:
+                    dow = d_iter.weekday()
+                    dow_refs_m = [fd["total"] / fd["hours"] for ds, fd in full_days.items()
+                                  if datetime.fromisoformat(ds).weekday() == dow]
+                    adj_refs_m = [fd["total"] / fd["hours"] for ds, fd in full_days.items()
+                                  if 0 < abs((datetime.fromisoformat(ds) - d_iter).days) <= adj_window]
+                    mu_ref = 0.0
+                    if len(adj_refs_m) >= 4:
+                        mu_adj_m = mean(adj_refs_m)
+                        cv = stdev(adj_refs_m) / mu_adj_m if mu_adj_m > 0 and len(adj_refs_m) >= 2 else 1.0
+                        if mu_adj_m > 0 and cv < 0.6:
+                            mu_ref = mu_adj_m
+                    if mu_ref == 0 and len(dow_refs_m) >= min_ref_days:
+                        mu_ref = mean(dow_refs_m)
+                    if mu_ref > 0:
+                        expected = round(mu_ref * typical_hours)
+                        if expected >= min_expected_total:
+                            anomalies[d_str] = {"total": 0, "expected": expected, "z_score": -99.0}
+                except:
+                    pass
+            d_iter += timedelta(days=1)
+
+    return anomalies
+
+anomaly_data = {inst: det for inst, dirs in data.items()
+                if (det := detect_anomalies(dirs))}
 
 # Générer le HTML
 html_parts = ['''<html>
@@ -372,6 +498,59 @@ html_parts = ['''<html>
             margin-bottom: 16px;
         }
         #noDataMsg span.icon { font-size: 36px; }
+        #anomalyWarning {
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            background: rgba(239,68,68,0.07);
+            border: 1.5px solid rgba(239,68,68,0.3);
+            border-radius: 8px;
+            color: #991b1b;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        #anomalyWarning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+        #anomalyWarning .anomaly-body { flex: 1; }
+        .anomaly-info-btn {
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(239,68,68,0.15);
+            color: #991b1b;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 1px;
+            position: relative;
+        }
+        .anomaly-info-btn::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: rgba(20,10,10,0.93);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.55;
+            padding: 10px 13px;
+            border-radius: 8px;
+            width: 290px;
+            white-space: normal;
+            text-align: left;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.18s;
+            z-index: 200;
+        }
+        .anomaly-info-btn:hover::after,
+        .anomaly-info-btn:focus::after { opacity: 1; }
         @media (min-width: 768px) {
             .desktop-only { display: block; }
             .mobile-only { display: none; }
@@ -542,6 +721,14 @@ html_parts.append('''
         <div id="chart-map-layout">
         <div id="chart-area">
         <div id="dataWarning"><span class="warn-icon">⚠️</span><span>Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence.</span></div>
+        <div id="anomalyWarning">
+            <span class="warn-icon">🔴</span>
+            <div class="anomaly-body">
+                <strong>Données potentiellement erronées</strong> — volumes anormalement bas détectés :<br>
+                <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
+            </div>
+            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés (0 passages = données manquantes).">ℹ</span>
+        </div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
 
@@ -611,6 +798,7 @@ for instance in data.keys():
         }
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
+html_parts.append(f"const anomalyDays = {json.dumps(anomaly_data)};\n")
 
 html_parts.append('''
         const COLOR_MAP_REV = {
@@ -667,8 +855,41 @@ html_parts.append('''
                 const cutoffDate = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - (days - 1));
                 indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
             }
-            const filteredLabels = indices.map(i => allLabels[i]);
 
+            // Pour la vue 7 jours, générer la grille horaire complète et remplir
+            // les heures manquantes avec null (les jours sans données apparaissent comme des gaps)
+            if (days === 7 && globalMaxDate) {
+                const cutoff = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - 6);
+                cutoff.setHours(0, 0, 0, 0);
+                const fullHours = [];
+                const cur = new Date(cutoff);
+                while (cur <= globalMaxDate) {
+                    const lbl = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')} ${String(cur.getHours()).padStart(2,'0')}:00`;
+                    fullHours.push(lbl);
+                    cur.setHours(cur.getHours() + 1);
+                }
+                const labelToIdx = {};
+                indices.forEach(i => { labelToIdx[allLabels[i]] = i; });
+                const hasMissing = fullHours.some(h => !(h in labelToIdx));
+                if (hasMissing) {
+                    const isMulti = allDatasets.length > 1;
+                    const showCombined = isMulti && displayMode === 'combined';
+                    if (showCombined) {
+                        return { labels: fullHours, datasets: [{ label: 'Combiné',
+                            data: fullHours.map(lbl => lbl in labelToIdx ? allDatasets.reduce((s, ds) => s + (ds.data[labelToIdx[lbl]] || 0), 0) : null),
+                            borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'),
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, spanGaps: false }] };
+                    }
+                    return { labels: fullHours, datasets: allDatasets.map(ds => ({
+                        label: ds.label,
+                        data: fullHours.map(lbl => lbl in labelToIdx ? ds.data[labelToIdx[lbl]] : null),
+                        borderColor: themeColor(ds.color), backgroundColor: themeColor(ds.fill),
+                        fill: !isMulti, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, spanGaps: false
+                    })) };
+                }
+            }
+
+            const filteredLabels = indices.map(i => allLabels[i]);
             const isMulti = allDatasets.length > 1;
             const showCombined = isMulti && displayMode === 'combined';
 
@@ -712,7 +933,26 @@ html_parts.append('''
             }
             const daySet = {};
             indices.forEach(i => { daySet[allLabels[i].slice(0, 10)] = true; });
-            const dayList = Object.keys(daySet).sort();
+            let dayList = Object.keys(daySet).sort();
+
+            // Pour la vue 7 jours, générer tous les jours du calendrier
+            // (les jours sans données apparaissent comme des barres à 0, potentiellement en rouge)
+            if (days === 7 && globalMaxDate) {
+                const fullRange = [];
+                const end = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate());
+                const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6);
+                const cur = new Date(start);
+                while (cur <= end) {
+                    fullRange.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`);
+                    cur.setDate(cur.getDate() + 1);
+                }
+                dayList = fullRange;
+            }
+
+            const anomInst = (typeof anomalyDays !== 'undefined' && anomalyDays[instance]) ? anomalyDays[instance] : {};
+            function barBg(d, base)  { return anomInst[d] ? 'rgba(239,68,68,0.65)' : base; }
+            function barBd(d, base)  { return anomInst[d] ? 'rgba(239,68,68,0.9)'  : base; }
+
             const isMulti = allDatasets.length > 1;
             const showCombined = isMulti && displayMode === 'combined';
             if (!isMulti || showCombined) {
@@ -720,17 +960,25 @@ html_parts.append('''
                 dayList.forEach(d => totals[d] = 0);
                 indices.forEach(i => {
                     const day = allLabels[i].slice(0, 10);
-                    allDatasets.forEach(ds => { totals[day] += (ds.data[i] || 0); });
+                    if (day in totals) allDatasets.forEach(ds => { totals[day] += (ds.data[i] || 0); });
                 });
-                return { labels: dayList, datasets: [{ label: showCombined ? 'Combiné' : allDatasets[0].label, data: dayList.map(d => totals[d]), backgroundColor: themeColor('rgba(29,184,96,0.75)'), borderColor: themeColor('#1DB860'), borderWidth: 1, borderRadius: 4 }] };
+                const defBg = themeColor('rgba(29,184,96,0.75)'), defBd = themeColor('#1DB860');
+                return { labels: dayList, datasets: [{ label: showCombined ? 'Combiné' : allDatasets[0].label, data: dayList.map(d => totals[d]),
+                    backgroundColor: dayList.map(d => barBg(d, defBg)), borderColor: dayList.map(d => barBd(d, defBd)), borderWidth: 1, borderRadius: 4 }] };
             }
             return {
                 labels: dayList,
                 datasets: allDatasets.map((ds, i) => {
                     const totals = {};
                     dayList.forEach(d => totals[d] = 0);
-                    indices.forEach(idx => { totals[allLabels[idx].slice(0, 10)] += (ds.data[idx] || 0); });
-                    return { label: ds.label, data: dayList.map(d => totals[d]), backgroundColor: themeColor(i === 0 ? 'rgba(29,184,96,0.75)' : 'rgba(41,171,226,0.75)'), borderColor: themeColor(ds.color), borderWidth: 1, borderRadius: 4 };
+                    indices.forEach(idx => {
+                        const day = allLabels[idx].slice(0, 10);
+                        if (day in totals) totals[day] += (ds.data[idx] || 0);
+                    });
+                    const defBg = themeColor(i === 0 ? 'rgba(29,184,96,0.75)' : 'rgba(41,171,226,0.75)');
+                    const defBd = themeColor(ds.color);
+                    return { label: ds.label, data: dayList.map(d => totals[d]),
+                        backgroundColor: dayList.map(d => barBg(d, defBg)), borderColor: dayList.map(d => barBd(d, defBd)), borderWidth: 1, borderRadius: 4 };
                 })
             };
         }
@@ -905,6 +1153,29 @@ html_parts.append('''
             return instance && chartData[instance] && chartData[instance].labels.length > 0;
         }
 
+        function updateAnomalyWarning(instance) {
+            const el = document.getElementById('anomalyWarning');
+            if (!instance || !anomalyDays[instance] || (currentPeriod !== 0 && currentPeriod !== 7)) { el.style.display = 'none'; return; }
+            const visibleDates = new Set();
+            if (currentPeriod === 0 && specificDate) {
+                visibleDates.add(specificDate);
+            } else if (chartData[instance]) {
+                chartData[instance].labels.forEach(l => visibleDates.add(l.slice(0, 10)));
+            }
+            const found = Object.entries(anomalyDays[instance]).filter(([d]) => visibleDates.has(d));
+            if (!found.length) { el.style.display = 'none'; return; }
+            const details = found.map(([d, info]) => {
+                const dateObj = new Date(d + 'T12:00:00');
+                const dateStr = dateObj.toLocaleDateString('fr-CA', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+                const label = info.total === 0
+                    ? `<strong>données manquantes</strong> (attendu ~${info.expected.toLocaleString('fr-CA')} passages)`
+                    : `<strong>${info.total.toLocaleString('fr-CA')}</strong> passages (attendu ~${info.expected.toLocaleString('fr-CA')}, z = ${info.z_score})`;
+                return `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} : ${label}`;
+            }).join('<br>');
+            document.getElementById('anomalyDetails').innerHTML = details;
+            el.style.display = 'flex';
+        }
+
         function selectCounter(instance) {
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
             const noDataMsg = document.getElementById('noDataMsg');
@@ -919,9 +1190,11 @@ html_parts.append('''
                 updateStats(instance);
                 updateDayLabel(instance);
                 updateDirToggle(instance);
+                updateAnomalyWarning(instance);
             } else {
                 noDataMsg.style.display = 'none';
                 document.getElementById('dataWarning').style.display = 'none';
+                document.getElementById('anomalyWarning').style.display = 'none';
                 updateStats(null);
                 updateDayLabel(null);
                 updateDirToggle(null);
@@ -1055,6 +1328,7 @@ html_parts.append('''
                 if (hasData) createChart(selected);
                 updateStats(selected);
                 updateDayLabel(selected);
+                updateAnomalyWarning(selected);
             }
         }
 
