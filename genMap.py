@@ -434,17 +434,42 @@ html_parts = ['''<html>
             gap: 16px;
         }
         #chart-area { min-width: 0; }
-        #map {
+        #map-wrapper {
+            position: relative;
             width: 100%;
             height: 300px;
+            flex-shrink: 0;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
             border-radius: 10px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.12);
             border: 1.5px solid rgba(29,184,96,0.18);
-            flex-shrink: 0;
+        }
+        #cyclosm-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: #fff;
+            border: 1.5px solid #ccc;
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        #cyclosm-btn.active {
+            background: #1DB860;
+            color: #fff;
+            border-color: #1DB860;
         }
         @media (min-width: 768px) {
             #chart-map-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-            #map { height: 100%; min-height: 300px; }
+            #map-wrapper { height: 100%; min-height: 300px; }
+            #map { height: 100%; }
         }
         .dir-toggle {
             display: flex;
@@ -744,7 +769,10 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
 
 html_parts.append('''
         </div>
-        <div id="map"></div>
+        <div id="map-wrapper">
+            <div id="map"></div>
+            <button id="cyclosm-btn" title="Afficher les pistes cyclables">🚲 Pistes cyclables</button>
+        </div>
         </div>
     </div>
     <script>
@@ -1403,10 +1431,27 @@ html_parts.append('''
 
         setTimeout(() => {
             map = L.map('map').setView([45.53, -73.59], 11);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
                 maxZoom: 19
-            }).addTo(map);
+            });
+            const cyclOsmLayer = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.cyclosm.org">CyclOSM</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 20
+            });
+            osmLayer.addTo(map);
+            let cyclOsmActive = false;
+            document.getElementById('cyclosm-btn').addEventListener('click', () => {
+                cyclOsmActive = !cyclOsmActive;
+                if (cyclOsmActive) {
+                    map.removeLayer(osmLayer);
+                    cyclOsmLayer.addTo(map);
+                } else {
+                    map.removeLayer(cyclOsmLayer);
+                    osmLayer.addTo(map);
+                }
+                document.getElementById('cyclosm-btn').classList.toggle('active', cyclOsmActive);
+            });
             Object.entries(counterLocations).forEach(([instance, loc]) => {
                 const gappy = gappyCounters.has(instance);
                 const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy))
