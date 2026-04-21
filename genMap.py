@@ -643,12 +643,47 @@ html_parts = ['''<html>
             animation: spinIcon 0.55s cubic-bezier(0.42, 0, 0.58, 1) forwards;
             pointer-events: none;
         }
+        @keyframes avatarPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55), 0 2px 8px rgba(0,0,0,0.25); }
+            60%  { box-shadow: 0 0 0 7px rgba(255,255,255,0), 0 2px 8px rgba(0,0,0,0.25); }
+            100% { box-shadow: 0 0 0 0 rgba(255,255,255,0), 0 2px 8px rgba(0,0,0,0.25); }
+        }
+        @keyframes avatarBob {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-3px); }
+        }
+        .avatar-link {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-left: 8px;
+            text-decoration: none;
+        }
+        .avatar-link img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.75);
+            object-fit: cover;
+            animation: avatarPulse 2.2s ease-out infinite, avatarBob 3s ease-in-out infinite;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+            cursor: pointer;
+        }
+        .avatar-link:hover img {
+            animation: none;
+            transform: scale(1.12);
+            border-color: #fff;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.3);
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div style="text-align:right;padding:6px 12px;font-size:12px;">
+    <div style="text-align:right;padding:6px 12px;font-size:12px;display:flex;align-items:center;justify-content:flex-end;gap:6px;">
         <a href="https://www.gabfortin.com" style="color:rgba(255,255,255,0.7);text-decoration:none;" target="_blank">gabfortin.com</a>
+        <a href="https://www.gabfortin.com" class="avatar-link" target="_blank" title="Gabriel Fortin">
+            <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
+        </a>
     </div>
     <div class="site-header">
         <img src="favico.png" alt="Logo" id="themeToggleBtn" title="Basculer vers le thème REV" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.15s ease;">
