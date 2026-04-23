@@ -4,7 +4,8 @@ from collections import defaultdict
 import os
 from tqdm import tqdm
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import math
 from statistics import mean, stdev, median
 
 # Compter le nombre total de lignes pour la barre de progression
@@ -493,6 +494,22 @@ html_parts = ['''<html>
             color: #fff;
             border-color: transparent;
         }
+        .bixi-btn {
+            padding: 5px 12px;
+            border: 1.5px solid rgba(220,38,38,0.35);
+            background: #fff;
+            color: rgba(220,38,38,0.75);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .bixi-btn.active {
+            background: linear-gradient(135deg, rgba(220,38,38,0.8), rgba(185,28,28,0.9));
+            color: #fff;
+            border-color: transparent;
+        }
         #dataWarning {
             display: none;
             align-items: flex-start;
@@ -538,6 +555,18 @@ html_parts = ['''<html>
         }
         #anomalyWarning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
         #anomalyWarning .anomaly-body { flex: 1; }
+        .bixi-exceeds-badge {
+            display: inline-block;
+            background: rgba(220,38,38,0.10);
+            color: #b91c1c;
+            border: 1px solid rgba(220,38,38,0.30);
+            border-radius: 4px;
+            padding: 0px 5px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
         .anomaly-info-btn {
             cursor: help;
             display: inline-flex;
@@ -688,8 +717,7 @@ html_parts = ['''<html>
     <div class="site-header">
         <img src="favico.png" alt="Logo" id="themeToggleBtn" title="Basculer vers le thème REV" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.15s ease;">
         <h1>Compteurs Vélo Montréal</h1>
-        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>.</p>
-        <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal. Certaines valeurs peuvent être incomplètes ou erronées.</p>
+        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>. Validation croisée avec les <a href="https://bixi.com/en/open-data/" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes BIXI</a>.</p>
     </div>
     <div class="container">
         <div class="period-buttons">
@@ -773,9 +801,14 @@ html_parts.append('''
                 <button class="dir-btn active" id="btnTimeline">Dans le temps</button>
                 <button class="dir-btn" id="btnDaily">Par jour</button>
             </div>
-            <div id="dirToggle" style="display:none;flex-direction:row;gap:6px;margin-left:auto;">
-                <button class="dir-btn active" id="btnSeparate">Par direction</button>
-                <button class="dir-btn" id="btnCombined">Combiné</button>
+            <div style="display:flex;gap:6px;margin-left:auto;align-items:center;">
+                <div id="bixiToggle" style="display:none;">
+                    <button class="bixi-btn active" id="btnBixi">Bixi</button>
+                </div>
+                <div id="dirToggle" style="display:none;flex-direction:row;gap:6px;">
+                    <button class="dir-btn" id="btnSeparate">Par direction</button>
+                    <button class="dir-btn active" id="btnCombined">Combiné</button>
+                </div>
             </div>
         </div>
         <div id="chart-map-layout">
@@ -863,6 +896,65 @@ html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n"
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 html_parts.append(f"const anomalyDays = {json.dumps(anomaly_data)};\n")
 
+# Croiser les trajets Bixi avec les compteurs pour valider les anomalies
+def _haversine_m(lat1, lon1, lat2, lon2):
+    R = 6371000
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dl/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+BIXI_RADIUS_M = 150
+bixi_near_counter = defaultdict(lambda: defaultdict(int))
+
+if os.path.exists('bixi.csv'):
+    with open('bixi.csv', encoding='utf-8') as f:
+        for row in tqdm(csv.DictReader(f), desc="Données Bixi"):
+            try:
+                slat = float(row['STARTSTATIONLATITUDE'])
+                slng = float(row['STARTSTATIONLONGITUDE'])
+                elat = float(row['ENDSTATIONLATITUDE'])
+                elng = float(row['ENDSTATIONLONGITUDE'])
+                date = datetime.fromtimestamp(int(row['STARTTIMEMS']) / 1000, tz=timezone.utc).strftime('%Y-%m-%d')
+                nearby = set()
+                for inst, loc in counter_locations.items():
+                    clat, clng = loc['lat'], loc['lng']
+                    if abs(slat - clat) < 0.003 and abs(slng - clng) < 0.004:
+                        if _haversine_m(clat, clng, slat, slng) <= BIXI_RADIUS_M:
+                            nearby.add(inst)
+                    if abs(elat - clat) < 0.003 and abs(elng - clng) < 0.004:
+                        if _haversine_m(clat, clng, elat, elng) <= BIXI_RADIUS_M:
+                            nearby.add(inst)
+                for inst in nearby:
+                    bixi_near_counter[inst][date] += 1
+            except Exception:
+                pass
+
+html_parts.append(f"const bixiNearby = {json.dumps({k: dict(v) for k, v in bixi_near_counter.items()})};\n")
+
+# Jours où les trajets Bixi dépassent le volume du compteur
+counter_daily_totals = defaultdict(lambda: defaultdict(int))
+for inst in bixi_near_counter:
+    if inst in data:
+        for rows in data[inst].values():
+            for row in rows:
+                date = row['periode'][:10]
+                counter_daily_totals[inst][date] += int(row['volume'])
+
+bixi_exceeds_days = {}
+for inst, bixi_days in bixi_near_counter.items():
+    exceeds = {}
+    cdaily = counter_daily_totals[inst]
+    for date, bcount in bixi_days.items():
+        ccount = cdaily.get(date, 0)
+        if bcount > ccount:
+            exceeds[date] = {"counter": ccount, "bixi": bcount}
+    if exceeds:
+        bixi_exceeds_days[inst] = exceeds
+
+html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
+
 html_parts.append('''
         const COLOR_MAP_REV = {
             '#1DB860': '#0072BC',
@@ -891,8 +983,9 @@ html_parts.append('''
             return max;
         }
 
-        let displayMode = 'separate';
+        let displayMode = 'combined';
         let viewMode = 'timeline';
+        let showBixi = true;
 
         function maxDateStr(instance) {
             const maxDate = getMaxDate(allChartData[instance].labels);
@@ -941,13 +1034,13 @@ html_parts.append('''
                         return { labels: fullHours, datasets: [{ label: 'Combiné',
                             data: fullHours.map(lbl => lbl in labelToIdx ? allDatasets.reduce((s, ds) => s + (ds.data[labelToIdx[lbl]] || 0), 0) : 0),
                             borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'),
-                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }] };
+                            fill: true, tension: 0.3, borderWidth: 1, pointRadius: 2, pointHoverRadius: 5 }] };
                     }
                     return { labels: fullHours, datasets: allDatasets.map(ds => ({
                         label: ds.label,
                         data: fullHours.map(lbl => lbl in labelToIdx ? ds.data[labelToIdx[lbl]] : 0),
                         borderColor: themeColor(ds.color), backgroundColor: themeColor(ds.fill),
-                        fill: !isMulti, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5
+                        fill: !isMulti, tension: 0.3, borderWidth: 1, pointRadius: 2, pointHoverRadius: 5
                     })) };
                 }
             }
@@ -962,7 +1055,7 @@ html_parts.append('''
                 );
                 return {
                     labels: filteredLabels,
-                    datasets: [{ label: 'Combiné', data: combined, borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'), fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }]
+                    datasets: [{ label: 'Combiné', data: combined, borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'), fill: true, tension: 0.3, borderWidth: 1, pointRadius: 2, pointHoverRadius: 5 }]
                 };
             }
 
@@ -976,7 +1069,7 @@ html_parts.append('''
                     backgroundColor: themeColor(ds.fill),
                     fill: isSingle,
                     tension: 0.3,
-                    borderWidth: 2,
+                    borderWidth: 1,
                     pointRadius: 2,
                     pointHoverRadius: 5
                 }))
@@ -1013,8 +1106,8 @@ html_parts.append('''
             }
 
             const anomInst = (typeof anomalyDays !== 'undefined' && anomalyDays[instance]) ? anomalyDays[instance] : {};
-            function barBg(d, base)  { return anomInst[d] ? 'rgba(239,68,68,0.65)' : base; }
-            function barBd(d, base)  { return anomInst[d] ? 'rgba(239,68,68,0.9)'  : base; }
+            function barBg(d, base)  { return anomInst[d] ? 'rgba(245,158,11,0.65)' : base; }
+            function barBd(d, base)  { return anomInst[d] ? 'rgba(245,158,11,0.9)'  : base; }
 
             const isMulti = allDatasets.length > 1;
             const showCombined = isMulti && displayMode === 'combined';
@@ -1116,14 +1209,34 @@ html_parts.append('''
                 const ctx = document.getElementById('chart-' + id);
                 if (ctx) {
                     const isDaily = viewMode === 'daily';
-                    const data = isDaily ? buildDailyData(id, currentPeriod) : chartData[id];
+                    const rawData = isDaily ? buildDailyData(id, currentPeriod) : chartData[id];
                     const type = isDaily ? 'bar' : 'line';
-                    const isSingle = data.datasets.length === 1;
-                    if (!isDaily && isSingle && data.datasets[0].fill) {
+                    const isSingle = rawData.datasets.length === 1;
+
+                    const bixiInst = (showBixi && typeof bixiNearby !== 'undefined' && bixiNearby[id]) ? bixiNearby[id] : null;
+                    let data = rawData;
+                    let hasBixi = false;
+                    if (bixiInst) {
+                        const bixiVals = rawData.labels.map(lbl => bixiInst[lbl.slice(0, 10)] ?? null);
+                        if (bixiVals.some(v => v !== null)) {
+                            hasBixi = true;
+                            const bixiDs = isDaily
+                                ? { label: 'Bixi', data: bixiVals, type: 'bar',
+                                    backgroundColor: 'rgba(220,38,38,0.25)', borderColor: 'rgba(220,38,38,0.55)',
+                                    borderWidth: 1, borderRadius: 3, yAxisID: 'y', order: 0 }
+                                : { label: 'Bixi', data: bixiVals, type: 'line', stepped: 'before',
+                                    pointRadius: 0, borderWidth: 1, borderColor: 'rgba(220,38,38,0.55)',
+                                    backgroundColor: 'rgba(220,38,38,0.06)', fill: true, tension: 0,
+                                    yAxisID: 'y', borderDash: [3, 2], order: 10 };
+                            data = { labels: rawData.labels, datasets: [...rawData.datasets, bixiDs] };
+                        }
+                    }
+
+                    if (!isDaily && isSingle && rawData.datasets[0].fill) {
                         const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 380);
                         gradient.addColorStop(0, themeColor('rgba(29,184,96,0.28)'));
                         gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                        data.datasets[0].backgroundColor = gradient;
+                        rawData.datasets[0].backgroundColor = gradient;
                     }
                     charts[id] = new Chart(ctx, {
                         type: type,
@@ -1132,7 +1245,7 @@ html_parts.append('''
                             responsive: true,
                             animation: { duration: 500, easing: 'easeInOutQuart' },
                             plugins: {
-                                legend: { display: !isSingle },
+                                legend: { display: data.datasets.length > 1 },
                                 tooltip: {
                                     backgroundColor: 'rgba(10,40,20,0.88)',
                                     titleColor: '#7ee8a2',
@@ -1181,7 +1294,7 @@ html_parts.append('''
                                     title: { display: true, text: 'Passages', color: '#999', font: { size: 11 } },
                                     beginAtZero: true,
                                     ticks: { color: '#777' }
-                                }
+                                },
                             }
                         }
                     });
@@ -1212,6 +1325,21 @@ html_parts.append('''
             }
         }
 
+        function updateBixiToggle(instance) {
+            const hasBixi = instance && typeof bixiNearby !== 'undefined' && bixiNearby[instance] && Object.keys(bixiNearby[instance]).length > 0;
+            document.getElementById('bixiToggle').style.display = hasBixi ? 'block' : 'none';
+        }
+
+        document.getElementById('btnBixi').addEventListener('click', function() {
+            showBixi = !showBixi;
+            this.classList.toggle('active', showBixi);
+            const instance = getSelectedCounter();
+            if (instance) {
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+            }
+        });
+
         function hasDataForPeriod(instance) {
             return instance && chartData[instance] && chartData[instance].labels.length > 0;
         }
@@ -1227,15 +1355,28 @@ html_parts.append('''
             }
             const found = Object.entries(anomalyDays[instance]).filter(([d]) => visibleDates.has(d));
             if (!found.length) { el.style.display = 'none'; return; }
-            const details = found.map(([d, info]) => {
+            const bixi = (typeof bixiNearby !== 'undefined' && bixiNearby[instance]) ? bixiNearby[instance] : {};
+            const exceeds = (typeof bixiExceedsDays !== 'undefined' && bixiExceedsDays[instance]) ? bixiExceedsDays[instance] : {};
+            const anomalyLines = found.map(([d, info]) => {
                 const dateObj = new Date(d + 'T12:00:00');
                 const dateStr = dateObj.toLocaleDateString('fr-CA', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
                 const label = info.total === 0
                     ? `<strong>données manquantes</strong> (attendu ~${info.expected.toLocaleString('fr-CA')} passages)`
                     : `<strong>${info.total.toLocaleString('fr-CA')}</strong> passages (attendu ~${info.expected.toLocaleString('fr-CA')}, z = ${info.z_score})`;
-                return `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} : ${label}`;
-            }).join('<br>');
-            document.getElementById('anomalyDetails').innerHTML = details;
+                const bixiCount = bixi[d] || 0;
+                const exceedsBadge = exceeds[d]
+                    ? `<span class="bixi-exceeds-badge">⚠ Bixi (${bixiCount}) > compteur (${info.total})</span>`
+                    : (bixiCount > 0 ? ` — <span style="color:#0085C8">✓ ${bixiCount} trajet${bixiCount > 1 ? 's' : ''} Bixi à proximité</span>` : '');
+                return `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} : ${label}${exceedsBadge}`;
+            });
+            const exceedsOnlyDates = Object.keys(exceeds).filter(d => visibleDates.has(d) && !anomalyDays[instance][d]);
+            const exceedsOnlyLines = exceedsOnlyDates.map(d => {
+                const dateObj = new Date(d + 'T12:00:00');
+                const dateStr = dateObj.toLocaleDateString('fr-CA', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+                const {counter, bixi: bcount} = exceeds[d];
+                return `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} : <strong>${counter.toLocaleString('fr-CA')}</strong> passages comptés<span class="bixi-exceeds-badge">⚠ Bixi (${bcount}) > compteur (${counter})</span>`;
+            });
+            document.getElementById('anomalyDetails').innerHTML = [...anomalyLines, ...exceedsOnlyLines].join('<br>');
             el.style.display = 'flex';
         }
 
@@ -1254,6 +1395,7 @@ html_parts.append('''
                 updateDayLabel(instance);
                 updateViewToggle();
                 updateDirToggle(instance);
+                updateBixiToggle(instance);
                 updateAnomalyWarning(instance);
             } else {
                 noDataMsg.style.display = 'none';
@@ -1262,6 +1404,7 @@ html_parts.append('''
                 updateStats(null);
                 updateDayLabel(null);
                 updateDirToggle(null);
+                updateBixiToggle(null);
             }
             if (typeof markers !== 'undefined') updateMapSelection(instance);
         }
@@ -1554,6 +1697,7 @@ html_parts.append('''
     </script>
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
+        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>
     </div>
 </body>
 </html>
