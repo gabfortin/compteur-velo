@@ -1,3 +1,5 @@
 *.csv
+*.zip
 .env
 .DS_Store
+.bixi_url

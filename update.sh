@@ -49,6 +49,78 @@ echo "$LOG Téléchargement du CSV..."
 curl -fsSL "$CSV_URL" -o cyclistes.csv
 echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
 
+# ── Télécharger le CSV BIXI (si une nouvelle version est disponible) ───────────
+echo "$LOG Recherche de la dernière version des données BIXI..."
+BIXI_URL=$(python3 - <<EOF
+import urllib.request, re, sys
+from datetime import datetime
+
+year = datetime.now().year
+try:
+    req = urllib.request.Request(
+        "https://bixi.com/en/open-data/",
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
+    html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
+    pattern = "https://[^ \"]+DonneesOuvertes%s_[0-9]+\\.zip" % year
+    matches = re.findall(pattern, html, re.IGNORECASE)
+    if matches:
+        best = max(matches, key=lambda u: len(re.search("_([0-9]+)\\.zip", u).group(1)))
+        print(best)
+    else:
+        sys.stderr.write("Aucun fichier BIXI %s trouve sur la page.\n" % year)
+        sys.exit(1)
+except Exception as e:
+    sys.stderr.write("Erreur scraping BIXI : %s\n" % e)
+    sys.exit(1)
+EOF
+) || true
+
+if [ -n "$BIXI_URL" ]; then
+    BIXI_URL_CACHE=".bixi_url"
+    CACHED_URL=""
+    [ -f "$BIXI_URL_CACHE" ] && CACHED_URL=$(cat "$BIXI_URL_CACHE")
+
+    if [ "$BIXI_URL" = "$CACHED_URL" ] && [ -f "bixi.csv" ]; then
+        echo "$LOG CSV BIXI déjà à jour — conservation du fichier existant."
+    else
+        echo "$LOG Téléchargement du ZIP BIXI : $BIXI_URL"
+        curl -fsSL "$BIXI_URL" -o bixi.zip
+        echo "$LOG ZIP téléchargé ($(du -sh bixi.zip | cut -f1)) — extraction..."
+        python3 - bixi.zip bixi.csv <<'PYEOF'
+import zipfile, csv, sys, io
+
+zip_path, out_path = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(zip_path) as z:
+    csv_files = sorted([
+        n for n in z.namelist()
+        if n.lower().endswith('.csv') and '__MACOSX' not in n
+    ])
+    if not csv_files:
+        sys.stderr.write("Aucun CSV trouvé dans le ZIP BIXI\n")
+        sys.exit(1)
+    header_written = False
+    with open(out_path, 'w', newline='', encoding='utf-8') as out:
+        for fname in csv_files:
+            with z.open(fname) as f:
+                reader = csv.reader(io.TextIOWrapper(f, encoding='utf-8-sig'))
+                for i, row in enumerate(reader):
+                    if i == 0:
+                        if not header_written:
+                            out.write(','.join(row) + '\n')
+                            header_written = True
+                    else:
+                        out.write(','.join(row) + '\n')
+    print(f"Extrait {len(csv_files)} fichier(s) CSV → {out_path}")
+PYEOF
+        rm -f bixi.zip
+        echo "$BIXI_URL" > "$BIXI_URL_CACHE"
+        echo "$LOG CSV BIXI prêt ($(du -sh bixi.csv | cut -f1))"
+    fi
+else
+    echo "$LOG URL BIXI introuvable — données existantes conservées."
+fi
+
 # ── Générer le HTML ────────────────────────────────────────────────────────────
 echo "$LOG Génération du HTML..."
 python3 genMap.py

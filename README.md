@@ -1,8 +1,8 @@
 # Compteurs Vélo Montréal
 
-Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique par compteur avec filtres de période, vue temporelle ou journalière, statistiques dynamiques, et une carte OpenStreetMap.
+Visualisation interactive des passages de cyclistes à Montréal, à partir des données ouvertes de la Ville. Le site affiche un graphique par compteur avec filtres de période, vue temporelle ou journalière, statistiques dynamiques, et une carte OpenStreetMap. Les données BIXI sont croisées avec les compteurs pour valider leur fiabilité.
 
-> ⚠️ Les données proviennent directement du portail de données ouvertes de la Ville de Montréal. Certaines valeurs peuvent être incomplètes ou erronées.
+> ⚠️ Les données proviennent directement du portail de données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.
 
 ---
 
@@ -10,7 +10,8 @@ Visualisation interactive des passages de cyclistes à Montréal, à partir des 
 
 ```
 compteur-velo/
-├── cyclistes.csv        # Source de données (portail données ouvertes Montréal) — ignoré par git
+├── cyclistes.csv        # Source principale (portail données ouvertes Montréal) — ignoré par git
+├── bixi.csv             # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
 ├── genMap.py            # Script de génération du site HTML
 ├── index.html           # Site généré (ne pas modifier manuellement)
 ├── favico.png           # Icône de l'application
@@ -21,7 +22,7 @@ compteur-velo/
 ├── entrypoint.sh        # Point d'entrée Docker (injecte les variables dans l'environnement cron)
 ├── .env                 # Variables d'environnement locales (ignoré par git)
 ├── .env.example         # Modèle de configuration
-├── .gitignore           # Exclut cyclistes.csv et .env
+├── .gitignore           # Exclut cyclistes.csv, bixi.csv et .env
 └── CNAME                # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
 ```
 
@@ -30,10 +31,12 @@ compteur-velo/
 ## Flux de génération
 
 ```
-cyclistes.csv  →  genMap.py  →  index.html  →  GitHub Pages
+cyclistes.csv  ─┐
+                ├──  genMap.py  →  index.html  →  GitHub Pages
+bixi.csv       ─┘
 ```
 
-`genMap.py` lit le CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
+`genMap.py` lit les deux CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
 
 Pour régénérer le site manuellement après une mise à jour du CSV :
 
@@ -69,6 +72,24 @@ Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par `genM
 
 ---
 
+## Source de données — `bixi.csv`
+
+Fichier CSV téléchargé depuis [bixi.com/en/open-data](https://bixi.com/en/open-data/). Contient tous les trajets BIXI de l'année en cours.
+
+Colonnes utilisées :
+
+| Colonne                    | Description                                 |
+|----------------------------|---------------------------------------------|
+| `STARTSTATIONLATITUDE`     | Latitude de la station de départ            |
+| `STARTSTATIONLONGITUDE`    | Longitude de la station de départ           |
+| `ENDSTATIONLATITUDE`       | Latitude de la station d'arrivée            |
+| `ENDSTATIONLONGITUDE`      | Longitude de la station d'arrivée           |
+| `STARTTIMEMS`              | Horodatage de départ en millisecondes (Unix) |
+
+Les données sont publiées annuellement (non en temps réel). Le fichier de l'année courante peut être remplacé dans le workflow lorsqu'une nouvelle version est publiée.
+
+---
+
 ## Script de génération — `genMap.py`
 
 ### Étape 1 — Lecture et filtrage du CSV
@@ -94,7 +115,38 @@ def is_within_last_6_months(date_str):
 
 Après le filtrage, `has_significant_gaps` analyse chaque compteur pour détecter les lacunes importantes (voir section [Qualité des données](#qualité-des-données--compteurs-avec-lacunes)).
 
-### Étape 2 — Génération du HTML
+### Étape 2 — Traitement BIXI
+
+Si `bixi.csv` est présent, `genMap.py` croise chaque trajet BIXI avec les compteurs à proximité via la distance haversine (rayon de 150 m) :
+
+```python
+def _haversine_m(lat1, lon1, lat2, lon2):
+    # Retourne la distance en mètres entre deux coordonnées GPS
+    ...
+
+BIXI_RADIUS_M = 150
+```
+
+Pour chaque trajet, si la station de **départ ou d'arrivée** se trouve dans le rayon d'un compteur, ce compteur est incrémenté pour la date du trajet. Un même trajet ne compte qu'une seule fois par compteur, même si les deux stations sont dans son rayon.
+
+Résultat : deux structures injectées dans le JS :
+
+```javascript
+// Nombre de trajets BIXI par compteur par jour
+const bixiNearby = {
+    "det-00709-01": { "2026-01-23": 59, "2026-01-27": 48, ... }
+};
+
+// Jours où les trajets BIXI dépassent le volume du compteur
+const bixiExceedsDays = {
+    "det-00709-01": {
+        "2026-01-23": { "counter": 0, "bixi": 59 },
+        ...
+    }
+};
+```
+
+### Étape 3 — Génération du HTML
 
 Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `index.html`.
 
@@ -104,7 +156,7 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
 <html>
   <head>                 ← CSS inline + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + Google Analytics
   <body>
-    .site-header         ← Logo, titre, sous-titre (lien vers données ouvertes), avertissement qualité, lien gabfortin.com
+    .site-header         ← Logo, titre, sous-titre (liens vers données ouvertes Ville + BIXI), lien gabfortin.com
     .container
       .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / Tout)
       .select-wrapper.desktop-only
@@ -115,13 +167,14 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
       .stats-row         ← 3 cartes : passages totaux, moyenne/jour, heure de pointe
       #viewToggle        ← Toggle "Dans le temps / Par jour" (masqué pour Jour spécifique uniquement)
       #dirToggle         ← Toggle "Par direction / Combiné" (bi-directionnels uniquement)
+      #bixiToggle        ← Toggle "Bixi" on/off (visible uniquement pour les compteurs avec données BIXI)
       #chart-map-layout  ← Grid 2 colonnes sur desktop, empilé sur mobile
         #chart-area
           #noDataMsg     ← Message "Aucune donnée disponible" (affiché si période vide)
           [N × .table-container]  ← Un div par compteur (masqué par défaut)
         #map             ← Carte Leaflet
     <script>             ← Données + logique JS inline
-    .watermark
+    .watermark           ← Crédit auteur + avertissement qualité des données
 ```
 
 **Données injectées dans le JS :**
@@ -144,8 +197,17 @@ countersByArrondissement["Le Plateau-Mont-Royal"] = [
 // Coordonnées GPS pour la carte
 counterLocations['det-00709-01'] = { lat: 45.53, lng: -73.57, label: '...', arrondissement: '...' };
 
-// Compteurs avec lacunes significatives (calculé par has_significant_gaps)
+// Compteurs avec lacunes significatives
 const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
+
+// Jours anormaux détectés statistiquement
+const anomalyDays = { "det-00709-01": { "2026-01-23": { total: 0, expected: 858, z_score: -99 } } };
+
+// Trajets BIXI par compteur par jour (rayon 150 m)
+const bixiNearby = { "det-00709-01": { "2026-01-23": 59, ... } };
+
+// Jours où BIXI > compteur
+const bixiExceedsDays = { "det-00709-01": { "2026-01-23": { counter: 0, bixi: 59 } } };
 ```
 
 ---
@@ -159,18 +221,21 @@ Tout le JavaScript est inline dans le HTML généré.
 | Variable                    | Contenu                                                                              |
 |-----------------------------|--------------------------------------------------------------------------------------|
 | `allChartData`              | Données brutes des 6 derniers mois, par instance                                     |
-| `chartData`                 | Données filtrées pour la période active, par instance                          |
-| `charts`                    | Instances Chart.js créées (cache)                                              |
-| `markers`                   | Markers Leaflet, par instance                                                  |
-| `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)                   |
-| `counterLocations`          | Coordonnées GPS et métadonnées par instance                                    |
-| `globalMaxDate`             | Date la plus récente parmi tous les compteurs — référence commune pour filtrer |
-| `currentPeriod`             | Nombre de jours de la période active (`-1` = tout, défaut : `7`)               |
-| `displayMode`               | `'separate'` ou `'combined'` (toggle bi-directionnel)                          |
-| `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)               |
-| `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)              |
+| `chartData`                 | Données filtrées pour la période active, par instance                                |
+| `charts`                    | Instances Chart.js créées (cache)                                                    |
+| `markers`                   | Markers Leaflet, par instance                                                        |
+| `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)                         |
+| `counterLocations`          | Coordonnées GPS et métadonnées par instance                                          |
+| `globalMaxDate`             | Date la plus récente parmi tous les compteurs — référence commune pour filtrer       |
+| `currentPeriod`             | Nombre de jours de la période active (`-1` = tout, défaut : `7`)                    |
+| `displayMode`               | `'combined'` (défaut) ou `'separate'` (toggle bi-directionnel)                      |
+| `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)                    |
+| `showBixi`                  | `true` (défaut) — affiche ou masque l'overlay BIXI sur les graphiques               |
+| `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)                   |
 | `gappyCounters`             | `Set` des instances avec lacunes significatives — injecté par `genMap.py`            |
-| `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` des jours anormaux — injecté par `genMap.py` |
+| `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` — injecté par `genMap.py`    |
+| `bixiNearby`                | Trajets BIXI par compteur par jour — injecté par `genMap.py`                        |
+| `bixiExceedsDays`           | Jours où BIXI > compteur — injecté par `genMap.py`                                  |
 | `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                                  |
 
 ### Fonctions principales
@@ -183,34 +248,35 @@ Filtre les données horaires pour la période active en se basant sur `globalMax
 - `days > 0` : retourne les N derniers jours à partir de `globalMaxDate`
 
 Selon `displayMode` :
+- `'combined'` : somme de toutes les directions en un seul dataset vert (défaut)
 - `'separate'` : un dataset par direction (vert / bleu ciel)
-- `'combined'` : somme de toutes les directions en un seul dataset vert
 
 #### `buildDailyData(instance, days)`
 Agrège les données horaires en totaux journaliers pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
 
-#### `hasDataForPeriod(instance)`
-Retourne `true` si `chartData[instance]` contient au moins un label pour la période active. Utilisé pour décider d'afficher le graphique ou le message "aucune donnée".
+#### `createChart(id)`
+Crée le graphique Chart.js pour le compteur donné. Si `showBixi` est actif et que `bixiNearby[id]` contient des données pour la période affichée, un dataset BIXI est ajouté :
 
-#### `selectCounter(instance)`
-Affiche le graphique du compteur sélectionné. Si `hasDataForPeriod` est faux, masque le canvas et affiche `#noDataMsg` à la place. Met aussi à jour les stats, les toggles, et la carte.
+- **Vue timeline** : step-line rouge pâle pointillée (`stepped: 'before'`), sur l'axe Y principal
+- **Vue daily** : barres rouges pâles, sur l'axe Y principal
 
-#### `filterDataByPeriod(days)`
-Change la période active : reconstruit `chartData` pour toutes les instances, bascule `viewMode` automatiquement, et recrée le graphique actif.
+Dans les deux cas, les valeurs BIXI sont sur la même échelle que les passages du compteur, permettant une comparaison directe.
 
-Règle de basculement automatique du `viewMode` :
+#### `updateAnomalyWarning(instance)`
+Affiche ou masque `#anomalyWarning` selon que des anomalies ou des dépassements BIXI tombent dans la période visible. Pour chaque jour signalé :
 
-| Période        | `viewMode` par défaut |
-|----------------|-----------------------|
-| Jour spécifique | `'timeline'`         |
-| 7 derniers jours | `'timeline'`        |
-| 30j / 90j / 180j / Tout | `'daily'`  |
+- Si `bixiExceedsDays[instance][date]` existe → badge rouge **"⚠ Bixi (N) > compteur (M)"**
+- Sinon si `bixiNearby[instance][date] > 0` → mention bleue "✓ N trajets Bixi à proximité"
+- Les jours où BIXI dépasse le compteur mais non détectés par l'algorithme statistique sont aussi listés
 
-#### `updateViewToggle()`
-Affiche ou masque `#viewToggle`. Le toggle est **masqué uniquement pour "Jour spécifique"** (`currentPeriod === 0`). Pour toutes les autres périodes, il est visible et permet de choisir entre courbe horaire et barres journalières.
+#### `updateBixiToggle(instance)`
+Affiche `#bixiToggle` uniquement pour les compteurs ayant des données BIXI dans `bixiNearby`.
 
 #### `updateDirToggle(instance)`
 Affiche `#dirToggle` uniquement pour les compteurs bi-directionnels (18 sur 45).
+
+#### `updateViewToggle()`
+Affiche ou masque `#viewToggle`. Le toggle est **masqué uniquement pour "Jour spécifique"** (`currentPeriod === 0`).
 
 #### `updateStats(instance)`
 Calcule les 3 statistiques en combinant toutes les directions :
@@ -219,9 +285,6 @@ Calcule les 3 statistiques en combinant toutes les directions :
 - **Heure de pointe** : heure cumulant le plus de passages
 
 Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
-
-#### `updateAnomalyWarning(instance)`
-Affiche ou masque `#anomalyWarning` selon que des anomalies tombent dans la période visible. Filtre `anomalyDays[instance]` en intersectant les dates avec les labels actifs de `chartData[instance]`. Appelée lors de chaque changement de compteur ou de période.
 
 #### `updateMapSelection(instance)`
 Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`), les compteurs normaux en vert (`#1DB860`), et les compteurs avec lacunes en amber (`#F59E0B`).
@@ -241,17 +304,33 @@ Au chargement, un arrondissement et un compteur sont choisis **aléatoirement**.
 ### Graphiques bi-directionnels
 
 Pour les 18 compteurs avec deux directions :
-- Par défaut : **2 lignes** (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
-- Mode combiné : **1 ligne** verte avec fill dégradé, somme des deux directions
+- Par défaut : **mode combiné** — 1 ligne verte avec fill dégradé, somme des deux directions
+- Mode séparé : 2 lignes (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
 - Le toggle "Par direction / Combiné" est visible uniquement pour ces compteurs
-- Le mode direction fonctionne identiquement en vue "Dans le temps" et "Par jour"
+
+### Overlay BIXI
+
+Pour les 14 compteurs ayant au moins une station BIXI dans un rayon de 150 m :
+- Un bouton **"Bixi"** rouge apparaît dans la barre de contrôle (actif par défaut)
+- En vue timeline : step-line rouge pâle pointillée superposée à la courbe des passages
+- En vue daily : barres rouges pâles sur le même axe Y que les barres du compteur
+- Le bouton masque/affiche l'overlay sans recharger la page
+
+### Code couleur des graphiques
+
+| Couleur | Signification |
+|---------|--------------|
+| Vert `#1DB860` | Passages du compteur (normal) |
+| Bleu ciel `#29ABE2` | 2e direction (mode séparé) |
+| Orange `rgba(245,158,11,...)` | Jour d'anomalie détectée (barres daily) |
+| Rouge pâle `rgba(220,38,38,...)` | Données BIXI (overlay) |
 
 ### Message "aucune donnée"
 
-Quand un compteur n'a aucune donnée dans la fenêtre temporelle sélectionnée (ex. compteur inactif depuis 4 mois, période choisie = "3 derniers mois") :
+Quand un compteur n'a aucune donnée dans la fenêtre temporelle sélectionnée :
 - Le canvas est masqué
-- `#noDataMsg` s'affiche à sa place avec le message *"Aucune donnée disponible pour cette période."*
-- La référence de temps est `globalMaxDate`, commune à tous les compteurs, pour garantir une cohérence entre eux
+- `#noDataMsg` s'affiche à sa place
+- La référence de temps est `globalMaxDate`, commune à tous les compteurs
 
 ### Carte Leaflet
 
@@ -282,19 +361,13 @@ Exécutée en Python dans `genMap.py` après le filtrage des 6 derniers mois. Un
 
 > **Pourquoi 14 jours ?** L'analyse du CSV révèle que la quasi-totalité des compteurs ont exactement 7 jours consécutifs manquants — une lacune systémique dans la source de données, non spécifique à un compteur. Le seuil de 14 jours permet d'ignorer ce bruit et de ne signaler que les interruptions réellement significatives.
 
-Les instances flaggées sont injectées dans le JS sous forme de `Set` :
-
-```javascript
-const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
-```
-
 ### Signalisation visuelle
 
 | Élément | Comportement |
 |---------|-------------|
 | Marker carte | Amber (`#F59E0B`) au lieu du vert, avec `⚠` dans le tooltip au survol |
 | Marker sélectionné | Bleu ciel (`#29ABE2`) comme les autres (comportement inchangé) |
-| Bannière `#dataWarning` | S'affiche sous le titre du compteur avec le message : *"Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence."* |
+| Bannière `#dataWarning` | S'affiche sous le titre du compteur avec un message d'avertissement |
 
 ---
 
@@ -304,7 +377,7 @@ En plus des lacunes, `genMap.py` détecte les jours dont le volume de passages e
 
 ### Détection — `detect_anomalies()`
 
-Exécutée après le filtrage des 6 derniers mois. Pour chaque instance, les totaux journaliers sont calculés en agrégeant toutes les directions et toutes les heures. Seuls les jours avec **≥ 18 heures de données** sont inclus (pour exclure les jours partiels en début/fin de fenêtre).
+Exécutée après le filtrage des 6 derniers mois. Pour chaque instance, les totaux journaliers sont calculés en agrégeant toutes les directions et toutes les heures. Seuls les jours avec **≥ 18 heures de données** sont inclus.
 
 Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes suivantes est déclenchée :
 
@@ -315,8 +388,6 @@ Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes s
 | Score Z négatif | `z = (taux − μ) / σ` | `z < −2,5` |
 | Taux trop faible | `taux / μ` | `< 50 %` de la moyenne |
 
-Où `taux = passages / heures_enregistrées`, `μ` et `σ` calculés sur les jours complets (≥ 18 h) du même jour de semaine.
-
 **Méthode 2 — Jours adjacents** (robuste à la saisonnalité) :
 
 | Critère | Seuil |
@@ -325,17 +396,19 @@ Où `taux = passages / heures_enregistrées`, `μ` et `σ` calculés sur les jou
 | Cohérence des références | CV (σ/μ) des jours adjacents `< 0,6` |
 | Nombre de références | ≥ 4 jours complets dans la fenêtre |
 
-**Jours entièrement absents** : tout jour sans aucune donnée dans la plage active du compteur (entre sa première et sa dernière mesure) est automatiquement signalé si le volume attendu dépasse 50 passages/jour.
+**Jours entièrement absents** : tout jour sans aucune donnée dans la plage active du compteur est automatiquement signalé si le volume attendu dépasse 50 passages/jour.
 
-**Minimum attendu** : `≥ 50 passages` pour qu'un jour soit signalé (évite le bruit sur les compteurs peu fréquentés).
+### Validation croisée BIXI
 
-Les anomalies détectées sont injectées dans le JS :
+En complément de la détection statistique, les anomalies sont croisées avec les données BIXI pour les 14 compteurs couverts :
+
+- Si des trajets BIXI sont enregistrés à proximité un jour où le compteur affiche 0 ou presque → le compteur était probablement en panne
+- Les jours où **BIXI > compteur** (204 cas identifiés sur 3 mois) sont signalés même s'ils ne déclenchent pas l'algorithme statistique
 
 ```javascript
-const anomalyDays = {
+const bixiExceedsDays = {
     "det-00709-01": {
-        "2026-04-17": { "total": 45, "expected": 892, "z_score": -3.8 },
-        "2026-04-18": { "total": 62, "expected": 876, "z_score": -3.5 }
+        "2026-01-23": { "counter": 0, "bixi": 59 }
     }
 };
 ```
@@ -344,12 +417,11 @@ const anomalyDays = {
 
 | Élément | Comportement |
 |---------|-------------|
-| Bannière `#anomalyWarning` | S'affiche en rouge pour les vues **Jour spécifique** et **7 derniers jours** uniquement, avec la liste des dates suspectes, le volume observé vs attendu (et z-score si applicable). Les jours sans données indiquent "données manquantes". |
-| Bouton `ℹ` (hover) | Tooltip expliquant les deux méthodes de calcul et la détection des jours manquants |
-| Barres rouges (vue Par jour) | Dans la vue journalière 7 jours, les barres correspondant à des jours anomaux (incluant les jours à 0) apparaissent en rouge |
-| Gaps (vue Dans le temps) | Dans la vue horaire 7 jours, les jours sans données apparaissent comme des interruptions (gaps) dans la courbe |
-
-La bannière se met à jour dynamiquement à chaque changement de période ou de compteur. Pour les périodes > 7 jours, les anomalies ponctuelles sont diluées et le warning n'est pas affiché.
+| Bannière `#anomalyWarning` | S'affiche pour les vues **Jour spécifique** et **7 derniers jours**, avec dates suspectes et volumes observés vs attendus |
+| Badge rouge `⚠ Bixi (N) > compteur (M)` | Affiché sur chaque jour où BIXI dépasse le compteur |
+| Mention bleue BIXI | Affiché quand des trajets BIXI confirment une anomalie sans la dépasser |
+| Barres oranges (vue Par jour) | Les barres correspondant à des jours anomaux apparaissent en orange (`rgba(245,158,11,...)`) |
+| Gaps (vue Dans le temps) | Les jours sans données apparaissent comme des interruptions dans la courbe |
 
 ---
 
