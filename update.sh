@@ -21,20 +21,21 @@ git config user.email "$GIT_EMAIL"
 git config user.name "$GIT_NAME"
 git remote set-url origin "https://$GITHUB_TOKEN@github.com/$GITHUB_REPO.git"
 
-# ── Trouver l'URL du CSV sur le portail de données ouvertes ───────────────────
+CSV_CHANGED=false
+BIXI_CHANGED=false
+
+# ── Télécharger le CSV cyclistes ──────────────────────────────────────────────
 echo "$LOG Recherche de l'URL du CSV..."
 CSV_URL=$(python3 - <<'EOF'
 import urllib.request, re, sys
 try:
     html = urllib.request.urlopen("https://donnees.montreal.ca/dataset/cyclistes").read().decode("utf-8")
-    m = re.search(r'href="([^"]+)"[^>]*title="T\u00e9l\u00e9charger"', html, re.DOTALL)
+    m = re.search(r'href="([^"]+)"[^>]*title="Télécharger"', html, re.DOTALL)
     if not m:
-        # Essai avec l'attribut dans l'autre ordre
-        m = re.search(r'title="T\u00e9l\u00e9charger"[^>]*href="([^"]+)"', html, re.DOTALL)
+        m = re.search(r'title="Télécharger"[^>]*href="([^"]+)"', html, re.DOTALL)
     if m:
         print(m.group(1))
     else:
-        print("", end="")
         sys.stderr.write("URL du CSV introuvable sur la page.\n")
         sys.exit(1)
 except Exception as e:
@@ -44,10 +45,21 @@ EOF
 )
 echo "$LOG URL trouvée : $CSV_URL"
 
-# ── Télécharger le nouveau CSV ─────────────────────────────────────────────────
-echo "$LOG Téléchargement du CSV..."
-curl -fsSL "$CSV_URL" -o cyclistes.csv
+echo "$LOG Téléchargement du CSV cyclistes..."
+OLD_HASH=""
+[ -f cyclistes.csv ] && OLD_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
+curl -fsSL \
+  -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+  -H "Referer: https://donnees.montreal.ca/dataset/cyclistes" \
+  "$CSV_URL" -o cyclistes.csv
 echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
+NEW_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
+if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+    echo "$LOG Nouveau CSV cyclistes détecté."
+    CSV_CHANGED=true
+else
+    echo "$LOG CSV cyclistes identique à la version précédente."
+fi
 
 # ── Télécharger le CSV BIXI (si une nouvelle version est disponible) ───────────
 echo "$LOG Recherche de la dernière version des données BIXI..."
@@ -116,9 +128,16 @@ PYEOF
         rm -f bixi.zip
         echo "$BIXI_URL" > "$BIXI_URL_CACHE"
         echo "$LOG CSV BIXI prêt ($(du -sh bixi.csv | cut -f1))"
+        BIXI_CHANGED=true
     fi
 else
     echo "$LOG URL BIXI introuvable — données existantes conservées."
+fi
+
+# ── Rien de nouveau → on arrête ───────────────────────────────────────────────
+if [ "$CSV_CHANGED" = false ] && [ "$BIXI_CHANGED" = false ]; then
+    echo "$LOG Aucune donnée nouvelle — rien à publier."
+    exit 0
 fi
 
 # ── Générer le HTML ────────────────────────────────────────────────────────────

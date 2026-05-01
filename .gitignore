@@ -5,3 +5,5 @@
 .bixi_url
 .claude
 .vscode
+./logs*
+logs
