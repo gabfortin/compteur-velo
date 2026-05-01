@@ -10,7 +10,7 @@ echo "Variables d'environnement chargées."
 echo "Exécution initiale au démarrage..."
 /app/update.sh 2>&1 | tee -a /var/log/update.log || true
 
-echo "Prochain run planifié : $(grep velo-cron /etc/cron.d/velo-cron | awk '{print $1,$2,$3,$4,$5}')"
+echo "Prochain run planifié : $(awk 'NF {print $1,$2,$3,$4,$5; exit}' /etc/cron.d/velo-cron)"
 echo "Démarrage du planificateur cron..."
 
 exec cron -f
