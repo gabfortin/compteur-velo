@@ -5,23 +5,21 @@ ENV TZ=America/Montreal
 # Dépendances système
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    cron \
     curl \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Supercronic (cron conçu pour Docker)
+RUN curl -fsSL https://github.com/aptible/supercronic/releases/download/v0.2.29/supercronic-linux-amd64 \
+    -o /usr/local/bin/supercronic && chmod +x /usr/local/bin/supercronic
 
 # Dépendances Python
 RUN pip install --no-cache-dir tqdm
 
 # Scripts
 WORKDIR /app
-COPY update.sh entrypoint.sh /app/
+COPY update.sh entrypoint.sh crontab /app/
 RUN chmod +x /app/update.sh /app/entrypoint.sh
-
-# Cron : tous les jours à 08h15 heure de Montréal (America/Montreal)
-RUN echo "15 8 * * * root . /etc/environment && /app/update.sh >> /var/log/update.log 2>&1" \
-    > /etc/cron.d/velo-cron \
-    && chmod 0644 /etc/cron.d/velo-cron
 
 RUN touch /var/log/update.log
 
