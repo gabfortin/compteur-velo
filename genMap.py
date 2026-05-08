@@ -205,7 +205,7 @@ html_parts = ['''<html>
             background: linear-gradient(160deg, #6dcf96 0%, #2a9455 45%, #0d4f2a 100%);
             color: #333;
             margin: 0;
-            padding: 12px;
+            padding: 0 12px 12px;
             min-height: 100vh;
         }
         @keyframes fadeDown {
@@ -608,7 +608,7 @@ html_parts = ['''<html>
         @media (min-width: 768px) {
             .desktop-only { display: block; }
             .mobile-only { display: none; }
-            body { padding: 20px; }
+            body { padding: 0 20px 20px; }
             h1 { font-size: 32px; }
             .subtitle { font-size: 14px; }
             .container { padding: 24px; }
@@ -672,48 +672,71 @@ html_parts = ['''<html>
             animation: spinIcon 0.55s cubic-bezier(0.42, 0, 0.58, 1) forwards;
             pointer-events: none;
         }
-        @keyframes avatarPulse {
-            0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55), 0 2px 8px rgba(0,0,0,0.25); }
-            60%  { box-shadow: 0 0 0 7px rgba(255,255,255,0), 0 2px 8px rgba(0,0,0,0.25); }
-            100% { box-shadow: 0 0 0 0 rgba(255,255,255,0), 0 2px 8px rgba(0,0,0,0.25); }
-        }
-        @keyframes avatarBob {
-            0%, 100% { transform: translateY(0); }
-            50%       { transform: translateY(-3px); }
-        }
-        .avatar-link {
-            display: inline-flex;
+        /* ── Top bar ── */
+        #topbar {
+            height: 50px;
+            display: flex;
             align-items: center;
-            vertical-align: middle;
-            margin-left: 8px;
-            text-decoration: none;
+            justify-content: space-between;
+            padding: 0 16px 0 20px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            margin: 0 -12px;
+            z-index: 900;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
-        .avatar-link img {
+        #topbar-nav { display: flex; align-items: center; gap: 4px; }
+        .nav-link {
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            color: #4b5563;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: background 0.25s, color 0.25s;
+        }
+        .nav-link:hover { background: #f1f5f9; color: #111827; }
+        .nav-link.active { background: #e8faf0; color: #1DB860; }
+        body.rev-mode .nav-link.active { background: #e8f2fc; color: #0072BC; }
+        #topbar-profile {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: #4b5563;
+            transition: color 0.25s;
+        }
+        #topbar-profile:hover { color: #111827; }
+        #topbar-profile:hover img { box-shadow: 0 0 0 2px #1DB860; }
+        body.rev-mode #topbar-profile:hover img { box-shadow: 0 0 0 2px #0072BC; }
+        #topbar-profile-name { font-size: 13px; font-weight: 500; }
+        #topbar-profile img {
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.75);
             object-fit: cover;
-            animation: avatarPulse 2.2s ease-out infinite, avatarBob 3s ease-in-out infinite;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-            cursor: pointer;
+            display: block;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 2px #e5e7eb;
+            transition: box-shadow 0.25s;
         }
-        .avatar-link:hover img {
-            animation: none;
-            transform: scale(1.12);
-            border-color: #fff;
-            box-shadow: 0 0 0 3px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.3);
+        @media (min-width: 768px) {
+            #topbar { margin: 0 -20px; }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div style="text-align:right;padding:6px 12px;font-size:12px;display:flex;align-items:center;justify-content:flex-end;gap:6px;">
-        <a href="https://www.gabfortin.com" style="color:rgba(255,255,255,0.7);text-decoration:none;" target="_blank">gabfortin.com</a>
-        <a href="https://www.gabfortin.com" class="avatar-link" target="_blank" title="Gabriel Fortin">
+    <nav id="topbar">
+        <div id="topbar-nav">
+            <a href="https://pistes.gabfortin.com" class="nav-link">Pistes</a>
+            <a href="/" class="nav-link active">Compteurs</a>
+        </div>
+        <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
+            <span id="topbar-profile-name">gabfortin.com</span>
             <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
         </a>
-    </div>
+    </nav>
     <div class="site-header">
         <img src="favico.png" alt="Logo" id="themeToggleBtn" title="Basculer vers le thème REV" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.15s ease;">
         <h1>Compteurs Vélo Montréal</h1>
