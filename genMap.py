@@ -537,6 +537,11 @@ html_parts = ['''<html>
             #map-wrapper { height: 100%; min-height: 300px; }
             #map { height: 100%; }
         }
+        @media (max-width: 767px) {
+            #dataWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
+            #anomalyWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
+            #anomalyWarning .anomaly-info-btn { display: none; }
+        }
         .dir-toggle {
             display: flex;
             gap: 6px;
@@ -762,13 +767,23 @@ html_parts = ['''<html>
         <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="">données ouvertes de la Ville</a>. Validation croisée avec les <a href="https://bixi.com/en/open-data/" target="_blank" style="">données ouvertes BIXI</a>.</p>
     </div>
     <div class="container">
-        <div class="period-buttons">
+        <div class="period-buttons desktop-only">
             <button class="period-btn" data-days="0">Jour spécifique</button>
             <button class="period-btn active" data-days="7">7 derniers jours</button>
             <button class="period-btn" data-days="30">Dernier mois</button>
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
             <button class="period-btn" data-days="-1">Tout</button>
+        </div>
+        <div class="select-wrapper mobile-only" style="margin-bottom:14px;">
+            <select id="periodSelectMobile">
+                <option value="0">Jour spécifique</option>
+                <option value="7" selected>7 derniers jours</option>
+                <option value="30">Dernier mois</option>
+                <option value="90">3 derniers mois</option>
+                <option value="180">6 derniers mois</option>
+                <option value="-1">Tout</option>
+            </select>
         </div>
         <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
         <div id="dayLabel" class="day-label" style="display:none"></div>
@@ -859,7 +874,7 @@ html_parts.append('''
         <div id="anomalyWarning">
             <span class="warn-icon">⚠️</span>
             <div class="anomaly-body">
-                <strong>Données potentiellement erronées</strong> — volumes anormalement bas détectés :<br>
+                <strong class="desktop-only">Données potentiellement erronées</strong><strong class="mobile-only">Données suspectes</strong><span class="desktop-only"> — volumes anormalement bas détectés :</span><br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
             </div>
             <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés (0 passages = données manquantes). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
@@ -1401,8 +1416,14 @@ html_parts.append('''
             if (!found.length) { el.style.display = 'none'; return; }
             const bixi = (typeof bixiNearby !== 'undefined' && bixiNearby[instance]) ? bixiNearby[instance] : {};
             const exceeds = (typeof bixiExceedsDays !== 'undefined' && bixiExceedsDays[instance]) ? bixiExceedsDays[instance] : {};
+            const isMobile = window.innerWidth < 768;
             const anomalyLines = found.map(([d, info]) => {
                 const dateObj = new Date(d + 'T12:00:00');
+                if (isMobile) {
+                    const dateStr = dateObj.toLocaleDateString('fr-CA', {day: 'numeric', month: 'short'});
+                    const label = info.total === 0 ? 'données manquantes' : `${info.total.toLocaleString('fr-CA')} passages`;
+                    return `${dateStr} — ${label}`;
+                }
                 const dateStr = dateObj.toLocaleDateString('fr-CA', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
                 const label = info.total === 0
                     ? `<strong>données manquantes</strong> (attendu ~${info.expected.toLocaleString('fr-CA')} passages)`
@@ -1414,7 +1435,7 @@ html_parts.append('''
                 return `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} : ${label}${exceedsBadge}`;
             });
             const exceedsOnlyDates = Object.keys(exceeds).filter(d => visibleDates.has(d) && !anomalyDays[instance][d]);
-            const exceedsOnlyLines = exceedsOnlyDates.map(d => {
+            const exceedsOnlyLines = isMobile ? [] : exceedsOnlyDates.map(d => {
                 const dateObj = new Date(d + 'T12:00:00');
                 const dateStr = dateObj.toLocaleDateString('fr-CA', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
                 const {counter, bixi: bcount} = exceeds[d];
@@ -1544,6 +1565,9 @@ html_parts.append('''
 
         function filterDataByPeriod(days) {
             currentPeriod = days;
+            const mPeriod = document.getElementById('periodSelectMobile');
+            if (mPeriod) mPeriod.value = String(days);
+            document.querySelectorAll('.period-btn').forEach(b => b.classList.toggle('active', parseInt(b.getAttribute('data-days')) === days));
             const wrapper = document.getElementById('datepickerWrapper');
             if (days === 0) {
                 const instance = getSelectedCounter();
@@ -1611,10 +1635,12 @@ html_parts.append('''
 
         document.querySelectorAll('.period-btn').forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
                 filterDataByPeriod(parseInt(this.getAttribute('data-days')));
             });
+        });
+
+        document.getElementById('periodSelectMobile').addEventListener('change', function() {
+            filterDataByPeriod(parseInt(this.value));
         });
 
         document.getElementById('specificDatePicker').addEventListener('change', function() {
