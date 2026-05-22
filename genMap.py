@@ -305,6 +305,9 @@ html_parts = ['''<html>
             line-height: 1.5;
         }
         .subtitle a { color: #1a9950; text-decoration: underline; }
+        @media (max-width: 767px) {
+            .subtitle { display: none; }
+        }
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -541,6 +544,19 @@ html_parts = ['''<html>
             #dataWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
             #anomalyWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
         }
+        .toggle-select {
+            padding: 6px 10px;
+            border: 1.5px solid rgba(29,184,96,0.35);
+            border-radius: 8px;
+            background: #fff;
+            color: #1DB860;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            width: 100%;
+        }
+        .toggle-select:focus { box-shadow: 0 0 0 3px rgba(29,184,96,0.15); border-color: #1DB860; }
         .dir-toggle {
             display: flex;
             gap: 6px;
@@ -852,10 +868,16 @@ html_parts.append('''
                 <div class="stat-label">Heure de pointe</div>
             </div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;min-height:30px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;min-height:30px;gap:8px;">
             <div id="viewToggle" style="display:none;flex-direction:row;gap:6px;">
                 <button class="dir-btn active" id="btnTimeline">Dans le temps</button>
                 <button class="dir-btn" id="btnDaily">Par jour</button>
+            </div>
+            <div id="viewToggleMobile" style="display:none;flex:1;">
+                <select id="viewSelectMobile" class="toggle-select">
+                    <option value="timeline" selected>Dans le temps</option>
+                    <option value="daily">Par jour</option>
+                </select>
             </div>
             <div style="display:flex;gap:6px;margin-left:auto;align-items:center;">
                 <div id="bixiToggle" style="display:none;">
@@ -864,6 +886,12 @@ html_parts.append('''
                 <div id="dirToggle" style="display:none;flex-direction:row;gap:6px;">
                     <button class="dir-btn" id="btnSeparate">Par direction</button>
                     <button class="dir-btn active" id="btnCombined">Combiné</button>
+                </div>
+                <div id="dirToggleMobile" style="display:none;">
+                    <select id="dirSelectMobile" class="toggle-select">
+                        <option value="combined" selected>Combiné</option>
+                        <option value="separate">Par direction</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -1362,24 +1390,24 @@ html_parts.append('''
         }
 
         function updateViewToggle() {
-            const toggle = document.getElementById('viewToggle');
-            if (currentPeriod >= 7 || currentPeriod === -1) {
-                toggle.style.display = 'flex';
-            } else {
-                toggle.style.display = 'none';
-                if (viewMode !== 'timeline') {
-                    viewMode = 'timeline';
-                    document.getElementById('btnTimeline').classList.add('active');
-                    document.getElementById('btnDaily').classList.remove('active');
-                }
+            const show = currentPeriod >= 7 || currentPeriod === -1;
+            const isMobile = window.innerWidth < 768;
+            document.getElementById('viewToggle').style.display = show && !isMobile ? 'flex' : 'none';
+            document.getElementById('viewToggleMobile').style.display = show && isMobile ? 'block' : 'none';
+            if (!show && viewMode !== 'timeline') {
+                viewMode = 'timeline';
+                document.getElementById('btnTimeline').classList.add('active');
+                document.getElementById('btnDaily').classList.remove('active');
+                document.getElementById('viewSelectMobile').value = 'timeline';
             }
         }
 
         function updateDirToggle(instance) {
-            const toggle = document.getElementById('dirToggle');
-            if (instance && allChartData[instance] && allChartData[instance].datasets.length > 1) {
-                toggle.style.display = 'flex';
-            } else {
+            const show = !!(instance && allChartData[instance] && allChartData[instance].datasets.length > 1);
+            const isMobile = window.innerWidth < 768;
+            document.getElementById('dirToggle').style.display = show && !isMobile ? 'flex' : 'none';
+            document.getElementById('dirToggleMobile').style.display = show && isMobile ? 'block' : 'none';
+            if (!show) {
                 toggle.style.display = 'none';
             }
         }
@@ -1473,35 +1501,25 @@ html_parts.append('''
             if (typeof markers !== 'undefined') updateMapSelection(instance);
         }
 
-        document.getElementById('btnTimeline').addEventListener('click', function() {
-            if (viewMode === 'timeline') return;
-            viewMode = 'timeline';
-            document.getElementById('btnTimeline').classList.add('active');
-            document.getElementById('btnDaily').classList.remove('active');
+        function applyViewMode(val) {
+            if (viewMode === val) return;
+            viewMode = val;
+            document.getElementById('btnTimeline').classList.toggle('active', val === 'timeline');
+            document.getElementById('btnDaily').classList.toggle('active', val === 'daily');
+            document.getElementById('viewSelectMobile').value = val;
             const instance = getSelectedCounter();
             if (instance) {
                 if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
                 createChart(instance);
             }
-        });
+        }
 
-        document.getElementById('btnDaily').addEventListener('click', function() {
-            if (viewMode === 'daily') return;
-            viewMode = 'daily';
-            document.getElementById('btnDaily').classList.add('active');
-            document.getElementById('btnTimeline').classList.remove('active');
-            const instance = getSelectedCounter();
-            if (instance) {
-                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
-                createChart(instance);
-            }
-        });
-
-        document.getElementById('btnSeparate').addEventListener('click', function() {
-            if (displayMode === 'separate') return;
-            displayMode = 'separate';
-            document.getElementById('btnSeparate').classList.add('active');
-            document.getElementById('btnCombined').classList.remove('active');
+        function applyDisplayMode(val) {
+            if (displayMode === val) return;
+            displayMode = val;
+            document.getElementById('btnSeparate').classList.toggle('active', val === 'separate');
+            document.getElementById('btnCombined').classList.toggle('active', val === 'combined');
+            document.getElementById('dirSelectMobile').value = val;
             const instance = getSelectedCounter();
             if (instance) {
                 chartData[instance] = buildFilteredData(instance, currentPeriod);
@@ -1509,21 +1527,14 @@ html_parts.append('''
                 createChart(instance);
                 updateStats(instance);
             }
-        });
+        }
 
-        document.getElementById('btnCombined').addEventListener('click', function() {
-            if (displayMode === 'combined') return;
-            displayMode = 'combined';
-            document.getElementById('btnCombined').classList.add('active');
-            document.getElementById('btnSeparate').classList.remove('active');
-            const instance = getSelectedCounter();
-            if (instance) {
-                chartData[instance] = buildFilteredData(instance, currentPeriod);
-                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
-                createChart(instance);
-                updateStats(instance);
-            }
-        });
+        document.getElementById('btnTimeline').addEventListener('click', () => applyViewMode('timeline'));
+        document.getElementById('btnDaily').addEventListener('click', () => applyViewMode('daily'));
+        document.getElementById('btnSeparate').addEventListener('click', () => applyDisplayMode('separate'));
+        document.getElementById('btnCombined').addEventListener('click', () => applyDisplayMode('combined'));
+        document.getElementById('viewSelectMobile').addEventListener('change', function() { applyViewMode(this.value); });
+        document.getElementById('dirSelectMobile').addEventListener('change', function() { applyDisplayMode(this.value); });
 
         document.getElementById('counterSelectDesktop').addEventListener('change', function() {
             selectCounter(this.value);
@@ -1583,10 +1594,12 @@ html_parts.append('''
                 viewMode = 'daily';
                 document.getElementById('btnDaily').classList.add('active');
                 document.getElementById('btnTimeline').classList.remove('active');
+                document.getElementById('viewSelectMobile').value = 'daily';
             } else {
                 viewMode = 'timeline';
                 document.getElementById('btnTimeline').classList.add('active');
                 document.getElementById('btnDaily').classList.remove('active');
+                document.getElementById('viewSelectMobile').value = 'timeline';
             }
             for (let instance in allChartData) {
                 chartData[instance] = buildFilteredData(instance, days);
