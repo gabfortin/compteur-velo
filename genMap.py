@@ -150,6 +150,9 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
         return {}
 
     typical_hours = median(v["hours"] for v in full_days.values())
+    typical_total = median(v["total"] for v in full_days.values())
+    # Seuil dynamique : 25 % de la médiane journalière, plancher absolu à 10
+    min_expected_effective = max(10, typical_total * 0.25)
 
     anomalies = {}
     for d_str, v in candidates.items():
@@ -195,7 +198,7 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
                 continue
             mu_ref = mu_adj if flagged_adj else mu_dow
             expected_total = round(mu_ref * typical_hours)
-            if expected_total < min_expected_total:
+            if expected_total < min_expected_effective:
                 continue
             z_val = -99.0
             if len(dow_refs) >= 2:
@@ -234,7 +237,7 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
                         mu_ref = mean(dow_refs_m)
                     if mu_ref > 0:
                         expected = round(mu_ref * typical_hours)
-                        if expected >= min_expected_total and not (weather_data and is_bad_weather(weather_data.get(d_str))):
+                        if expected >= min_expected_effective and not (weather_data and is_bad_weather(weather_data.get(d_str))):
                             anomalies[d_str] = {"total": 0, "expected": expected, "z_score": -99.0}
                 except:
                     pass
@@ -904,7 +907,7 @@ html_parts.append('''
                 <strong class="desktop-only">Données potentiellement erronées</strong><strong class="mobile-only">Données suspectes</strong><span class="desktop-only"> — volumes anormalement bas détectés :</span><br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
             </div>
-            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés (0 passages = données manquantes). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
+            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés si le volume attendu dépasse 25 % de la médiane journalière du compteur (plancher : 10 passages). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
         </div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
@@ -1481,9 +1484,6 @@ html_parts.append('''
             const isMobile = window.innerWidth < 768;
             document.getElementById('dirToggle').style.display = show && !isMobile ? 'flex' : 'none';
             document.getElementById('dirToggleMobile').style.display = show && isMobile ? 'block' : 'none';
-            if (!show) {
-                toggle.style.display = 'none';
-            }
         }
 
         function updateBixiToggle(instance) {
@@ -1506,7 +1506,9 @@ html_parts.append('''
 
         function updateAnomalyWarning(instance) {
             const el = document.getElementById('anomalyWarning');
-            if (!instance || !anomalyDays[instance] || (currentPeriod !== 0 && currentPeriod !== 7)) { el.style.display = 'none'; return; }
+            el.style.display = 'none';
+            document.getElementById('anomalyDetails').innerHTML = '';
+            if (!instance || !anomalyDays[instance] || (currentPeriod !== 0 && currentPeriod !== 7)) return;
             const visibleDates = new Set();
             if (currentPeriod === 0 && specificDate) {
                 visibleDates.add(specificDate);
@@ -1757,7 +1759,7 @@ html_parts.append('''
         const COLOR_GAPPY    = '#F59E0B';
 
         function markerStyle(selected, gappy) {
-            const base = gappy ? COLOR_GAPPY : COLOR_DEFAULT;
+            const base = COLOR_DEFAULT;
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : base, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
 

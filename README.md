@@ -420,7 +420,15 @@ Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes s
 | Cohérence des références | CV (σ/μ) des jours adjacents `< 0,6` |
 | Nombre de références | ≥ 4 jours complets dans la fenêtre |
 
-**Jours entièrement absents** : tout jour sans aucune donnée entre la première mesure du compteur et **hier** (`datetime.now() - timedelta(days=1)`) est automatiquement signalé si le volume attendu dépasse 50 passages/jour. La borne supérieure est étendue à hier (et non limitée à la dernière date dans les données) pour détecter les compteurs qui n'ont pas transmis de données récentes.
+**Jours entièrement absents** : tout jour sans aucune donnée entre la première mesure du compteur et **hier** (`datetime.now() - timedelta(days=1)`) est automatiquement signalé si le volume attendu dépasse le seuil dynamique du compteur. La borne supérieure est étendue à hier (et non limitée à la dernière date dans les données) pour détecter les compteurs qui n'ont pas transmis de données récentes.
+
+**Seuil dynamique** (`min_expected_effective`) : plutôt qu'un seuil fixe, le seuil est calculé à partir de l'historique propre au compteur :
+
+```python
+min_expected_effective = max(10, median_journalière × 0.25)
+```
+
+où `median_journalière` est la médiane des totaux de passages sur les journées complètes (≥ 18 h). Un plancher absolu de 10 garantit que les compteurs extrêmement peu fréquentés ne génèrent pas de faux positifs. Ce seuil adaptatif permet de détecter des anomalies sur des compteurs à faible trafic (~10–20 passages/jour) qui étaient systématiquement ignorés avec un seuil fixe à 50.
 
 **Suppression météo** : les jours de météo sévère ne sont pas signalés, quelle que soit la méthode. Les critères sont issus de `weather_data` (voir section Météo) :
 
