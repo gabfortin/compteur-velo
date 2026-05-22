@@ -4,6 +4,7 @@ from collections import defaultdict
 import os
 from tqdm import tqdm
 import json
+import urllib.request
 from datetime import datetime, timedelta, timezone
 import math
 from statistics import mean, stdev, median
@@ -57,10 +58,70 @@ def has_significant_gaps(instance_data, gap_days=14, missing_ratio=0.20):
 
 gappy_instances = {inst for inst, dirs in data.items() if has_significant_gaps(dirs)}
 
+# ── Météo ─────────────────────────────────────────────────────────────────────
+
+def weather_icon(code):
+    if code is None:             return '🌡️'
+    if code == 0:                return '☀️'
+    if code in (1, 2):           return '🌤️'
+    if code == 3:                return '☁️'
+    if code in (45, 48):         return '🌫️'
+    if code in (51, 53, 55, 56, 57): return '🌦️'
+    if code in (61, 63, 65, 66, 67): return '🌧️'
+    if code in (71, 73, 75, 77): return '❄️'
+    if code in (80, 81, 82):     return '🌦️'
+    if code in (85, 86):         return '🌨️'
+    if code in (95, 96, 99):     return '⛈️'
+    return '🌡️'
+
+def is_bad_weather(w):
+    if not w: return False
+    return (w.get('precip') or 0) > 15 or (w.get('snow') or 0) > 5 or (w.get('tmax') or 20) < -15
+
+def fetch_weather_data():
+    """Météo quotidienne de Montréal via Open-Meteo (archive + forecast récent)."""
+    LAT, LNG = 45.5017, -73.5673
+    start = (datetime.now() - timedelta(days=182)).strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%Y-%m-%d')
+    result = {}
+    sources = [
+        ("https://archive-api.open-meteo.com/v1/archive",
+         f"?latitude={LAT}&longitude={LNG}&start_date={start}&end_date={today}"
+         f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,weather_code"
+         f"&timezone=America%2FToronto"),
+        ("https://api.open-meteo.com/v1/forecast",
+         f"?latitude={LAT}&longitude={LNG}&past_days=10&forecast_days=0"
+         f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,weather_code"
+         f"&timezone=America%2FToronto"),
+    ]
+    for base_url, params in sources:
+        try:
+            req = urllib.request.Request(base_url + params, headers={"User-Agent": "compteur-velo/1.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                d = json.loads(resp.read().decode())
+            for i, date in enumerate(d['daily']['time']):
+                if date > today:
+                    continue
+                result[date] = {
+                    'tmax':  d['daily']['temperature_2m_max'][i],
+                    'tmin':  d['daily']['temperature_2m_min'][i],
+                    'precip': d['daily']['precipitation_sum'][i] or 0,
+                    'snow':   d['daily']['snowfall_sum'][i] or 0,
+                    'code':   int(d['daily']['weather_code'][i] or 0),
+                }
+        except Exception as e:
+            print(f"Avertissement météo ({base_url.split('/')[2]}) : {e}")
+    for date in result:
+        result[date]['icon'] = weather_icon(result[date]['code'])
+    print(f"Météo : {len(result)} jours chargés.")
+    return result
+
+weather_data = fetch_weather_data()
+
 # Détecter les jours avec un volume anormalement bas (dysfonctionnement probable du compteur)
 def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4,
                      ratio_threshold=0.5, adj_ratio_threshold=0.2, adj_window=6,
-                     min_expected_total=50):
+                     min_expected_total=50, weather_data=None):
     """
     Détecte les jours avec un taux horaire anormalement bas par deux méthodes
     complémentaires, et signale si l'une ou l'autre est déclenchée :
@@ -130,6 +191,8 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
             flagged_adj = mu_adj > 0 and rate < mu_adj * adj_ratio_threshold and cv_adj < 0.6
 
         if flagged_dow or flagged_adj:
+            if weather_data and is_bad_weather(weather_data.get(d_str)):
+                continue
             mu_ref = mu_adj if flagged_adj else mu_dow
             expected_total = round(mu_ref * typical_hours)
             if expected_total < min_expected_total:
@@ -171,7 +234,7 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
                         mu_ref = mean(dow_refs_m)
                     if mu_ref > 0:
                         expected = round(mu_ref * typical_hours)
-                        if expected >= min_expected_total:
+                        if expected >= min_expected_total and not (weather_data and is_bad_weather(weather_data.get(d_str))):
                             anomalies[d_str] = {"total": 0, "expected": expected, "z_score": -99.0}
                 except:
                     pass
@@ -180,7 +243,7 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
     return anomalies
 
 anomaly_data = {inst: det for inst, dirs in data.items()
-                if (det := detect_anomalies(dirs))}
+                if (det := detect_anomalies(dirs, weather_data=weather_data))}
 
 # Générer le HTML
 html_parts = ['''<html>
@@ -843,7 +906,7 @@ html_parts.append('''
                 <strong>Données potentiellement erronées</strong> — volumes anormalement bas détectés :<br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
             </div>
-            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés (0 passages = données manquantes).">ℹ</span>
+            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés (0 passages = données manquantes). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
         </div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
@@ -918,6 +981,8 @@ for instance in data.keys():
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 html_parts.append(f"const anomalyDays = {json.dumps(anomaly_data)};\n")
+weather_js = {d: {k: v for k, v in w.items() if k != 'code'} for d, w in weather_data.items()}
+html_parts.append(f"const weatherData = {json.dumps(weather_js)};\n")
 
 # Croiser les trajets Bixi avec les compteurs pour valider les anomalies
 def _haversine_m(lat1, lon1, lat2, lon2):
@@ -1285,6 +1350,19 @@ html_parts.append('''
                                             const d = parseLabel(label);
                                             return d.toLocaleDateString('fr-CA', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
                                                 + ' · ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+                                        },
+                                        afterBody: function(items) {
+                                            if (!isDaily) return [];
+                                            const label = items[0].label;
+                                            const w = (typeof weatherData !== 'undefined') ? weatherData[label] : null;
+                                            if (!w) return [];
+                                            const lines = [''];
+                                            let line = w.icon + '  ' + (w.tmax !== null ? Math.round(w.tmax) + '°C' : '?');
+                                            if (w.tmin !== null) line += ' / ' + Math.round(w.tmin) + '°C';
+                                            lines.push(line);
+                                            if (w.precip > 0.5) lines.push('🌧  ' + w.precip.toFixed(1) + ' mm pluie');
+                                            if (w.snow > 0.5) lines.push('❄  ' + w.snow.toFixed(1) + ' cm neige');
+                                            return lines;
                                         }
                                     }
                                 }

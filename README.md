@@ -115,7 +115,24 @@ def is_within_last_6_months(date_str):
 
 Après le filtrage, `has_significant_gaps` analyse chaque compteur pour détecter les lacunes importantes (voir section [Qualité des données](#qualité-des-données--compteurs-avec-lacunes)).
 
-### Étape 2 — Traitement BIXI
+### Étape 2 — Données météo
+
+`fetch_weather_data()` interroge [Open-Meteo](https://open-meteo.com/) (gratuit, sans clé API) en deux passes pour couvrir les 6 derniers mois sans discontinuité :
+
+| Source | URL | Couverture |
+|--------|-----|------------|
+| API archive (ERA5) | `archive-api.open-meteo.com/v1/archive` | J-182 à J-0 (lag ~5 jours) |
+| API forecast | `api.open-meteo.com/v1/forecast` | `past_days=10` (comble le lag de l'archive) |
+
+Les deux résultats sont fusionnés, les données forecast prenant priorité pour les dates récentes.
+
+Champs récupérés par jour : `temperature_2m_max`, `temperature_2m_min`, `precipitation_sum`, `snowfall_sum`, `weather_code` (WMO). Un emoji est calculé depuis le code WMO par `weather_icon()`.
+
+Le résultat est embarqué dans le HTML sous la forme `const weatherData = {...}`, puis utilisé :
+1. pour exclure les jours sévères de la détection d'anomalies (`is_bad_weather()`)
+2. pour enrichir le tooltip des graphiques journaliers côté JS
+
+### Étape 4 — Traitement BIXI
 
 Si `bixi.csv` est présent, `genMap.py` croise chaque trajet BIXI avec les compteurs à proximité via la distance haversine (rayon de 150 m) :
 
@@ -146,7 +163,7 @@ const bixiExceedsDays = {
 };
 ```
 
-### Étape 3 — Génération du HTML
+### Étape 5 — Génération du HTML
 
 Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `index.html`.
 
@@ -156,7 +173,8 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
 <html>
   <head>                 ← CSS inline + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + Google Analytics
   <body>
-    .site-header         ← Logo, titre, sous-titre (liens vers données ouvertes Ville + BIXI), lien gabfortin.com
+    <nav #topbar>        ← Barre de navigation : liens Pistes / Compteurs + lien profil gabfortin.com
+    .site-header         ← Logo, titre, sous-titre (liens vers données ouvertes Ville + BIXI)
     .container
       .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / Tout)
       .select-wrapper.desktop-only
@@ -174,7 +192,7 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
           [N × .table-container]  ← Un div par compteur (masqué par défaut)
         #map             ← Carte Leaflet
     <script>             ← Données + logique JS inline
-    .watermark           ← Crédit auteur + avertissement qualité des données
+    .watermark           ← Crédit auteur + avertissement qualité des données + timestamp de génération
 ```
 
 **Données injectées dans le JS :**
@@ -208,6 +226,9 @@ const bixiNearby = { "det-00709-01": { "2026-01-23": 59, ... } };
 
 // Jours où BIXI > compteur
 const bixiExceedsDays = { "det-00709-01": { "2026-01-23": { counter: 0, bixi: 59 } } };
+
+// Météo quotidienne de Montréal (Open-Meteo, 6 derniers mois)
+const weatherData = { "2026-05-21": { tmax: 15.1, tmin: 7.2, precip: 0, snow: 0, icon: "🌤️" } };
 ```
 
 ---
@@ -236,6 +257,7 @@ Tout le JavaScript est inline dans le HTML généré.
 | `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` — injecté par `genMap.py`    |
 | `bixiNearby`                | Trajets BIXI par compteur par jour — injecté par `genMap.py`                        |
 | `bixiExceedsDays`           | Jours où BIXI > compteur — injecté par `genMap.py`                                  |
+| `weatherData`               | Météo quotidienne `{date: {tmax, tmin, precip, snow, icon}}` — injecté par `genMap.py` |
 | `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                                  |
 
 ### Fonctions principales
@@ -342,7 +364,9 @@ Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se cal
 |--------------|------------------|-------------------------|--------------------------------------|
 | Dans le temps | Jour spécifique | `14:00`, `15:00`…       | `mer. 4 nov. 2025 · 14:00`          |
 | Dans le temps | Autres          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025 · 14:00`          |
-| Par jour      | Toutes          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025`                  |
+| Par jour      | Toutes          | `4 nov.`, `5 nov.`…     | `mer. 4 nov. 2025` + météo du jour  |
+
+En mode **Par jour**, le tooltip affiche en plus la météo issue de `weatherData` : icône, température max/min, et précipitations si > 0,5 mm ou neige si > 0,5 cm (ex. `🌧️  12°C / 5°C · 18,3 mm pluie`).
 
 ---
 
@@ -396,7 +420,15 @@ Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes s
 | Cohérence des références | CV (σ/μ) des jours adjacents `< 0,6` |
 | Nombre de références | ≥ 4 jours complets dans la fenêtre |
 
-**Jours entièrement absents** : tout jour sans aucune donnée dans la plage active du compteur est automatiquement signalé si le volume attendu dépasse 50 passages/jour.
+**Jours entièrement absents** : tout jour sans aucune donnée entre la première mesure du compteur et **hier** (`datetime.now() - timedelta(days=1)`) est automatiquement signalé si le volume attendu dépasse 50 passages/jour. La borne supérieure est étendue à hier (et non limitée à la dernière date dans les données) pour détecter les compteurs qui n'ont pas transmis de données récentes.
+
+**Suppression météo** : les jours de météo sévère ne sont pas signalés, quelle que soit la méthode. Les critères sont issus de `weather_data` (voir section Météo) :
+
+| Condition | Seuil |
+|-----------|-------|
+| Précipitations | > 15 mm/jour |
+| Neige | > 5 cm/jour |
+| Température maximale | < −15 °C |
 
 ### Validation croisée BIXI
 
