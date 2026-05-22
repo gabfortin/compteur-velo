@@ -540,7 +540,6 @@ html_parts = ['''<html>
         @media (max-width: 767px) {
             #dataWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
             #anomalyWarning { font-size: 11px; padding: 7px 10px; gap: 7px; }
-            #anomalyWarning .anomaly-info-btn { display: none; }
         }
         .dir-toggle {
             display: flex;
