@@ -1312,9 +1312,69 @@ html_parts.append('''
                         gradient.addColorStop(1, 'rgba(0,0,0,0)');
                         rawData.datasets[0].backgroundColor = gradient;
                     }
+
+                    // ── Visualisation des données manquantes ──
+                    const anomalies = (typeof anomalyDays !== 'undefined' && anomalyDays[id]) || {};
+                    const missingDaySet = new Set(
+                        Object.entries(anomalies).filter(([, v]) => v.total === 0).map(([d]) => d)
+                    );
+                    const missingPlugin = missingDaySet.size ? {
+                        id: 'missingViz',
+                        beforeDraw(chart) {
+                            if (isDaily) return;
+                            const {ctx: c, chartArea: area, scales: {x: xAxis}} = chart;
+                            if (!area) return;
+                            const labels = chart.data.labels;
+                            c.save();
+                            c.fillStyle = 'rgba(220,38,38,0.07)';
+                            for (let i = 0; i < labels.length - 1; i++) {
+                                const d1 = new Date(labels[i].replace(' ', 'T'));
+                                const d2 = new Date(labels[i+1].replace(' ', 'T'));
+                                if ((d2 - d1) <= 23 * 3600 * 1000) continue;
+                                let chk = new Date(d1);
+                                chk.setDate(chk.getDate() + 1); chk.setHours(0, 0, 0, 0);
+                                let found = false;
+                                while (chk < d2) {
+                                    if (missingDaySet.has(chk.toISOString().slice(0, 10))) { found = true; break; }
+                                    chk.setDate(chk.getDate() + 1);
+                                }
+                                if (found) {
+                                    const x1 = xAxis.getPixelForIndex(i), x2 = xAxis.getPixelForIndex(i + 1);
+                                    c.fillRect(x1, area.top, x2 - x1, area.bottom - area.top);
+                                }
+                            }
+                            c.restore();
+                        }
+                    } : null;
+
+                    // Barres fantômes (vue par jour) — dataset réel pour que le hover fonctionne
+                    if (isDaily && missingDaySet.size) {
+                        const missingVals = data.labels.map(lbl => { const a = anomalies[lbl]; return (a && a.total === 0) ? a.expected : null; });
+                        if (missingVals.some(v => v !== null)) {
+                            data = { labels: data.labels, datasets: [...data.datasets, {
+                                label: 'Données absentes', data: missingVals, type: 'bar',
+                                backgroundColor: 'rgba(220,38,38,0.12)', borderColor: 'rgba(220,38,38,0.55)',
+                                borderWidth: 1.5, borderRadius: 3, yAxisID: 'y', order: 1,
+                                grouped: false,
+                            }]};
+                        }
+                    }
+
+                    // Points rouges sur les jours suspects (vue dans le temps)
+                    if (!isDaily && missingDaySet.size) {
+                        data.datasets.forEach(ds => {
+                            if (!Array.isArray(ds.data)) return;
+                            ds.pointBackgroundColor = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 'rgba(220,38,38,0.85)' : (ds.borderColor || '#1DB860'));
+                            ds.pointBorderColor    = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 'rgba(220,38,38,1)'    : (ds.borderColor || '#1DB860'));
+                            ds.pointRadius         = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 4 : 2);
+                            ds.pointHoverRadius    = 6;
+                        });
+                    }
+
                     charts[id] = new Chart(ctx, {
                         type: type,
                         data: data,
+                        plugins: missingPlugin ? [missingPlugin] : [],
                         options: {
                             responsive: true,
                             animation: { duration: 500, easing: 'easeInOutQuart' },
@@ -1327,6 +1387,11 @@ html_parts.append('''
                                     padding: 10,
                                     cornerRadius: 8,
                                     callbacks: {
+                                        label: function(item) {
+                                            if (item.dataset.label === 'Données absentes')
+                                                return ' Attendu : ~' + Math.round(item.raw).toLocaleString('fr-CA') + ' passages';
+                                            return ' ' + (item.dataset.label || 'Passages') + ' : ' + item.formattedValue;
+                                        },
                                         title: function(items) {
                                             const label = items[0].label;
                                             if (isDaily) {
@@ -1338,16 +1403,25 @@ html_parts.append('''
                                                 + ' · ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
                                         },
                                         afterBody: function(items) {
-                                            if (!isDaily) return [];
                                             const label = items[0].label;
-                                            const w = (typeof weatherData !== 'undefined') ? weatherData[label] : null;
-                                            if (!w) return [];
-                                            const lines = [''];
-                                            let line = w.icon + '  ' + (w.tmax !== null ? Math.round(w.tmax) + '°C' : '?');
-                                            if (w.tmin !== null) line += ' / ' + Math.round(w.tmin) + '°C';
-                                            lines.push(line);
-                                            if (w.precip > 0.5) lines.push('🌧  ' + w.precip.toFixed(1) + ' mm pluie');
-                                            if (w.snow > 0.5) lines.push('❄  ' + w.snow.toFixed(1) + ' cm neige');
+                                            const dateKey = label.slice(0, 10);
+                                            const lines = [];
+                                            const w = (typeof weatherData !== 'undefined') ? weatherData[dateKey] : null;
+                                            if (w) {
+                                                lines.push('');
+                                                let wline = w.icon + '  ' + (w.tmax !== null ? Math.round(w.tmax) + '°C' : '?');
+                                                if (w.tmin !== null) wline += ' / ' + Math.round(w.tmin) + '°C';
+                                                lines.push(wline);
+                                                if (w.precip > 0.5) lines.push('🌧  ' + w.precip.toFixed(1) + ' mm pluie');
+                                                if (w.snow > 0.5) lines.push('❄  ' + w.snow.toFixed(1) + ' cm neige');
+                                            }
+                                            if (!isDaily) {
+                                                const anomaly = anomalies[dateKey];
+                                                if (anomaly) {
+                                                    if (!lines.length) lines.push('');
+                                                    lines.push(anomaly.total === 0 ? '⚠ Données manquantes' : '⚠ Volume suspect');
+                                                }
+                                            }
                                             return lines;
                                         }
                                     }
