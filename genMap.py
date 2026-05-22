@@ -151,7 +151,7 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
         first_date = min(all_dates)
         last_date  = max(all_dates)
         d_iter = datetime.fromisoformat(first_date)
-        end_iter = datetime.fromisoformat(last_date)
+        end_iter = max(datetime.fromisoformat(last_date), datetime.now() - timedelta(days=1))
         while d_iter <= end_iter:
             d_str = d_iter.strftime('%Y-%m-%d')
             if d_str not in all_dates and d_str not in anomalies:
