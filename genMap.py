@@ -1017,7 +1017,7 @@ html_parts.append('''
 
         let displayMode = 'combined';
         let viewMode = 'timeline';
-        let showBixi = true;
+        let showBixi = false;
 
         function maxDateStr(instance) {
             const maxDate = getMaxDate(allChartData[instance].labels);
@@ -1371,8 +1371,7 @@ html_parts.append('''
         }
 
         function updateBixiToggle(instance) {
-            const hasBixi = instance && typeof bixiNearby !== 'undefined' && bixiNearby[instance] && Object.keys(bixiNearby[instance]).length > 0;
-            document.getElementById('bixiToggle').style.display = hasBixi ? 'block' : 'none';
+            document.getElementById('bixiToggle').style.display = 'none';
         }
 
         document.getElementById('btnBixi').addEventListener('click', function() {
@@ -1587,9 +1586,9 @@ html_parts.append('''
         (function() {
             const arrondissements = Object.keys(countersByArrondissement);
             if (!arrondissements.length) return;
-            const defaultArr = arrondissements[Math.floor(Math.random() * arrondissements.length)];
-            const counters = countersByArrondissement[defaultArr];
-            const defaultCounter = counters[Math.floor(Math.random() * counters.length)].value;
+            const defaultCounter = 'det-00709-01';
+            const defaultArr = counterLocations[defaultCounter]?.arrondissement
+                || arrondissements[0];
 
             // Desktop
             document.getElementById('counterSelectDesktop').value = defaultCounter;
