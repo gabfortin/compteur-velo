@@ -1544,8 +1544,7 @@ html_parts.append('''
             const arr = this.value;
             const wrapper = document.getElementById('counterSelectWrapper');
             const mobileSelect = document.getElementById('counterSelectMobile');
-            selectCounter(null);
-            mobileSelect.innerHTML = '<option value="">Sélectionnez un compteur</option>';
+            mobileSelect.innerHTML = '';
             if (arr && countersByArrondissement[arr]) {
                 countersByArrondissement[arr].forEach(c => {
                     const opt = document.createElement('option');
@@ -1554,8 +1553,12 @@ html_parts.append('''
                     mobileSelect.appendChild(opt);
                 });
                 wrapper.style.visibility = 'visible';
+                const first = countersByArrondissement[arr][0].value;
+                mobileSelect.value = first;
+                selectCounter(first);
             } else {
                 wrapper.style.visibility = 'hidden';
+                selectCounter(null);
             }
         });
 
@@ -1764,4 +1767,4 @@ html = ''.join(html_parts)
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(html)
 
-print("Fichier HTML généré : passages.html")
+print("Fichier HTML généré : index.html")
