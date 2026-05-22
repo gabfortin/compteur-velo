@@ -265,7 +265,7 @@ html_parts = ['''<html>
         * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(160deg, #6dcf96 0%, #2a9455 45%, #0d4f2a 100%);
+            background: #f0faf4;
             color: #333;
             margin: 0;
             padding: 0 12px 12px;
@@ -291,26 +291,28 @@ html_parts = ['''<html>
             animation: fadeDown 0.55s cubic-bezier(.22,.68,0,1.2) both;
         }
         h1 {
-            color: #fff;
+            color: #111827;
             font-size: 26px;
             font-weight: 700;
             letter-spacing: -0.5px;
             margin: 0 0 8px 0;
         }
         .subtitle {
-            color: rgba(255,255,255,0.72);
+            color: #4b5563;
             font-size: 13px;
             margin: 0;
             font-weight: 400;
             line-height: 1.5;
         }
+        .subtitle a { color: #1a9950; text-decoration: underline; }
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: rgba(255,255,255,0.97);
+            background: #fff;
             border-radius: 12px;
             padding: 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            border: 1px solid #e5e7eb;
             border-top: 3px solid #1DB860;
             animation: fadeUp 0.5s 0.1s cubic-bezier(.22,.68,0,1.2) both;
         }
@@ -691,50 +693,6 @@ html_parts = ['''<html>
             .stat-value { font-size: 24px; }
             .stat-label { font-size: 11px; }
         }
-        /* ── Thème REV ─────────────────────────────────────────────────────── */
-        body, .container, .period-btn, .dir-btn, select, .stat-card,
-        .stat-value, h2, .watermark, #specificDatePicker {
-            transition: background 0.35s ease, background-color 0.35s ease,
-                        border-color 0.35s ease, color 0.35s ease,
-                        box-shadow 0.35s ease;
-        }
-        body.rev-mode {
-            background: linear-gradient(160deg, #1a8fd1 0%, #003d7a 100%);
-        }
-        body.rev-mode .container          { border-top-color: #0072BC; }
-        body.rev-mode .select-wrapper::after { border-top-color: #0072BC; }
-        body.rev-mode select              { border-color: rgba(0,114,188,0.25); }
-        body.rev-mode select:focus        { border-color: #0072BC; box-shadow: 0 0 0 3px rgba(0,114,188,0.15); }
-        body.rev-mode .stat-card          { background: linear-gradient(135deg, rgba(0,114,188,0.07), rgba(0,114,188,0.02)); border-color: rgba(0,114,188,0.18); }
-        body.rev-mode .stat-card:hover    { border-color: rgba(0,114,188,0.4); box-shadow: 0 4px 12px rgba(0,114,188,0.12); }
-        body.rev-mode .stat-value         { color: #0072BC; }
-        body.rev-mode .day-label          { color: #005a96; }
-        body.rev-mode h2                  { color: #004f85; }
-        body.rev-mode h2::before          { background: linear-gradient(to bottom, #0072BC, #005a96); }
-        body.rev-mode .period-btn         { border-color: rgba(0,114,188,0.35); color: #0072BC; }
-        body.rev-mode .period-btn::before { background: radial-gradient(circle, rgba(0,114,188,0.15) 0%, transparent 70%); }
-        body.rev-mode .period-btn:hover   { border-color: #0072BC; box-shadow: 0 3px 8px rgba(0,114,188,0.2); }
-        body.rev-mode .period-btn.active  { background: linear-gradient(135deg, #0072BC, #005a96); box-shadow: 0 3px 10px rgba(0,114,188,0.35); color: #fff; }
-        body.rev-mode #specificDatePicker { border-color: #0072BC; color: #0072BC; box-shadow: 0 3px 10px rgba(0,114,188,0.2); }
-        body.rev-mode #specificDatePicker:focus { box-shadow: 0 0 0 3px rgba(0,114,188,0.15); }
-        body.rev-mode .dir-btn            { border-color: rgba(0,114,188,0.35); color: #0072BC; }
-        body.rev-mode .dir-btn.active     { background: linear-gradient(135deg, #0072BC, #005a96); color: #fff; }
-        body.rev-mode .watermark          { color: rgba(0,114,188,0.4); }
-        body.rev-mode .watermark a        { color: rgba(0,114,188,0.6); }
-        body.rev-mode .watermark a:hover  { color: #0072BC; }
-        body.rev-mode #noDataMsg          { border-color: rgba(0,114,188,0.25); }
-        body.rev-mode p strong            { color: #0072BC; }
-        #themeToggleBtn:hover             { transform: scale(1.07); }
-        #themeToggleBtn:active            { transform: scale(0.96); }
-        @keyframes spinIcon {
-            from { transform: rotate(0deg) scale(1); }
-            50%  { transform: rotate(180deg) scale(1.12); }
-            to   { transform: rotate(360deg) scale(1); }
-        }
-        #themeToggleBtn.spinning {
-            animation: spinIcon 0.55s cubic-bezier(0.42, 0, 0.58, 1) forwards;
-            pointer-events: none;
-        }
         /* ── Top bar ── */
         #topbar {
             height: 50px;
@@ -760,7 +718,6 @@ html_parts = ['''<html>
         }
         .nav-link:hover { background: #f1f5f9; color: #111827; }
         .nav-link.active { background: #e8faf0; color: #1DB860; }
-        body.rev-mode .nav-link.active { background: #e8f2fc; color: #0072BC; }
         #topbar-profile {
             display: flex;
             align-items: center;
@@ -771,7 +728,6 @@ html_parts = ['''<html>
         }
         #topbar-profile:hover { color: #111827; }
         #topbar-profile:hover img { box-shadow: 0 0 0 2px #1DB860; }
-        body.rev-mode #topbar-profile:hover img { box-shadow: 0 0 0 2px #0072BC; }
         #topbar-profile-name { font-size: 13px; font-weight: 500; }
         #topbar-profile img {
             width: 32px;
@@ -801,9 +757,9 @@ html_parts = ['''<html>
         </a>
     </nav>
     <div class="site-header">
-        <img src="favico.png" alt="Logo" id="themeToggleBtn" title="Basculer vers le thème REV" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.15s ease;">
+        <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
         <h1>Compteurs Vélo Montréal</h1>
-        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes de la Ville</a>. Validation croisée avec les <a href="https://bixi.com/en/open-data/" target="_blank" style="color:rgba(255,255,255,0.9);text-decoration:underline;">données ouvertes BIXI</a>.</p>
+        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="">données ouvertes de la Ville</a>. Validation croisée avec les <a href="https://bixi.com/en/open-data/" target="_blank" style="">données ouvertes BIXI</a>.</p>
     </div>
     <div class="container">
         <div class="period-buttons">
@@ -1044,19 +1000,7 @@ for inst, bixi_days in bixi_near_counter.items():
 html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
 
 html_parts.append('''
-        const COLOR_MAP_REV = {
-            '#1DB860': '#0072BC',
-            '#29ABE2': '#1DB860',
-            'rgba(29,184,96,0.15)':  'rgba(0,114,188,0.15)',
-            'rgba(41,171,226,0.15)': 'rgba(29,184,96,0.15)',
-            'rgba(29,184,96,0.75)':  'rgba(0,114,188,0.75)',
-            'rgba(41,171,226,0.75)': 'rgba(29,184,96,0.75)',
-            'rgba(29,184,96,0.28)':  'rgba(0,114,188,0.28)',
-        };
-        function themeColor(color) {
-            if (!document.body.classList.contains('rev-mode')) return color;
-            return COLOR_MAP_REV[color] || color;
-        }
+        function themeColor(color) { return color; }
 
         function parseLabel(label) {
             return new Date(label.replace(' ', 'T'));
@@ -1694,7 +1638,7 @@ html_parts.append('''
         });
 
         // ── Carte Leaflet ──
-        let COLOR_DEFAULT  = '#1DB860';
+        const COLOR_DEFAULT = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
         const COLOR_GAPPY    = '#F59E0B';
 
@@ -1767,34 +1711,6 @@ html_parts.append('''
             map.panTo([counterLocations[instance].lat, counterLocations[instance].lng]);
         }
 
-        // ── Thème REV ──
-        const REV_COLOR = '#0072BC';
-        const GREEN_COLOR = '#1DB860';
-
-        if (localStorage.getItem('theme') === 'rev') {
-            document.body.classList.add('rev-mode');
-            COLOR_DEFAULT = REV_COLOR;
-            document.getElementById('themeToggleBtn').title = 'Revenir au thème Montréal';
-        }
-
-        document.getElementById('themeToggleBtn').addEventListener('click', function() {
-            if (this.classList.contains('spinning')) return;
-            this.classList.add('spinning');
-            this.addEventListener('animationend', () => {
-                this.classList.remove('spinning');
-                const isRev = document.body.classList.toggle('rev-mode');
-                COLOR_DEFAULT = isRev ? REV_COLOR : GREEN_COLOR;
-                this.title = isRev ? 'Revenir au thème Montréal' : 'Basculer vers le thème REV';
-                localStorage.setItem('theme', isRev ? 'rev' : 'green');
-                updateMapSelection(getSelectedCounter());
-                const selected = getSelectedCounter();
-                if (selected && hasDataForPeriod(selected)) {
-                    chartData[selected] = buildFilteredData(selected, currentPeriod);
-                    if (charts[selected]) { charts[selected].destroy(); charts[selected] = null; }
-                    createChart(selected);
-                }
-            }, { once: true });
-        });
     </script>
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
