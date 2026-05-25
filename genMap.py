@@ -1,6 +1,5 @@
 import csv
 import re
-import time
 from collections import defaultdict
 import os
 from tqdm import tqdm
@@ -99,43 +98,28 @@ det_quality = classify_det_quality(data)
 
 # ── Intégrer velo-full-2026.csv (compteurs supplémentaires, intervalles 15 min) ──
 
-def fetch_nominatim_meta(lat, lng):
-    """Reverse geocode via Nominatim (OpenStreetMap) pour obtenir arrondissement et rue."""
-    url = (f"https://nominatim.openstreetmap.org/reverse"
-           f"?lat={lat}&lon={lng}&format=json&accept-language=fr")
-    try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": "compteur-velo/1.0 (github.com/gabfortin/compteur-velo)"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            d = json.loads(resp.read().decode())
-        addr = d.get('address', {})
-        # Arrondissement : city_district > quarter > suburb > neighbourhood
-        arr = (addr.get('city_district') or addr.get('quarter') or
-               addr.get('suburb') or addr.get('neighbourhood') or 'Montréal')
-        # Rue principale
-        rue1 = (addr.get('road') or addr.get('pedestrian') or
-                addr.get('path') or addr.get('cycleway') or 'Écocompteur')
-        return {'arrondissement': arr, 'rue_1': rue1, 'rue_2': ''}
-    except Exception as e:
-        print(f"  Nominatim erreur ({lat},{lng}) : {e}")
-        return {'arrondissement': 'Montréal', 'rue_1': 'Écocompteur', 'rue_2': ''}
-
 
 def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.json'):
-    """Charge velo-full-2026.csv (intervalles 15 min), agrège à l'heure et retourne
+    """Charge compteurs.csv (intervalles 15 min), agrège à l'heure et retourne
     un dict compatible avec data{} : {instance_id: {'N/A': [rows]}}.
 
     - Les IDs sont préfixés 'vf-' (ex. vf-100041114) pour éviter tout conflit.
-    - Les métadonnées (arrondissement, rue) sont obtenues par reverse geocoding
-      Nominatim et mises en cache dans velo_meta_cache.json pour éviter de
-      réinterroger l'API à chaque génération.
+    - Les noms des compteurs sont résolus depuis localisation_des_compteurs_velo_update.csv
+      et mis en cache dans velo_meta_cache.json.
     - Si le fichier est absent, retourne {} sans erreur.
     """
     if not os.path.exists(filepath):
         print(f"{filepath} introuvable — données velo-full ignorées.")
         return {}
+
+    # Charger le fichier de localisation pour nommer les compteurs (remplace Nominatim)
+    localisation_noms = {}
+    localisation_file = 'localisation_des_compteurs_velo_update.csv'
+    if os.path.exists(localisation_file):
+        with open(localisation_file, encoding='utf-8') as f:
+            for lrow in csv.DictReader(f):
+                localisation_noms[lrow['ID']] = lrow['Nom']
+        print(f"Localisation : {len(localisation_noms)} noms chargés depuis {localisation_file}.")
 
     # Charger le cache de métadonnées
     meta_cache = {}
@@ -160,18 +144,22 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
                     'lng': float(row['longitude'])
                 }
 
-    # Reverse geocoding uniquement pour les nouveaux compteurs (pas en cache)
+    # Résoudre les nouveaux compteurs depuis le fichier de localisation (sans Nominatim)
     new_cids = [cid for cid in counter_info if cid not in meta_cache]
     if new_cids:
-        print(f"Reverse geocoding de {len(new_cids)} nouveaux compteurs via Nominatim...")
+        print(f"Résolution de {len(new_cids)} nouveaux compteurs via le fichier de localisation...")
         for cid in new_cids:
-            lat, lng = counter_info[cid]['lat'], counter_info[cid]['lng']
-            meta_cache[cid] = fetch_nominatim_meta(lat, lng)
-            print(f"  {cid} → {meta_cache[cid]['arrondissement']} / {meta_cache[cid]['rue_1']}")
-            time.sleep(1.1)   # Respecter la limite Nominatim (1 requête/s)
+            nom = localisation_noms.get(cid, f'Écocompteur {cid}')
+            meta_cache[cid] = {'arrondissement': 'Montréal', 'rue_1': nom, 'rue_2': ''}
+            print(f"  {cid} → {meta_cache[cid]['rue_1']}")
         with open(meta_cache_file, 'w', encoding='utf-8') as f:
             json.dump(meta_cache, f, ensure_ascii=False, indent=2)
         print(f"  Cache métadonnées sauvegardé → {meta_cache_file}")
+
+    # Mettre à jour rue_1 depuis le CSV de localisation pour tous les compteurs connus
+    for cid in meta_cache:
+        if cid in localisation_noms:
+            meta_cache[cid]['rue_1'] = localisation_noms[cid]
 
     # Construire la structure compatible avec data{} (last 6 months, même filtre)
     cutoff = datetime.now() - timedelta(days=180)
