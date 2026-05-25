@@ -23,6 +23,7 @@ git remote set-url origin "https://$GITHUB_TOKEN@github.com/$GITHUB_REPO.git"
 
 CSV_CHANGED=false
 BIXI_CHANGED=false
+COMPTEURS_CHANGED=false
 
 # ── Télécharger le CSV cyclistes ──────────────────────────────────────────────
 echo "$LOG Recherche de l'URL du CSV..."
@@ -134,8 +135,57 @@ else
     echo "$LOG URL BIXI introuvable — données existantes conservées."
 fi
 
+# ── Télécharger le CSV compteurs vélo (intervalles 15 min, année courante) ───
+echo "$LOG Recherche de l'URL compteurs vélo (${YEAR:-$(date +%Y)})..."
+COMPTEURS_URL=$(python3 - <<'EOF'
+import urllib.request, re, sys
+from datetime import datetime
+
+year = datetime.now().year
+try:
+    req = urllib.request.Request(
+        "https://donnees.montreal.ca/dataset/velos-comptage",
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
+    html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
+    # Chercher le lien de téléchargement du fichier de l'année courante
+    m = re.search(
+        r'href="([^"]*comptage_velo_%d[^"]*\.csv[^"]*)"' % year,
+        html, re.IGNORECASE
+    )
+    if m:
+        print(m.group(1))
+    else:
+        sys.stderr.write("URL compteurs %d introuvable sur la page.\n" % year)
+        sys.exit(1)
+except Exception as e:
+    sys.stderr.write("Erreur scraping compteurs : %s\n" % e)
+    sys.exit(1)
+EOF
+) || true
+
+if [ -n "$COMPTEURS_URL" ]; then
+    echo "$LOG URL trouvée : $COMPTEURS_URL"
+    OLD_HASH_C=""
+    [ -f compteurs.csv ] && OLD_HASH_C=$(md5sum compteurs.csv | cut -d' ' -f1)
+    curl -fsSL \
+      -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+      -H "Referer: https://donnees.montreal.ca/dataset/velos-comptage" \
+      "$COMPTEURS_URL" -o compteurs.csv
+    echo "$LOG Fichier téléchargé ($(du -sh compteurs.csv | cut -f1))"
+    NEW_HASH_C=$(md5sum compteurs.csv | cut -d' ' -f1)
+    if [ "$OLD_HASH_C" != "$NEW_HASH_C" ]; then
+        echo "$LOG Nouveau fichier compteurs détecté."
+        COMPTEURS_CHANGED=true
+    else
+        echo "$LOG Fichier compteurs identique à la version précédente."
+    fi
+else
+    echo "$LOG URL compteurs introuvable — données existantes conservées."
+fi
+
 # ── Rien de nouveau → on arrête ───────────────────────────────────────────────
-if [ "$CSV_CHANGED" = false ] && [ "$BIXI_CHANGED" = false ]; then
+if [ "$CSV_CHANGED" = false ] && [ "$BIXI_CHANGED" = false ] && [ "$COMPTEURS_CHANGED" = false ]; then
     echo "$LOG Aucune donnée nouvelle — rien à publier."
     exit 0
 fi
@@ -151,6 +201,8 @@ python3 test_data.py
 # ── Publier sur GitHub ─────────────────────────────────────────────────────────
 echo "$LOG Vérification des changements..."
 git add index.html
+# Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
+[ -f velo_meta_cache.json ] && git add velo_meta_cache.json
 
 if git diff --staged --quiet; then
     echo "$LOG Aucun changement dans index.html — rien à publier."

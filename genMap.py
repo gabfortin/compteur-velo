@@ -1,5 +1,6 @@
 import csv
 import re
+import time
 from collections import defaultdict
 import os
 from tqdm import tqdm
@@ -33,6 +34,120 @@ def is_within_last_6_months(date_str):
 for instance in data.keys():
     for direction in data[instance].keys():
         data[instance][direction] = [row for row in data[instance][direction] if is_within_last_6_months(row['periode'])]
+
+# ── Intégrer velo-full-2026.csv (compteurs supplémentaires, intervalles 15 min) ──
+
+def fetch_nominatim_meta(lat, lng):
+    """Reverse geocode via Nominatim (OpenStreetMap) pour obtenir arrondissement et rue."""
+    url = (f"https://nominatim.openstreetmap.org/reverse"
+           f"?lat={lat}&lon={lng}&format=json&accept-language=fr")
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "compteur-velo/1.0 (github.com/gabfortin/compteur-velo)"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            d = json.loads(resp.read().decode())
+        addr = d.get('address', {})
+        # Arrondissement : city_district > quarter > suburb > neighbourhood
+        arr = (addr.get('city_district') or addr.get('quarter') or
+               addr.get('suburb') or addr.get('neighbourhood') or 'Montréal')
+        # Rue principale
+        rue1 = (addr.get('road') or addr.get('pedestrian') or
+                addr.get('path') or addr.get('cycleway') or 'Écocompteur')
+        return {'arrondissement': arr, 'rue_1': rue1, 'rue_2': ''}
+    except Exception as e:
+        print(f"  Nominatim erreur ({lat},{lng}) : {e}")
+        return {'arrondissement': 'Montréal', 'rue_1': 'Écocompteur', 'rue_2': ''}
+
+
+def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.json'):
+    """Charge velo-full-2026.csv (intervalles 15 min), agrège à l'heure et retourne
+    un dict compatible avec data{} : {instance_id: {'N/A': [rows]}}.
+
+    - Les IDs sont préfixés 'vf-' (ex. vf-100041114) pour éviter tout conflit.
+    - Les métadonnées (arrondissement, rue) sont obtenues par reverse geocoding
+      Nominatim et mises en cache dans velo_meta_cache.json pour éviter de
+      réinterroger l'API à chaque génération.
+    - Si le fichier est absent, retourne {} sans erreur.
+    """
+    if not os.path.exists(filepath):
+        print(f"{filepath} introuvable — données velo-full ignorées.")
+        return {}
+
+    # Charger le cache de métadonnées
+    meta_cache = {}
+    if os.path.exists(meta_cache_file):
+        with open(meta_cache_file, encoding='utf-8') as f:
+            meta_cache = json.load(f)
+
+    # Agréger les passages de 15 min → horaire
+    print(f"Chargement {filepath}...")
+    counter_info = {}                                       # {cid: {lat, lng}}
+    hourly = defaultdict(lambda: defaultdict(int))          # {cid: {hour_key: total}}
+
+    with open(filepath, encoding='utf-8') as f:
+        for row in tqdm(csv.DictReader(f), desc="velo-full (agrégation 15 min → h)"):
+            cid = row['id_compteur']
+            hh = row['heure'][:2]                           # 'HH' de 'HH:MM:SS'
+            hour_key = f"{row['date']} {hh}:00:00"
+            hourly[cid][hour_key] += int(row['nb_passages'])
+            if cid not in counter_info:
+                counter_info[cid] = {
+                    'lat': float(row['latitude']),
+                    'lng': float(row['longitude'])
+                }
+
+    # Reverse geocoding uniquement pour les nouveaux compteurs (pas en cache)
+    new_cids = [cid for cid in counter_info if cid not in meta_cache]
+    if new_cids:
+        print(f"Reverse geocoding de {len(new_cids)} nouveaux compteurs via Nominatim...")
+        for cid in new_cids:
+            lat, lng = counter_info[cid]['lat'], counter_info[cid]['lng']
+            meta_cache[cid] = fetch_nominatim_meta(lat, lng)
+            print(f"  {cid} → {meta_cache[cid]['arrondissement']} / {meta_cache[cid]['rue_1']}")
+            time.sleep(1.1)   # Respecter la limite Nominatim (1 requête/s)
+        with open(meta_cache_file, 'w', encoding='utf-8') as f:
+            json.dump(meta_cache, f, ensure_ascii=False, indent=2)
+        print(f"  Cache métadonnées sauvegardé → {meta_cache_file}")
+
+    # Construire la structure compatible avec data{} (last 6 months, même filtre)
+    cutoff = datetime.now() - timedelta(days=180)
+    result = {}
+
+    for cid in sorted(counter_info):
+        instance_id = f"vf-{cid}"
+        meta = meta_cache.get(cid, {
+            'arrondissement': 'Montréal',
+            'rue_1': f'Écocompteur {cid}',
+            'rue_2': ''
+        })
+        rows = []
+        for hour_key, total in sorted(hourly[cid].items()):
+            try:
+                if datetime.fromisoformat(hour_key) < cutoff:
+                    continue
+            except Exception:
+                continue
+            rows.append({
+                'periode':        hour_key,
+                'volume':         str(total),
+                'latitude':       str(counter_info[cid]['lat']),
+                'longitude':      str(counter_info[cid]['lng']),
+                'arrondissement': meta['arrondissement'],
+                'rue_1':          meta['rue_1'],
+                'rue_2':          meta.get('rue_2', ''),
+                'direction':      'N/A',
+            })
+        if rows:
+            result[instance_id] = {'N/A': rows}
+
+    print(f"velo-full : {len(result)} compteurs intégrés.")
+    return result
+
+
+vf_data = load_velo_full('compteurs.csv')
+data.update(vf_data)
 
 # Détecter les compteurs avec des lacunes significatives dans les données
 def has_significant_gaps(instance_data, gap_days=14, missing_ratio=0.20):
@@ -655,6 +770,55 @@ html_parts = ['''<html>
             margin-left: 5px;
             vertical-align: middle;
         }
+        .counter-type-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            vertical-align: middle;
+            margin-left: 8px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            text-decoration: none;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .counter-type-badge:hover { opacity: 0.75; }
+        .counter-type-fut {
+            background: rgba(29,184,96,0.10);
+            color: #15803d;
+            border: 1px solid rgba(29,184,96,0.28);
+        }
+        .counter-type-boucle {
+            background: rgba(139,92,246,0.10);
+            color: #6d28d9;
+            border: 1px solid rgba(139,92,246,0.28);
+        }
+        #map-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.94);
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 11px;
+            color: #4b5563;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+            pointer-events: none;
+        }
+        .legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .legend-dot {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.9);
+            flex-shrink: 0;
+        }
         .anomaly-info-btn {
             cursor: help;
             display: inline-flex;
@@ -825,15 +989,22 @@ for instance in data.keys():
 
 def counter_label(instance, row):
     directions = sorted(data[instance].keys())
-    if len(directions) > 1:
-        return f"{row['rue_1']} & {row['rue_2']} ({instance})"
-    return f"{row['rue_1']} & {row['rue_2']} — {directions[0]} ({instance})"
+    rue2 = row.get('rue_2', '')
+    location = f"{row['rue_1']} & {rue2}" if rue2 else row['rue_1']
+    # Pas de direction affichée si plusieurs directions ou direction N/A (velo-full)
+    if len(directions) > 1 or directions == ['N/A']:
+        return f"{location} ({instance})"
+    return f"{location} — {directions[0]} ({instance})"
 
 for arrondissement in sorted(by_arrondissement.keys()):
     html_parts.append(f'<optgroup label="{arrondissement}">')
-    for instance, row in sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2'])):
+    # Fût en premier, boucles ensuite — dans chaque groupe, tri alphabétique
+    sorted_counters = sorted(by_arrondissement[arrondissement],
+                             key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
+    for instance, row in sorted_counters:
         label = counter_label(instance, row)
-        html_parts.append(f'<option value="{instance}">{label}</option>')
+        prefix = '[Boucle] ' if instance.startswith('vf-') else ''
+        html_parts.append(f'<option value="{instance}">{prefix}{label}</option>')
     html_parts.append('</optgroup>')
 
 html_parts.append('''
@@ -915,9 +1086,16 @@ html_parts.append('''
 for instance, directions in tqdm(data.items(), desc="Génération HTML"):
     row = first_row_for(instance)
     if row:
-        location = f"{row['arrondissement']} - {row['rue_1']} & {row['rue_2']}"
+        rue2 = row.get('rue_2', '')
+        location = (f"{row['arrondissement']} - {row['rue_1']} & {rue2}"
+                    if rue2 else f"{row['arrondissement']} - {row['rue_1']}")
+        is_boucle  = instance.startswith('vf-')
+        type_label = 'Boucle magnétique' if is_boucle else 'Détecteur sur fût'
+        type_cls   = 'boucle' if is_boucle else 'fut'
+        type_url   = ('https://donnees.montreal.ca/dataset/velos-comptage'
+                      if is_boucle else 'https://donnees.montreal.ca/fr/dataset/cyclistes')
         html_parts.append(f'<div id="{instance}" class="table-container">')
-        html_parts.append(f'<h2>Compteur {instance}</h2>')
+        html_parts.append(f'<h2>Compteur {instance} <a href="{type_url}" target="_blank" rel="noopener" class="counter-type-badge counter-type-{type_cls}">{type_label}</a></h2>')
         html_parts.append(f'<p><strong>Emplacement:</strong> {location}</p>')
         html_parts.append(f'<canvas id="chart-{instance}"></canvas>')
         html_parts.append('</div>')
@@ -927,6 +1105,11 @@ html_parts.append('''
         <div id="map-wrapper">
             <div id="map"></div>
             <button id="cyclosm-btn" title="Afficher les pistes cyclables">🚲 Pistes cyclables</button>
+            <div id="map-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#1DB860;box-shadow:0 0 0 1.5px #fff;"></span>Détecteur sur fût</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#8B5CF6;box-shadow:0 0 0 1.5px #fff;"></span>Boucle magnétique</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#29ABE2;box-shadow:0 0 0 1.5px #fff;"></span>Sélectionné</span>
+            </div>
         </div>
         </div>
     </div>
@@ -956,7 +1139,7 @@ for instance, directions in data.items():
         date_vol = {row['periode'][:16]: int(row['volume']) for row in rows}
         volumes = [date_vol.get(d) for d in all_dates]
         datasets.append({
-            'label': direction,
+            'label': 'Passages' if direction == 'N/A' else direction,
             'color': DIRECTION_COLORS[i % len(DIRECTION_COLORS)],
             'fill':  DIRECTION_FILLS[i % len(DIRECTION_FILLS)],
             'data':  volumes
@@ -964,8 +1147,11 @@ for instance, directions in data.items():
     html_parts.append(f"allChartData['{instance}'] = {{ labels: {json.dumps(all_dates)}, datasets: {json.dumps(datasets)} }};\n")
 
 for arrondissement in sorted(by_arrondissement.keys()):
-    counters = sorted(by_arrondissement[arrondissement], key=lambda x: (x[1]['rue_1'], x[1]['rue_2']))
-    entries = [{"value": inst, "label": counter_label(inst, row)} for inst, row in counters]
+    counters = sorted(by_arrondissement[arrondissement],
+                      key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
+    entries = [{"value": inst,
+                "label": ('[Boucle] ' if inst.startswith('vf-') else '') + counter_label(inst, row)}
+               for inst, row in counters]
     html_parts.append(f"countersByArrondissement[{json.dumps(arrondissement)}] = {json.dumps(entries)};\n")
 
 # Localisation des compteurs pour la carte
@@ -977,7 +1163,8 @@ for instance in data.keys():
             'lat': float(row['latitude']),
             'lng': float(row['longitude']),
             'label': counter_label(instance, row),
-            'arrondissement': row['arrondissement']
+            'arrondissement': row['arrondissement'],
+            'type': 'boucle' if instance.startswith('vf-') else 'fut'
         }
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
@@ -1754,17 +1941,21 @@ html_parts.append('''
         });
 
         // ── Carte Leaflet ──
-        const COLOR_DEFAULT = '#1DB860';
+        const COLOR_DEFAULT  = '#1DB860';
         const COLOR_SELECTED = '#29ABE2';
         const COLOR_GAPPY    = '#F59E0B';
+        const COLOR_BOUCLE   = '#8B5CF6';
 
-        function markerStyle(selected, gappy) {
-            const base = COLOR_DEFAULT;
+        function markerStyle(selected, gappy, type) {
+            const base = (!selected && type === 'boucle') ? COLOR_BOUCLE : COLOR_DEFAULT;
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : base, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
 
         function updateMapSelection(instance) {
-            Object.entries(markers).forEach(([id, m]) => m.setStyle(markerStyle(id === instance, gappyCounters.has(id))));
+            Object.entries(markers).forEach(([id, m]) => {
+                const type = counterLocations[id] ? counterLocations[id].type : 'fut';
+                m.setStyle(markerStyle(id === instance, gappyCounters.has(id), type));
+            });
             if (instance && markers[instance]) markers[instance].bringToFront();
         }
 
@@ -1793,9 +1984,10 @@ html_parts.append('''
             });
             Object.entries(counterLocations).forEach(([instance, loc]) => {
                 const gappy = gappyCounters.has(instance);
-                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy))
+                const typeIcon = loc.type === 'boucle' ? '⬡ ' : '📍 ';
+                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy, loc.type))
                     .addTo(map)
-                    .bindTooltip((gappy ? '⚠ ' : '') + loc.label, { direction: 'top', offset: [0, -6] });
+                    .bindTooltip((gappy ? '⚠ ' : typeIcon) + loc.label, { direction: 'top', offset: [0, -6] });
                 m.on('click', () => setCounterFromMap(instance));
                 markers[instance] = m;
             });

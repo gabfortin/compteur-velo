@@ -4,6 +4,7 @@ exactement aux données du fichier cyclistes.csv.
 """
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -78,6 +79,15 @@ def combined_for_instance(inst):
 print(f"  Instances trouvées : {len(csv_data)}")
 print(f"  Période couverte   : depuis {cutoff.strftime('%Y-%m-%d')}")
 
+# ─── 1b. Recenser les instances velo-full (compteurs.csv, préfixe vf-) ───────
+
+vf_instances = set()
+if os.path.exists('compteurs.csv'):
+    with open('compteurs.csv', encoding='utf-8') as f:
+        for row in csv.DictReader(f):
+            vf_instances.add(f"vf-{row['id_compteur']}")
+    print(f"  Instances vf- (compteurs.csv) : {len(vf_instances)}")
+
 # ─── 2. Parser index.html ────────────────────────────────────────────────────
 
 print("\n=== Chargement de index.html ===")
@@ -112,15 +122,16 @@ print("\n=== Tests de couverture ===")
 
 csv_instances  = set(csv_data.keys())
 html_instances = set(html_data.keys())
+# Les instances HTML peuvent inclure des vf- (compteurs.csv) en plus de cyclistes.csv
+known_instances = csv_instances | vf_instances
 
-check("Toutes les instances CSV sont dans le HTML",
-      csv_instances == html_instances,
-      f"Manquantes dans HTML : {csv_instances - html_instances} | "
-      f"En trop dans HTML : {html_instances - csv_instances}")
+check("Toutes les instances cyclistes.csv sont dans le HTML",
+      csv_instances.issubset(html_instances),
+      f"Manquantes dans HTML : {csv_instances - html_instances}")
 
-check("Aucune instance fantôme dans le HTML",
-      html_instances.issubset(csv_instances),
-      f"Instances inconnues : {html_instances - csv_instances}")
+check("Aucune instance inconnue dans le HTML",
+      html_instances.issubset(known_instances),
+      f"Instances inconnues : {html_instances - known_instances}")
 
 print("\n=== Tests de données par instance ===")
 
@@ -192,9 +203,10 @@ optgroup_re = re.compile(r'<optgroup label="([^"]+)">')
 html_groups = set(optgroup_re.findall(html))
 csv_groups  = set(m['arrondissement'] for m in csv_meta.values())
 
-check("Tous les arrondissements sont des optgroups",
-      csv_groups == html_groups,
-      f"Manquants : {csv_groups - html_groups} | En trop : {html_groups - csv_groups}")
+check("Tous les arrondissements cyclistes.csv sont des optgroups",
+      csv_groups.issubset(html_groups),
+      f"Manquants dans HTML : {csv_groups - html_groups}")
+# Les arrondissements supplémentaires viennent des boucles magnétiques (compteurs.csv) — c'est normal
 
 # ─── Résumé ──────────────────────────────────────────────────────────────────
 
