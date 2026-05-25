@@ -115,6 +115,12 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
     cutoff = datetime.now() - timedelta(days=180)
     result = {}
 
+    # Date max globale dans le fichier (toutes sources confondues) pour classifier les groupes
+    all_day_keys = [hk[:10] for cid in hourly for hk in hourly[cid]]
+    global_max_str = max(all_day_keys) if all_day_keys else None
+
+    vf_quality = {}  # {instance_id: {group, last_complete, last_any, lag_days}}
+
     for cid in sorted(counter_info):
         instance_id = f"vf-{cid}"
         meta = meta_cache.get(cid, {
@@ -131,6 +137,32 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
         for hk in hourly[cid]:
             hours_per_day[hk[:10]] += 1
         complete_days = {d for d, n in hours_per_day.items() if n >= 12}
+
+        # ── Classifier ce compteur (Groupe A / B / C) ──────────────────────
+        last_complete = max(complete_days) if complete_days else None
+        last_any      = max(hours_per_day.keys()) if hours_per_day else None
+
+        group    = 'A'
+        lag_days = None
+        if global_max_str and last_any:
+            lag_any      = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_any)).days
+            lag_complete = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_complete)).days if last_complete else 999
+            if lag_any > 30:
+                group = 'C'   # Plus de données récentes → inactif / désaffecté
+            elif lag_complete > 7:
+                group = 'B'   # Données récentes mais incomplètes → délai de publication
+        else:
+            group = 'C'
+
+        if group == 'B' and last_complete and global_max_str:
+            lag_days = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_complete)).days
+
+        vf_quality[instance_id] = {
+            'group':         group,
+            'last_complete': last_complete,
+            'last_any':      last_any,
+            'lag_days':      lag_days,
+        }
 
         rows = []
         for hour_key, total in sorted(hourly[cid].items()):
@@ -154,11 +186,12 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
         if rows:
             result[instance_id] = {'N/A': rows}
 
-    print(f"velo-full : {len(result)} compteurs intégrés.")
-    return result
+    groups = {g: sum(1 for q in vf_quality.values() if q['group'] == g) for g in ('A', 'B', 'C')}
+    print(f"velo-full : {len(result)} compteurs intégrés (A={groups['A']}, B={groups['B']}, C={groups['C']}).")
+    return result, vf_quality
 
 
-vf_data = load_velo_full('compteurs.csv')
+vf_data, vf_quality = load_velo_full('compteurs.csv')
 data.update(vf_data)
 
 # Détecter les compteurs avec des lacunes significatives dans les données
@@ -770,6 +803,27 @@ html_parts = ['''<html>
         }
         #anomalyWarning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
         #anomalyWarning .anomaly-body { flex: 1; }
+        #vfQualityWarning {
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        #vfQualityWarning.vf-warn-lag {
+            background: rgba(245,158,11,0.08);
+            border: 1.5px solid rgba(245,158,11,0.40);
+            color: #92620a;
+        }
+        #vfQualityWarning.vf-warn-stopped {
+            background: rgba(239,68,68,0.07);
+            border: 1.5px solid rgba(239,68,68,0.35);
+            color: #991b1b;
+        }
+        #vfQualityWarning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
         .bixi-exceeds-badge {
             display: inline-block;
             background: rgba(220,38,38,0.10);
@@ -814,12 +868,13 @@ html_parts = ['''<html>
             background: rgba(255,255,255,0.94);
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 5px 10px;
+            padding: 6px 10px;
             font-size: 11px;
             color: #4b5563;
             display: flex;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.10);
             pointer-events: none;
         }
@@ -1133,6 +1188,7 @@ html_parts.append('''
             </div>
             <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés si le volume attendu dépasse 25 % de la médiane journalière du compteur (plancher : 10 passages). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
         </div>
+        <div id="vfQualityWarning"><span class="warn-icon" id="vfQualityIcon"></span><span id="vfQualityText"></span></div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 ''')
 
@@ -1161,6 +1217,8 @@ html_parts.append('''
             <div id="map-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#1DB860;box-shadow:0 0 0 1.5px #fff;"></span>Détecteur sur fût</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#8B5CF6;box-shadow:0 0 0 1.5px #fff;"></span>Boucle magnétique</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#F59E0B;box-shadow:0 0 0 1.5px #fff;"></span>Délai de données</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#EF4444;box-shadow:0 0 0 1.5px #fff;"></span>Compteur inactif</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#29ABE2;box-shadow:0 0 0 1.5px #fff;"></span>Sélectionné</span>
             </div>
         </div>
@@ -1222,6 +1280,7 @@ for instance in data.keys():
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 html_parts.append(f"const anomalyDays = {json.dumps(anomaly_data)};\n")
+html_parts.append(f"const vfDataQuality = {json.dumps(vf_quality)};\n")
 weather_js = {d: {k: v for k, v in w.items() if k != 'code'} for d, w in weather_data.items()}
 html_parts.append(f"const weatherData = {json.dumps(weather_js)};\n")
 
@@ -1793,6 +1852,30 @@ html_parts.append('''
             el.style.display = 'flex';
         }
 
+        function updateVfQualityWarning(instance) {
+            const el = document.getElementById('vfQualityWarning');
+            el.style.display = 'none';
+            el.className = '';
+            if (!instance || typeof vfDataQuality === 'undefined' || !vfDataQuality[instance]) return;
+            const q = vfDataQuality[instance];
+            if (q.group === 'A') return;
+            const fmt = d => d
+                ? new Date(d + 'T12:00:00').toLocaleDateString('fr-CA', {day: 'numeric', month: 'long', year: 'numeric'})
+                : '—';
+            const iconEl = document.getElementById('vfQualityIcon');
+            const textEl = document.getElementById('vfQualityText');
+            if (q.group === 'B') {
+                el.className = 'vf-warn-lag';
+                iconEl.textContent = '⚠️';
+                textEl.innerHTML = `<strong>Délai de publication</strong> — Les données de ce compteur s\'arrêtent au <strong>${fmt(q.last_complete)}</strong>. La Ville de Montréal publie ces données avec environ <strong>${q.lag_days} jours</strong> de délai. Elles seront mises à jour automatiquement.`;
+            } else if (q.group === 'C') {
+                el.className = 'vf-warn-stopped';
+                iconEl.textContent = '⛔';
+                textEl.innerHTML = `<strong>Compteur potentiellement inactif</strong> — Aucune donnée reçue depuis le <strong>${fmt(q.last_complete || q.last_any)}</strong>. Ce compteur est peut-être désaffecté ou en réparation.`;
+            }
+            el.style.display = 'flex';
+        }
+
         function selectCounter(instance) {
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
             const noDataMsg = document.getElementById('noDataMsg');
@@ -1810,10 +1893,12 @@ html_parts.append('''
                 updateDirToggle(instance);
                 updateBixiToggle(instance);
                 updateAnomalyWarning(instance);
+                updateVfQualityWarning(instance);
             } else {
                 noDataMsg.style.display = 'none';
                 document.getElementById('dataWarning').style.display = 'none';
                 document.getElementById('anomalyWarning').style.display = 'none';
+                document.getElementById('vfQualityWarning').style.display = 'none';
                 updateStats(null);
                 updateDayLabel(null);
                 updateDirToggle(null);
@@ -1999,20 +2084,32 @@ html_parts.append('''
         });
 
         // ── Carte Leaflet ──
-        const COLOR_DEFAULT  = '#1DB860';
-        const COLOR_SELECTED = '#29ABE2';
-        const COLOR_GAPPY    = '#F59E0B';
-        const COLOR_BOUCLE   = '#8B5CF6';
+        const COLOR_DEFAULT       = '#1DB860';
+        const COLOR_SELECTED      = '#29ABE2';
+        const COLOR_GAPPY         = '#F59E0B';
+        const COLOR_BOUCLE        = '#8B5CF6';
+        const COLOR_BOUCLE_LAG    = '#F59E0B';   // Groupe B – délai de publication
+        const COLOR_BOUCLE_STOPPED = '#EF4444';  // Groupe C – compteur inactif
 
-        function markerStyle(selected, gappy, type) {
-            const base = (!selected && type === 'boucle') ? COLOR_BOUCLE : COLOR_DEFAULT;
+        function vfGroup(instance) {
+            return (typeof vfDataQuality !== 'undefined' && vfDataQuality[instance])
+                ? vfDataQuality[instance].group : 'A';
+        }
+
+        function markerStyle(selected, gappy, type, group) {
+            let base = COLOR_DEFAULT;
+            if (!selected && type === 'boucle') {
+                if (group === 'C') base = COLOR_BOUCLE_STOPPED;
+                else if (group === 'B') base = COLOR_BOUCLE_LAG;
+                else base = COLOR_BOUCLE;
+            }
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : base, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
 
         function updateMapSelection(instance) {
             Object.entries(markers).forEach(([id, m]) => {
                 const type = counterLocations[id] ? counterLocations[id].type : 'fut';
-                m.setStyle(markerStyle(id === instance, gappyCounters.has(id), type));
+                m.setStyle(markerStyle(id === instance, gappyCounters.has(id), type, vfGroup(id)));
             });
             if (instance && markers[instance]) markers[instance].bringToFront();
         }
@@ -2042,10 +2139,15 @@ html_parts.append('''
             });
             Object.entries(counterLocations).forEach(([instance, loc]) => {
                 const gappy = gappyCounters.has(instance);
+                const grp = vfGroup(instance);
                 const typeIcon = loc.type === 'boucle' ? '⬡ ' : '📍 ';
-                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy, loc.type))
+                const tooltipPrefix = grp === 'C' ? '⛔ '
+                                    : grp === 'B' ? '⚠ '
+                                    : gappy       ? '⚠ '
+                                    : typeIcon;
+                const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy, loc.type, grp))
                     .addTo(map)
-                    .bindTooltip((gappy ? '⚠ ' : typeIcon) + loc.label, { direction: 'top', offset: [0, -6] });
+                    .bindTooltip(tooltipPrefix + loc.label, { direction: 'top', offset: [0, -6] });
                 m.on('click', () => setCounterFromMap(instance));
                 markers[instance] = m;
             });
