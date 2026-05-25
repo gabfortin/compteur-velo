@@ -2248,7 +2248,7 @@ html_parts.append('''
         (function() {
             const arrondissements = Object.keys(countersByArrondissement);
             if (!arrondissements.length) return;
-            const defaultCounter = 'det-00709-01';
+            const defaultCounter = 'vf-300046833';
             const defaultArr = counterLocations[defaultCounter]?.arrondissement
                 || arrondissements[0];
 
