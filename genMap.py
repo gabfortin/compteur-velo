@@ -1074,7 +1074,9 @@ html_parts = ['''<html>
         }
         #topbar-profile:hover { color: #111827; }
         #topbar-profile:hover img { box-shadow: 0 0 0 2px #1DB860; }
-        #topbar-profile-name { font-size: 13px; font-weight: 500; }
+        #topbar-profile-name { font-size: 13px; font-weight: 500; display: none; }
+        .nav-label-short { display: inline; }
+        .nav-label-full  { display: none; }
         #topbar-profile img {
             width: 32px;
             height: 32px;
@@ -1087,6 +1089,9 @@ html_parts = ['''<html>
         }
         @media (min-width: 768px) {
             #topbar { margin: 0 -20px; }
+            #topbar-profile-name { display: inline; }
+            .nav-label-short { display: none; }
+            .nav-label-full  { display: inline; }
         }
         /* ── Vue globale ── */
         #global-page { max-width: 1200px; margin: 0 auto; padding: 0 12px 40px; }
@@ -1168,7 +1173,7 @@ html_parts = ['''<html>
     <nav id="topbar">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
-            <button class="nav-link" id="nav-global" onclick="showView(\'global\')">Vue globale</button>
+            <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
         <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
@@ -2583,7 +2588,7 @@ html_parts.append('''
     <!-- ══ Page Vue globale ═══════════════════════════════════════════════ -->
     <div id="global-page" style="display:none">
       <div class="site-header" id="global-header">
-        <h1>Vue globale</h1>
+        <h1>Vue Globale</h1>
         <p class="subtitle" style="display:block">Passages agrégés de tous les compteurs actifs</p>
       </div>
       <div id="global-cards"></div>
