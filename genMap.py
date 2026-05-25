@@ -1328,7 +1328,7 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
         location = (f"{row['arrondissement']} - {row['rue_1']} & {rue2}"
                     if rue2 else f"{row['arrondissement']} - {row['rue_1']}")
         is_boucle  = instance.startswith('vf-')
-        type_label = 'Boucle magnétique' if is_boucle else 'Détecteur sur fût'
+        type_label = 'Éco-Compteur' if is_boucle else 'Détecteur SUM'
         type_cls   = 'boucle' if is_boucle else 'fut'
         type_url   = ('https://donnees.montreal.ca/dataset/velos-comptage'
                       if is_boucle else 'https://donnees.montreal.ca/fr/dataset/cyclistes')
@@ -2499,7 +2499,7 @@ html_parts.append('''
             <div class="source-card-top">
               <span class="source-card-icon">🚦</span>
               <div>
-                <div class="source-card-title">Détecteurs sur fût <span class="mbadge mbadge-fut">Fût</span></div>
+                <div class="source-card-title">Détecteurs SUM <span class="mbadge mbadge-fut">Détecteur SUM</span></div>
                 <div class="source-card-sub">cyclistes.csv — Ville de Montréal</div>
               </div>
             </div>
@@ -2510,11 +2510,11 @@ html_parts.append('''
             <div class="source-card-top">
               <span class="source-card-icon">🔵</span>
               <div>
-                <div class="source-card-title">Boucles magnétiques <span class="mbadge mbadge-boucle">Boucle</span></div>
+                <div class="source-card-title">Éco-Compteurs <span class="mbadge mbadge-boucle">Éco-Compteur</span></div>
                 <div class="source-card-sub">compteurs.csv — Ville de Montréal</div>
               </div>
             </div>
-            <div class="source-card-desc">Détecteurs inductifs encastrés dans l\'asphalte. Données à intervalles de 15 minutes, sens unique, identifiants numériques. Agrégées à l\'heure pour l\'affichage.</div>
+            <div class="source-card-desc">Détecteurs inductifs encastrés dans l\'asphalte. Données à intervalles de 15 minutes, sens unique, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">vf-XXXXXXX</code>. Agrégées à l\'heure pour l\'affichage.</div>
             <a class="source-card-link" href="https://donnees.montreal.ca/dataset/velos-comptage" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
           </div>
           <div class="source-card">
@@ -2580,7 +2580,7 @@ html_parts.append('''
       <div class="methodo-section">
         <h3>📅 Fenêtre temporelle</h3>
         <p>Seules les données des <strong>6 derniers mois glissants</strong> (180 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
-        <p>Pour les boucles magnétiques, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des détecteurs sur fût.</p>
+        <p>Pour les Éco-Compteurs, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des Détecteurs SUM.</p>
       </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
