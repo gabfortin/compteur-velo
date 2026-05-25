@@ -1105,7 +1105,6 @@ html_parts = ['''<html>
 <body>
     <nav id="topbar">
         <div id="topbar-nav">
-            <a href="https://pistes.gabfortin.com" class="nav-link">Pistes</a>
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
@@ -2272,7 +2271,7 @@ html_parts.append('''
                 <div class="source-card-sub">cyclistes.csv — Ville de Montréal</div>
               </div>
             </div>
-            <div class="source-card-desc">Capteurs piezo-électriques ou optiques installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>.</div>
+            <div class="source-card-desc">Capteurs installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>.</div>
             <a class="source-card-link" href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
           </div>
           <div class="source-card">
@@ -2357,6 +2356,7 @@ html_parts.append('''
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>
+        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez l\'<a href="#" onclick="showView(\'methodo\');return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color=\'#1DB860\'" onmouseout="this.style.color=\'rgba(29,184,96,0.7)\'">onglet Méthodologie</a>.</p>
         <p style="font-size:0.7rem;color:#aaa;margin-top:4px;">Page mise à jour le ''' + datetime.now(timezone.utc).strftime('%Y-%m-%d à %H:%M') + ''' UTC</p>
     </div>
 </body>
