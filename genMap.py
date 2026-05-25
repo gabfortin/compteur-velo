@@ -122,8 +122,20 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
             'rue_1': f'Écocompteur {cid}',
             'rue_2': ''
         })
+
+        # Exclure les jours incomplets : le portail publie parfois seulement
+        # quelques heures par jour pour les données récentes.  Un jour avec
+        # moins de 12 entrées horaires est ignoré pour ne pas fausser les stats
+        # et l'heure de pointe dans la vue « 7 derniers jours ».
+        hours_per_day = defaultdict(int)
+        for hk in hourly[cid]:
+            hours_per_day[hk[:10]] += 1
+        complete_days = {d for d, n in hours_per_day.items() if n >= 12}
+
         rows = []
         for hour_key, total in sorted(hourly[cid].items()):
+            if hour_key[:10] not in complete_days:
+                continue
             try:
                 if datetime.fromisoformat(hour_key) < cutoff:
                     continue
@@ -1304,6 +1316,10 @@ html_parts.append('''
         function buildFilteredData(instance, days) {
             const allLabels = allChartData[instance].labels;
             const allDatasets = allChartData[instance].datasets;
+            // Ancrer la fenêtre sur la date max propre à ce compteur,
+            // pour éviter qu'un écart de fraîcheur entre sources (ex. det- vs vf-)
+            // ne décale la fenêtre vers une période sans données.
+            const instMax = getMaxDate(allLabels) || globalMaxDate;
 
             let indices;
             if (days === 0) {
@@ -1312,19 +1328,19 @@ html_parts.append('''
             } else if (days === -1) {
                 indices = allLabels.map((_, i) => i);
             } else {
-                if (!globalMaxDate) return { labels: [], datasets: [] };
-                const cutoffDate = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - (days - 1));
+                if (!instMax) return { labels: [], datasets: [] };
+                const cutoffDate = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
                 indices = allLabels.map((l, i) => parseLabel(l) >= cutoffDate ? i : -1).filter(i => i >= 0);
             }
 
             // Pour la vue 7 jours, générer la grille horaire complète et remplir
             // les heures manquantes avec null (les jours sans données apparaissent comme des gaps)
-            if (days === 7 && globalMaxDate) {
-                const cutoff = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - 6);
+            if (days === 7 && instMax) {
+                const cutoff = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - 6);
                 cutoff.setHours(0, 0, 0, 0);
                 const fullHours = [];
                 const cur = new Date(cutoff);
-                while (cur <= globalMaxDate) {
+                while (cur <= instMax) {
                     const lbl = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')} ${String(cur.getHours()).padStart(2,'0')}:00`;
                     fullHours.push(lbl);
                     cur.setHours(cur.getHours() + 1);
@@ -1384,12 +1400,13 @@ html_parts.append('''
         function buildDailyData(instance, days) {
             const allLabels = allChartData[instance].labels;
             const allDatasets = allChartData[instance].datasets;
+            const instMax = getMaxDate(allLabels) || globalMaxDate;
             let indices;
             if (days === -1) {
                 indices = allLabels.map((_, i) => i);
             } else {
-                if (!globalMaxDate) return { labels: [], datasets: [] };
-                const cutoff = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate() - (days - 1));
+                if (!instMax) return { labels: [], datasets: [] };
+                const cutoff = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
                 indices = allLabels.map((l, i) => parseLabel(l) >= cutoff ? i : -1).filter(i => i >= 0);
             }
             const daySet = {};
@@ -1398,9 +1415,9 @@ html_parts.append('''
 
             // Pour la vue 7 jours, générer tous les jours du calendrier
             // (les jours sans données apparaissent comme des barres à 0, potentiellement en rouge)
-            if (days === 7 && globalMaxDate) {
+            if (days === 7 && instMax) {
                 const fullRange = [];
-                const end = new Date(globalMaxDate.getFullYear(), globalMaxDate.getMonth(), globalMaxDate.getDate());
+                const end = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate());
                 const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6);
                 const cur = new Date(start);
                 while (cur <= end) {
