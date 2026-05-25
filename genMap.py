@@ -905,6 +905,47 @@ html_parts = ['''<html>
         }
         .nav-link:hover { background: #f1f5f9; color: #111827; }
         .nav-link.active { background: #e8faf0; color: #1DB860; }
+        button.nav-link { background: none; border: none; cursor: pointer; font-family: inherit; }
+        /* ── Page Méthodologie ───────────────────────────────────────── */
+        #methodo-page { max-width: 820px; margin: 0 auto; padding: 32px 16px 60px; }
+        .methodo-hero { text-align: center; margin-bottom: 40px; }
+        .methodo-hero h2 { font-size: 24px; font-weight: 800; color: #111827; margin-bottom: 8px; }
+        .methodo-hero p { font-size: 15px; color: #6b7280; line-height: 1.6; }
+        .methodo-section { margin-bottom: 40px; }
+        .methodo-section > h3 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 16px;
+            padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+        .methodo-section p { font-size: 14px; color: #4b5563; line-height: 1.75; margin-bottom: 10px; }
+        .methodo-section ul { font-size: 14px; color: #4b5563; line-height: 1.75; padding-left: 22px; margin-bottom: 12px; }
+        .methodo-section li { margin-bottom: 3px; }
+        .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        @media (max-width: 600px) { .source-grid { grid-template-columns: 1fr; } }
+        .source-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+            padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+        .source-card-top { display: flex; align-items: center; gap: 10px; }
+        .source-card-icon { font-size: 22px; flex-shrink: 0; }
+        .source-card-title { font-size: 14px; font-weight: 700; color: #111827; }
+        .source-card-sub { font-size: 12px; color: #9ca3af; }
+        .source-card-desc { font-size: 13px; color: #6b7280; line-height: 1.6; }
+        .source-card-link { font-size: 12px; color: #1DB860; text-decoration: none; font-weight: 500; }
+        .source-card-link:hover { text-decoration: underline; }
+        .mbadge { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 8px; white-space: nowrap; }
+        .mbadge-fut    { background: rgba(29,184,96,0.10); color: #15803d; border: 1px solid rgba(29,184,96,0.28); }
+        .mbadge-boucle { background: rgba(139,92,246,0.10); color: #6d28d9; border: 1px solid rgba(139,92,246,0.28); }
+        .mbadge-bixi   { background: rgba(41,171,226,0.10); color: #0369a1; border: 1px solid rgba(41,171,226,0.28); }
+        .mbadge-meteo  { background: rgba(251,191,36,0.10); color: #b45309; border: 1px solid rgba(251,191,36,0.28); }
+        .algo-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+            padding: 14px 16px; margin-bottom: 12px; font-size: 13.5px; color: #166534; line-height: 1.75; }
+        .algo-box strong { color: #15803d; }
+        .algo-box code { background: rgba(21,128,61,0.1); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+        .algo-warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+            padding: 14px 16px; margin-bottom: 12px; font-size: 13.5px; color: #92400e; line-height: 1.75; }
+        .pipeline-steps { counter-reset: step; list-style: none; padding: 0; }
+        .pipeline-steps li { counter-increment: step; display: flex; align-items: flex-start;
+            gap: 14px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151; }
+        .pipeline-steps li:last-child { border-bottom: none; }
+        .pipeline-steps li::before { content: counter(step); background: #1DB860; color: #fff;
+            font-size: 11px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
         #topbar-profile {
             display: flex;
             align-items: center;
@@ -936,19 +977,19 @@ html_parts = ['''<html>
     <nav id="topbar">
         <div id="topbar-nav">
             <a href="https://pistes.gabfortin.com" class="nav-link">Pistes</a>
-            <a href="/" class="nav-link active">Compteurs</a>
+            <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
+            <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
         <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
             <span id="topbar-profile-name">gabfortin.com</span>
             <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
         </a>
     </nav>
-    <div class="site-header">
+    <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
         <h1>Compteurs Vélo Montréal</h1>
-        <p class="subtitle">Données de passage de cyclistes à Montréal, tirées du portail de <a href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" style="">données ouvertes de la Ville</a>. Validation croisée avec les <a href="https://bixi.com/en/open-data/" target="_blank" style="">données ouvertes BIXI</a>.</p>
     </div>
-    <div class="container">
+    <div class="container" id="main-container">
         <div class="period-buttons desktop-only">
             <button class="period-btn" data-days="0">Jour spécifique</button>
             <button class="period-btn active" data-days="7">7 derniers jours</button>
@@ -2019,7 +2060,121 @@ html_parts.append('''
             map.panTo([counterLocations[instance].lat, counterLocations[instance].lng]);
         }
 
+        // ── Toggle vue Compteurs / Méthodologie ──────────────────────────────
+        function showView(view) {
+            const isMain = view === \'main\';
+            document.getElementById(\'main-header\').style.display    = isMain ? \'\' : \'none\';
+            document.getElementById(\'main-container\').style.display = isMain ? \'\' : \'none\';
+            document.getElementById(\'methodo-page\').style.display   = isMain ? \'none\' : \'\';
+            document.getElementById(\'nav-compteurs\').classList.toggle(\'active\', isMain);
+            document.getElementById(\'nav-methodo\').classList.toggle(\'active\', !isMain);
+            // Remonter en haut de page lors du changement de vue
+            window.scrollTo({ top: 0, behavior: \'smooth\' });
+        }
+
     </script>
+
+    <!-- ══ Page Méthodologie ═══════════════════════════════════════════════ -->
+    <div id="methodo-page" style="display:none">
+      <div class="methodo-hero">
+        <h2>Méthodologie &amp; Sources de données</h2>
+        <p>Comment les données sont collectées, traitées et validées avant d\'être affichées sur cette carte.</p>
+      </div>
+
+      <!-- Sources -->
+      <div class="methodo-section">
+        <h3>📡 Sources de données</h3>
+        <div class="source-grid">
+          <div class="source-card">
+            <div class="source-card-top">
+              <span class="source-card-icon">🚦</span>
+              <div>
+                <div class="source-card-title">Détecteurs sur fût <span class="mbadge mbadge-fut">Fût</span></div>
+                <div class="source-card-sub">cyclistes.csv — Ville de Montréal</div>
+              </div>
+            </div>
+            <div class="source-card-desc">Capteurs piezo-électriques ou optiques installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>.</div>
+            <a class="source-card-link" href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
+          </div>
+          <div class="source-card">
+            <div class="source-card-top">
+              <span class="source-card-icon">🔵</span>
+              <div>
+                <div class="source-card-title">Boucles magnétiques <span class="mbadge mbadge-boucle">Boucle</span></div>
+                <div class="source-card-sub">compteurs.csv — Ville de Montréal</div>
+              </div>
+            </div>
+            <div class="source-card-desc">Détecteurs inductifs encastrés dans l\'asphalte. Données à intervalles de 15 minutes, sens unique, identifiants numériques. Agrégées à l\'heure pour l\'affichage.</div>
+            <a class="source-card-link" href="https://donnees.montreal.ca/dataset/velos-comptage" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
+          </div>
+          <div class="source-card">
+            <div class="source-card-top">
+              <span class="source-card-icon">🚲</span>
+              <div>
+                <div class="source-card-title">BIXI Montréal <span class="mbadge mbadge-bixi">BIXI</span></div>
+                <div class="source-card-sub">bixi.csv — BIXI open data</div>
+              </div>
+            </div>
+            <div class="source-card-desc">Données de trajets BIXI de l\'année courante. Utilisées pour valider les volumes des capteurs fixes situés près de stations BIXI — un dépassement visible est signalé.</div>
+            <a class="source-card-link" href="https://bixi.com/en/open-data/" target="_blank" rel="noopener">→ Données ouvertes BIXI ↗</a>
+          </div>
+          <div class="source-card">
+            <div class="source-card-top">
+              <span class="source-card-icon">🌤️</span>
+              <div>
+                <div class="source-card-title">Météo quotidienne <span class="mbadge mbadge-meteo">Météo</span></div>
+                <div class="source-card-sub">Open-Meteo API (archive + prévisions)</div>
+              </div>
+            </div>
+            <div class="source-card-desc">Température min/max, précipitations et chutes de neige pour Montréal. Sert exclusivement à exclure les jours de météo sévère de la détection d\'anomalies.</div>
+            <a class="source-card-link" href="https://open-meteo.com/" target="_blank" rel="noopener">→ open-meteo.com ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Détection lacunes -->
+      <div class="methodo-section">
+        <h3>⚠️ Détection des lacunes</h3>
+        <p>Un compteur est marqué comme <em>lacunaire</em> (icône ⚠ sur la carte, bandeau d\'avertissement dans le panneau) lorsque ses données présentent l\'un des deux critères suivants :</p>
+        <div class="algo-box">
+          <strong>Critère 1 — Interruption longue :</strong> au moins un écart de plus de <code>14 jours consécutifs</code> sans aucune donnée dans la période active du compteur.<br>
+          <strong>Critère 2 — Taux de manquants élevé :</strong> plus de <code>20 %</code> des jours dans la plage min–max du compteur sont totalement absents.
+        </div>
+      </div>
+
+      <!-- Détection anomalies -->
+      <div class="methodo-section">
+        <h3>🔍 Détection des anomalies</h3>
+        <p>Des jours suspects (dysfonctionnement probable du capteur) sont identifiés par deux méthodes complémentaires. Un jour est signalé dès qu\'<em>au moins l\'une</em> se déclenche :</p>
+        <div class="algo-box">
+          <strong>Méthode 1 — Z-score par jour de semaine :</strong> le taux horaire (passages/h) du jour est comparé à la moyenne <code>μ</code> et l\'écart-type <code>σ</code> de tous les jours complets (≥ 18 h de données) du même jour de semaine. Signalé si <code>taux &lt; μ − 2,5σ</code> ET <code>taux &lt; 50 % de μ</code>.
+        </div>
+        <div class="algo-box">
+          <strong>Méthode 2 — Jours adjacents :</strong> comparaison du taux horaire aux jours complets dans une fenêtre de <code>± 6 jours</code>. Signalé si <code>taux &lt; 20 % de la moyenne adjacente</code> et que le coefficient de variation est &lt; 0,6 (trafic stable autour de la période). Robuste à la saisonnalité.
+        </div>
+        <div class="algo-box">
+          <strong>Jours entièrement absents :</strong> une journée sans aucune donnée dans la plage active du compteur est signalée si le volume attendu (estimé par les méthodes ci-dessus) dépasse <code>25 % de la médiane journalière</code> du compteur (plancher absolu : 10 passages).
+        </div>
+        <div class="algo-warn">
+          <strong>🌧 Exclusion météo :</strong> les jours présentant des conditions sévères sont automatiquement exclus de la détection — pluie &gt; 15 mm, neige &gt; 5 cm, ou température maximale &lt; −15 °C.
+        </div>
+      </div>
+
+      <!-- Validation BIXI -->
+      <div class="methodo-section">
+        <h3>🚲 Validation croisée BIXI</h3>
+        <p>Pour les compteurs situés à proximité de stations BIXI, le volume journalier BIXI (départs + arrivées) est affiché en superposition. Si le volume BIXI dépasse le volume du capteur pour une journée donnée, la barre est marquée d\'un badge <em>«&nbsp;Bixi &gt; capteur&nbsp;»</em> — signal possible d\'une sous-comptabilisation.</p>
+      </div>
+
+      <!-- Fenêtre temporelle -->
+      <div class="methodo-section">
+        <h3>📅 Fenêtre temporelle</h3>
+        <p>Seules les données des <strong>6 derniers mois glissants</strong> (180 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
+        <p>Pour les boucles magnétiques, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des détecteurs sur fût.</p>
+      </div>
+    </div>
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>

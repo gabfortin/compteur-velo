@@ -10,20 +10,22 @@ Visualisation interactive des passages de cyclistes à Montréal, à partir des 
 
 ```
 compteur-velo/
-├── cyclistes.csv        # Source principale (portail données ouvertes Montréal) — ignoré par git
-├── bixi.csv             # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
-├── genMap.py            # Script de génération du site HTML
-├── index.html           # Site généré (ne pas modifier manuellement)
-├── favico.png           # Icône de l'application
-├── test_data.py         # Suite de tests de validation des données
-├── update.sh            # Script de mise à jour automatique (télécharge CSV → génère HTML → publie)
-├── Dockerfile           # Image Docker pour l'automatisation (cron quotidien)
-├── docker-compose.yml   # Orchestration du conteneur d'automatisation
-├── entrypoint.sh        # Point d'entrée Docker (injecte les variables dans l'environnement cron)
-├── .env                 # Variables d'environnement locales (ignoré par git)
-├── .env.example         # Modèle de configuration
-├── .gitignore           # Exclut cyclistes.csv, bixi.csv et .env
-└── CNAME                # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
+├── cyclistes.csv            # Détecteurs sur fût — portail données ouvertes Montréal — ignoré par git
+├── compteurs.csv            # Boucles magnétiques — portail données ouvertes Montréal — ignoré par git
+├── bixi.csv                 # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
+├── velo_meta_cache.json     # Cache Nominatim (arrondissement + rue des boucles magnétiques)
+├── genMap.py                # Script de génération du site HTML
+├── index.html               # Site généré (ne pas modifier manuellement)
+├── favico.png               # Icône de l'application
+├── test_data.py             # Suite de tests de validation des données
+├── update.sh                # Script de mise à jour automatique (télécharge CSV → génère HTML → publie)
+├── Dockerfile               # Image Docker pour l'automatisation (cron quotidien)
+├── docker-compose.yml       # Orchestration du conteneur d'automatisation
+├── entrypoint.sh            # Point d'entrée Docker (injecte les variables dans l'environnement cron)
+├── .env                     # Variables d'environnement locales (ignoré par git)
+├── .env.example             # Modèle de configuration
+├── .gitignore               # Exclut cyclistes.csv, bixi.csv, compteurs.csv et .env
+└── CNAME                    # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
 ```
 
 ---
@@ -32,11 +34,11 @@ compteur-velo/
 
 ```
 cyclistes.csv  ─┐
-                ├──  genMap.py  →  index.html  →  GitHub Pages
+compteurs.csv  ─┤──  genMap.py  →  index.html  →  GitHub Pages
 bixi.csv       ─┘
 ```
 
-`genMap.py` lit les deux CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
+`genMap.py` lit les trois CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
 
 Pour régénérer le site manuellement après une mise à jour du CSV :
 
@@ -47,9 +49,11 @@ python3 test_data.py   # Valide les données après génération
 
 ---
 
-## Source de données — `cyclistes.csv`
+## Sources de données
 
-Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/cyclistes).
+### `cyclistes.csv` — Détecteurs sur fût
+
+Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/fr/dataset/cyclistes). Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
 
 Colonnes :
 
@@ -70,29 +74,48 @@ Colonnes :
 
 Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par `genMap.py`.
 
----
+### `compteurs.csv` — Boucles magnétiques
 
-## Source de données — `bixi.csv`
+Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/velos-comptage). Contient les passages en intervalles de 15 minutes des boucles magnétiques encastrées dans la chaussée.
+
+Colonnes :
+
+| Colonne        | Description                                           |
+|----------------|-------------------------------------------------------|
+| `date`         | Date (format `YYYY-MM-DD`)                            |
+| `heure`        | Heure de début de l'intervalle (format `HH:MM:SS`)   |
+| `id_compteur`  | Identifiant numérique du capteur (ex. `100041114`)    |
+| `nb_passages`  | Nombre de passages sur l'intervalle de 15 min         |
+| `longitude`    | Longitude GPS                                         |
+| `latitude`     | Latitude GPS                                          |
+
+Ces données sont publiées pour l'année courante. L'URL de téléchargement suit le schéma `comptage_velo_{année}.csv` — `update.sh` scrape automatiquement l'URL correcte pour l'année en cours.
+
+**Différences avec `cyclistes.csv` :**
+- Granularité 15 min (agrégée en horaire par `genMap.py`) vs horaire natif
+- Pas de direction, arrondissement ou nom de rue dans le fichier — ces métadonnées sont obtenues par reverse geocoding Nominatim (OpenStreetMap) et mises en cache dans `velo_meta_cache.json`
+- Identifiants numériques (`100041114`) préfixés `vf-` dans `genMap.py` (ex. `vf-100041114`) pour éviter tout conflit avec les `det-` de `cyclistes.csv`
+- 54 capteurs couvrant des emplacements majoritairement différents des 46 détecteurs sur fût
+
+### `bixi.csv`
 
 Fichier CSV téléchargé depuis [bixi.com/en/open-data](https://bixi.com/en/open-data/). Contient tous les trajets BIXI de l'année en cours.
 
 Colonnes utilisées :
 
-| Colonne                    | Description                                 |
-|----------------------------|---------------------------------------------|
-| `STARTSTATIONLATITUDE`     | Latitude de la station de départ            |
-| `STARTSTATIONLONGITUDE`    | Longitude de la station de départ           |
-| `ENDSTATIONLATITUDE`       | Latitude de la station d'arrivée            |
-| `ENDSTATIONLONGITUDE`      | Longitude de la station d'arrivée           |
+| Colonne                    | Description                                  |
+|----------------------------|----------------------------------------------|
+| `STARTSTATIONLATITUDE`     | Latitude de la station de départ             |
+| `STARTSTATIONLONGITUDE`    | Longitude de la station de départ            |
+| `ENDSTATIONLATITUDE`       | Latitude de la station d'arrivée             |
+| `ENDSTATIONLONGITUDE`      | Longitude de la station d'arrivée            |
 | `STARTTIMEMS`              | Horodatage de départ en millisecondes (Unix) |
-
-Les données sont publiées annuellement (non en temps réel). Le fichier de l'année courante peut être remplacé dans le workflow lorsqu'une nouvelle version est publiée.
 
 ---
 
 ## Script de génération — `genMap.py`
 
-### Étape 1 — Lecture et filtrage du CSV
+### Étape 1 — Lecture et filtrage de `cyclistes.csv`
 
 Les données sont groupées par instance **et par direction** :
 
@@ -100,7 +123,7 @@ Les données sont groupées par instance **et par direction** :
 data[row['instance']][row['direction']].append(row)
 ```
 
-18 des 45 compteurs ont deux directions (ex. Est + Ouest). Les regrouper séparément évite les timestamps dupliqués et les volumes gonflés.
+Certains compteurs ont deux directions (ex. Est + Ouest). Les regrouper séparément évite les timestamps dupliqués et les volumes gonflés.
 
 Les données sont ensuite filtrées pour ne garder que les 180 derniers jours :
 
@@ -113,9 +136,33 @@ def is_within_last_6_months(date_str):
 
 > **Note** : le fuseau horaire (`-05` / `-04`) est retiré avec une regex ciblant la fin de la chaîne. Un simple `.replace('-05', '')` corromprait les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
 
-Après le filtrage, `has_significant_gaps` analyse chaque compteur pour détecter les lacunes importantes (voir section [Qualité des données](#qualité-des-données--compteurs-avec-lacunes)).
+### Étape 2 — Intégration de `compteurs.csv` (boucles magnétiques)
 
-### Étape 2 — Données météo
+`load_velo_full()` charge `compteurs.csv`, agrège les intervalles de 15 min en données horaires, et retourne une structure compatible avec `data{}` :
+
+```python
+hour_key = f"{row['date']} {row['heure'][:2]}:00:00"
+hourly[cid][hour_key] += int(row['nb_passages'])
+```
+
+Les métadonnées manquantes (arrondissement, rue) sont obtenues par reverse geocoding via `fetch_nominatim_meta()` (API Nominatim / OpenStreetMap, gratuit, sans clé), avec un délai de 1,1 s entre les requêtes pour respecter la limite de débit. Les résultats sont mis en cache dans `velo_meta_cache.json` — les générations suivantes n'effectuent aucune requête pour les capteurs déjà connus.
+
+```python
+# Extrait de fetch_nominatim_meta()
+arr  = addr.get('city_district') or addr.get('quarter') or addr.get('suburb') or 'Montréal'
+rue1 = addr.get('road') or addr.get('pedestrian') or addr.get('path') or 'Écocompteur'
+```
+
+Les instances sont préfixées `vf-` et fusionnées dans `data{}` :
+
+```python
+result[f"vf-{cid}"] = {'N/A': rows}   # Une seule direction, pas de direction connue
+data.update(vf_data)
+```
+
+Après la fusion, tout le pipeline (détection de lacunes, détection d'anomalies, génération HTML, carte, dropdowns) s'applique uniformément aux deux types de compteurs.
+
+### Étape 3 — Données météo
 
 `fetch_weather_data()` interroge [Open-Meteo](https://open-meteo.com/) (gratuit, sans clé API) en deux passes pour couvrir les 6 derniers mois sans discontinuité :
 
@@ -179,6 +226,7 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
       .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / Tout)
       .select-wrapper.desktop-only
         <select>         ← Dropdown unique groupé par arrondissement (desktop)
+                            Détecteurs sur fût en premier, boucles magnétiques en second dans chaque groupe
       .mobile-only
         <select>         ← Dropdown arrondissement (mobile)
         <select>         ← Dropdown compteur (mobile, peuplé dynamiquement)
@@ -190,7 +238,8 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
         #chart-area
           #noDataMsg     ← Message "Aucune donnée disponible" (affiché si période vide)
           [N × .table-container]  ← Un div par compteur (masqué par défaut)
-        #map             ← Carte Leaflet
+                                     Le titre <h2> contient un badge cliquable indiquant le type de capteur
+        #map             ← Carte Leaflet avec légende de types
     <script>             ← Données + logique JS inline
     .watermark           ← Crédit auteur + avertissement qualité des données + timestamp de génération
 ```
@@ -199,21 +248,29 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
 
 ```javascript
 // Données horaires par instance et direction
-allChartData['det-00077-01'] = {
+allChartData['det-00709-01'] = {
     labels: ["2025-11-04 14:00", ...],
     datasets: [
         { label: 'Ouest', color: '#1DB860', fill: 'rgba(...)', data: [4, 8, ...] },
         { label: 'Est',   color: '#29ABE2', fill: 'rgba(...)', data: [7, 12, ...] }
     ]
 };
+// Pour les boucles magnétiques, une seule direction 'N/A' → label 'Passages'
+allChartData['vf-100012217'] = {
+    labels: ["2026-01-01 10:00", ...],
+    datasets: [{ label: 'Passages', color: '#1DB860', data: [...] }]
+};
 
 // Compteurs par arrondissement (pour le dropdown mobile)
+// Préfixe '[Boucle] ' pour les boucles magnétiques
 countersByArrondissement["Le Plateau-Mont-Royal"] = [
-    { value: "det-00709-01", label: "Papineau & Rachel (det-00709-01)" }
+    { value: "det-00709-01", label: "Papineau & Rachel (det-00709-01)" },
+    { value: "vf-100012217", label: "[Boucle] Rue Rachel Est (vf-100012217)" }
 ];
 
-// Coordonnées GPS pour la carte
-counterLocations['det-00709-01'] = { lat: 45.53, lng: -73.57, label: '...', arrondissement: '...' };
+// Coordonnées GPS et type de capteur pour la carte
+counterLocations['det-00709-01'] = { lat: 45.53, lng: -73.57, label: '...', arrondissement: '...', type: 'fut' };
+counterLocations['vf-100012217'] = { lat: 45.52, lng: -73.58, label: '...', arrondissement: '...', type: 'boucle' };
 
 // Compteurs avec lacunes significatives
 const gappyCounters = new Set(["det-00077-01", "det-01452-01", "det-13259-02"]);
@@ -246,12 +303,12 @@ Tout le JavaScript est inline dans le HTML généré.
 | `charts`                    | Instances Chart.js créées (cache)                                                    |
 | `markers`                   | Markers Leaflet, par instance                                                        |
 | `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)                         |
-| `counterLocations`          | Coordonnées GPS et métadonnées par instance                                          |
+| `counterLocations`          | Coordonnées GPS, métadonnées et type (`'fut'` / `'boucle'`) par instance             |
 | `globalMaxDate`             | Date la plus récente parmi tous les compteurs — référence commune pour filtrer       |
 | `currentPeriod`             | Nombre de jours de la période active (`-1` = tout, défaut : `7`)                    |
 | `displayMode`               | `'combined'` (défaut) ou `'separate'` (toggle bi-directionnel)                      |
 | `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)                    |
-| `showBixi`                  | `true` (défaut) — affiche ou masque l'overlay BIXI sur les graphiques               |
+| `showBixi`                  | `false` — overlay BIXI désactivé par défaut                                         |
 | `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)                   |
 | `gappyCounters`             | `Set` des instances avec lacunes significatives — injecté par `genMap.py`            |
 | `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` — injecté par `genMap.py`    |
@@ -295,7 +352,7 @@ Affiche ou masque `#anomalyWarning` selon que des anomalies ou des dépassements
 Affiche `#bixiToggle` uniquement pour les compteurs ayant des données BIXI dans `bixiNearby`.
 
 #### `updateDirToggle(instance)`
-Affiche `#dirToggle` uniquement pour les compteurs bi-directionnels (18 sur 45).
+Affiche `#dirToggle` uniquement pour les compteurs bi-directionnels (détecteurs sur fût uniquement — les boucles magnétiques n'ont pas de direction).
 
 #### `updateViewToggle()`
 Affiche ou masque `#viewToggle`. Le toggle est **masqué uniquement pour "Jour spécifique"** (`currentPeriod === 0`).
@@ -309,7 +366,7 @@ Calcule les 3 statistiques en combinant toutes les directions :
 Les valeurs sont animées avec `animateCount()` (easing `easeOutCubic`, 700 ms).
 
 #### `updateMapSelection(instance)`
-Met le marker du compteur sélectionné en bleu ciel (`#29ABE2`), les compteurs normaux en vert (`#1DB860`), et les compteurs avec lacunes en amber (`#F59E0B`).
+Met le marker du compteur sélectionné en **bleu ciel** (`#29ABE2`), les détecteurs sur fût en **vert** (`#1DB860`), et les boucles magnétiques en **violet** (`#8B5CF6`). La couleur de base dépend de `counterLocations[id].type`.
 
 #### `setCounterFromMap(instance)`
 Appelé lors d'un clic sur un marker Leaflet. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
@@ -318,25 +375,26 @@ Appelé lors d'un clic sur un marker Leaflet. Met à jour les dropdowns desktop 
 
 | Contexte | Interface |
 |----------|-----------|
-| Desktop (≥ 768px) | Un seul dropdown avec `<optgroup>` par arrondissement |
-| Mobile (< 768px)  | Deux dropdowns en cascade : arrondissement → compteur |
+| Desktop (≥ 768px) | Un seul dropdown avec `<optgroup>` par arrondissement. Dans chaque groupe : détecteurs sur fût en premier (tri alphabétique), puis boucles magnétiques préfixées `[Boucle]` |
+| Mobile (< 768px)  | Deux dropdowns en cascade : arrondissement → compteur (même ordre et préfixes) |
 
-Au chargement, un arrondissement et un compteur sont choisis **aléatoirement**.
+Au chargement, le compteur `det-00709-01` (Papineau / Rachel) est sélectionné par défaut.
 
 ### Graphiques bi-directionnels
 
-Pour les 18 compteurs avec deux directions :
+Pour les détecteurs sur fût avec deux directions :
 - Par défaut : **mode combiné** — 1 ligne verte avec fill dégradé, somme des deux directions
 - Mode séparé : 2 lignes (vert `#1DB860` + bleu ciel `#29ABE2`), légende affichée
 - Le toggle "Par direction / Combiné" est visible uniquement pour ces compteurs
 
+Les boucles magnétiques n'ont qu'une seule série ("Passages") — le toggle de direction est masqué pour elles.
+
 ### Overlay BIXI
 
-Pour les 14 compteurs ayant au moins une station BIXI dans un rayon de 150 m :
-- Un bouton **"Bixi"** rouge apparaît dans la barre de contrôle (actif par défaut)
+Pour les compteurs ayant au moins une station BIXI dans un rayon de 150 m :
+- Un bouton **"Bixi"** rouge apparaît dans la barre de contrôle
 - En vue timeline : step-line rouge pâle pointillée superposée à la courbe des passages
 - En vue daily : barres rouges pâles sur le même axe Y que les barres du compteur
-- Le bouton masque/affiche l'overlay sans recharger la page
 
 ### Code couleur des graphiques
 
@@ -345,18 +403,21 @@ Pour les 14 compteurs ayant au moins une station BIXI dans un rayon de 150 m :
 | Vert `#1DB860` | Passages du compteur (normal) |
 | Bleu ciel `#29ABE2` | 2e direction (mode séparé) |
 | Orange `rgba(245,158,11,...)` | Jour d'anomalie détectée (barres daily) |
-| Rouge pâle `rgba(220,38,38,...)` | Données BIXI (overlay) |
-
-### Message "aucune donnée"
-
-Quand un compteur n'a aucune donnée dans la fenêtre temporelle sélectionnée :
-- Le canvas est masqué
-- `#noDataMsg` s'affiche à sa place
-- La référence de temps est `globalMaxDate`, commune à tous les compteurs
+| Rouge pâle `rgba(220,38,38,...)` | Données BIXI (overlay) ou données manquantes |
 
 ### Carte Leaflet
 
-Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se calculer avant que Leaflet mesure la hauteur du conteneur. Sur desktop, la carte occupe 320 px de large et s'aligne en hauteur avec le graphique via `display: grid`.
+Initialisée dans un `setTimeout(..., 0)` pour laisser le layout CSS Grid se calculer avant que Leaflet mesure la hauteur du conteneur.
+
+**Code couleur des markers :**
+
+| Couleur | Signification |
+|---------|--------------|
+| Vert `#1DB860` | Détecteur sur fût (non sélectionné) |
+| Violet `#8B5CF6` | Boucle magnétique (non sélectionnée) |
+| Bleu ciel `#29ABE2` | Compteur sélectionné (quel que soit le type) |
+
+Une légende est affichée en bas à gauche de la carte. Le tooltip au survol préfixe `📍` pour les fûts et `⬡` pour les boucles. Les badges de type dans le panneau de détail (`<h2>`) sont des liens cliquables vers la source de données correspondante.
 
 ### Comportement de l'axe X
 
@@ -389,8 +450,6 @@ Exécutée en Python dans `genMap.py` après le filtrage des 6 derniers mois. Un
 
 | Élément | Comportement |
 |---------|-------------|
-| Marker carte | Amber (`#F59E0B`) au lieu du vert, avec `⚠` dans le tooltip au survol |
-| Marker sélectionné | Bleu ciel (`#29ABE2`) comme les autres (comportement inchangé) |
 | Bannière `#dataWarning` | S'affiche sous le titre du compteur avec un message d'avertissement |
 
 ---
@@ -440,18 +499,10 @@ où `median_journalière` est la médiane des totaux de passages sur les journé
 
 ### Validation croisée BIXI
 
-En complément de la détection statistique, les anomalies sont croisées avec les données BIXI pour les 14 compteurs couverts :
+En complément de la détection statistique, les anomalies sont croisées avec les données BIXI pour les compteurs couverts :
 
 - Si des trajets BIXI sont enregistrés à proximité un jour où le compteur affiche 0 ou presque → le compteur était probablement en panne
-- Les jours où **BIXI > compteur** (204 cas identifiés sur 3 mois) sont signalés même s'ils ne déclenchent pas l'algorithme statistique
-
-```javascript
-const bixiExceedsDays = {
-    "det-00709-01": {
-        "2026-01-23": { "counter": 0, "bixi": 59 }
-    }
-};
-```
+- Les jours où **BIXI > compteur** sont signalés même s'ils ne déclenchent pas l'algorithme statistique
 
 ### Signalisation visuelle
 
@@ -460,24 +511,31 @@ const bixiExceedsDays = {
 | Bannière `#anomalyWarning` | S'affiche pour les vues **Jour spécifique** et **7 derniers jours**, avec dates suspectes et volumes observés vs attendus |
 | Badge rouge `⚠ Bixi (N) > compteur (M)` | Affiché sur chaque jour où BIXI dépasse le compteur |
 | Mention bleue BIXI | Affiché quand des trajets BIXI confirment une anomalie sans la dépasser |
-| Barres oranges (vue Par jour) | Les barres correspondant à des jours anomaux apparaissent en orange (`rgba(245,158,11,...)`) |
+| Barres oranges (vue Par jour) | Les barres correspondant à des jours anomaux apparaissent en orange |
 | Gaps (vue Dans le temps) | Les jours sans données apparaissent comme des interruptions dans la courbe |
 
 ---
 
 ## Tests — `test_data.py`
 
-Suite de validation qui compare directement le CSV et `index.html`. À relancer après chaque régénération du HTML.
+Suite de validation qui compare directement les CSV et `index.html`. À relancer après chaque régénération du HTML.
 
 ```bash
 python3 test_data.py
 ```
 
+Le script charge `cyclistes.csv` et `compteurs.csv` (si présent) pour établir la liste des instances attendues, puis valide :
+
+- Toutes les instances de `cyclistes.csv` sont présentes dans le HTML
+- Aucune instance inconnue dans le HTML (les `vf-` de `compteurs.csv` sont acceptées)
+- Pour chaque instance `det-` : labels, volumes et nombre de directions correspondent exactement au CSV
+- Tous les arrondissements de `cyclistes.csv` ont un `<optgroup>` correspondant (des groupes supplémentaires pour les boucles magnétiques sont acceptés)
+
 ---
 
 ## Automatisation — Docker
 
-Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Montréal** via cron. Il clone ou met à jour le dépôt GitHub, télécharge le CSV depuis le portail de données ouvertes, régénère `index.html`, valide les données, puis publie si des changements sont détectés.
+Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Montréal** via cron. Il clone ou met à jour le dépôt GitHub, télécharge les CSV depuis les portails de données ouvertes, régénère `index.html`, valide les données, puis publie si des changements sont détectés.
 
 ### Fichiers impliqués
 
@@ -486,7 +544,25 @@ Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Mont
 | `Dockerfile`       | Image `python:3.11-slim` + git + cron + tqdm. Cron configuré à 08h15 |
 | `docker-compose.yml` | Monte `./logs` dans `/var/log`, charge `.env`, redémarre toujours  |
 | `entrypoint.sh`    | Exporte les variables d'env vers `/etc/environment` pour que cron y ait accès, puis lance `cron -f` |
-| `update.sh`        | Pipeline complet : clone/pull → scrape URL CSV → télécharge CSV → `genMap.py` → `test_data.py` → commit + push |
+| `update.sh`        | Pipeline complet : clone/pull → télécharge les 3 CSV → `genMap.py` → `test_data.py` → commit + push |
+
+### Pipeline `update.sh`
+
+```
+1. clone / git pull
+2. Scraper + télécharger cyclistes.csv       → CSV_CHANGED
+3. Scraper + télécharger bixi.csv (ZIP)      → BIXI_CHANGED
+4. Scraper + télécharger compteurs.csv       → COMPTEURS_CHANGED
+5. Si aucun changement → exit 0
+6. python3 genMap.py                         (inclut le géocodage Nominatim si nouveaux capteurs)
+7. python3 test_data.py
+8. git add index.html velo_meta_cache.json
+9. git commit + git push si index.html a changé
+```
+
+`compteurs.csv` est scrappé sur `https://donnees.montreal.ca/dataset/velos-comptage` en cherchant le lien `comptage_velo_{année}.csv` pour l'année courante — le script s'adapte automatiquement en début de nouvelle année.
+
+`velo_meta_cache.json` est commité dans le dépôt pour que le cache Nominatim persiste entre les runs Docker. Si de nouveaux capteurs apparaissent dans `compteurs.csv` (nouveaux IDs non présents dans le cache), `genMap.py` les géocode lors de la génération et le cache mis à jour est commité dans le même commit que `index.html`.
 
 ### Variables d'environnement — `.env`
 
@@ -506,6 +582,7 @@ cp .env.example .env
 ### Démarrer le conteneur
 
 ```bash
+docker compose build          # À relancer après chaque modification de update.sh ou genMap.py
 docker compose up -d          # Démarre en arrière-plan
 docker compose logs -f        # Suit les logs en temps réel
 ```
@@ -529,7 +606,7 @@ Chaque `push` sur `main` déclenche automatiquement le déploiement. En producti
 ```bash
 python3 genMap.py        # Régénère index.html
 python3 test_data.py     # Valide les données
-git add index.html
+git add index.html velo_meta_cache.json
 git commit -m "Mise à jour manuelle"
 git push
 ```
