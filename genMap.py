@@ -35,6 +35,68 @@ for instance in data.keys():
     for direction in data[instance].keys():
         data[instance][direction] = [row for row in data[instance][direction] if is_within_last_6_months(row['periode'])]
 
+# ── Classifier les compteurs sur fût (det-) ───────────────────────────────────
+def classify_det_quality(det_data):
+    """Classifie chaque compteur det- en groupe A/B/C selon la fraîcheur des données.
+    - A : à jour (dernière donnée complète proche du max global)
+    - B : délai de publication (données récentes mais incomplètes)
+    - C : compteur potentiellement inactif (aucune donnée récente)
+    """
+    # Normaliser le format de période : '2025-11-04 14:00:00-05' → '2025-11-04'
+    def day_of(periode):
+        clean = re.sub(r'[+-]\d{2}$', '', periode.strip('"').strip())
+        return clean[:10]
+
+    # Date max globale (compteurs det- uniquement)
+    all_days = [
+        day_of(row['periode'])
+        for directions in det_data.values()
+        for rows in directions.values()
+        for row in rows
+    ]
+    global_max = max(all_days) if all_days else None
+
+    quality = {}
+    for instance, directions in det_data.items():
+        # Heures distinctes par jour (toutes directions confondues)
+        hours_per_day = defaultdict(set)
+        for rows in directions.values():
+            for row in rows:
+                d = day_of(row['periode'])
+                h = row['periode'].strip('"').strip()[11:13]
+                hours_per_day[d].add(h)
+
+        last_complete = max((d for d, hrs in hours_per_day.items() if len(hrs) >= 12), default=None)
+        last_any      = max(hours_per_day.keys()) if hours_per_day else None
+
+        group    = 'A'
+        lag_days = None
+        if global_max and last_any:
+            lag_any      = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_any)).days
+            lag_complete = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_complete)).days if last_complete else 999
+            if lag_any > 30:
+                group = 'C'
+            elif lag_complete > 7:
+                group = 'B'
+        else:
+            group = 'C'
+
+        if group == 'B' and last_complete and global_max:
+            lag_days = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_complete)).days
+
+        quality[instance] = {
+            'group':         group,
+            'last_complete': last_complete,
+            'last_any':      last_any,
+            'lag_days':      lag_days,
+        }
+
+    groups = {g: sum(1 for q in quality.values() if q['group'] == g) for g in ('A', 'B', 'C')}
+    print(f"det- : {len(quality)} compteurs classifiés (A={groups['A']}, B={groups['B']}, C={groups['C']}).")
+    return quality
+
+det_quality = classify_det_quality(data)
+
 # ── Intégrer velo-full-2026.csv (compteurs supplémentaires, intervalles 15 min) ──
 
 def fetch_nominatim_meta(lat, lng):
@@ -851,9 +913,9 @@ html_parts = ['''<html>
         }
         .counter-type-badge:hover { opacity: 0.75; }
         .counter-type-fut {
-            background: rgba(29,184,96,0.10);
-            color: #15803d;
-            border: 1px solid rgba(29,184,96,0.28);
+            background: rgba(41,171,226,0.10);
+            color: #0369a1;
+            border: 1px solid rgba(41,171,226,0.28);
         }
         .counter-type-boucle {
             background: rgba(139,92,246,0.10);
@@ -996,9 +1058,9 @@ html_parts = ['''<html>
         .source-card-link { font-size: 12px; color: #1DB860; text-decoration: none; font-weight: 500; }
         .source-card-link:hover { text-decoration: underline; }
         .mbadge { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 8px; white-space: nowrap; }
-        .mbadge-fut    { background: rgba(29,184,96,0.10); color: #15803d; border: 1px solid rgba(29,184,96,0.28); }
+        .mbadge-fut    { background: rgba(41,171,226,0.10);  color: #0369a1; border: 1px solid rgba(41,171,226,0.28); }
         .mbadge-boucle { background: rgba(139,92,246,0.10); color: #6d28d9; border: 1px solid rgba(139,92,246,0.28); }
-        .mbadge-bixi   { background: rgba(41,171,226,0.10); color: #0369a1; border: 1px solid rgba(41,171,226,0.28); }
+        .mbadge-bixi   { background: rgba(220,38,38,0.09);  color: #b91c1c; border: 1px solid rgba(220,38,38,0.28); }
         .mbadge-meteo  { background: rgba(251,191,36,0.10); color: #b45309; border: 1px solid rgba(251,191,36,0.28); }
         .algo-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
             padding: 14px 16px; margin-bottom: 12px; font-size: 13.5px; color: #166534; line-height: 1.75; }
@@ -1215,8 +1277,7 @@ html_parts.append('''
             <div id="map"></div>
             <button id="cyclosm-btn" title="Afficher les pistes cyclables">🚲 Pistes cyclables</button>
             <div id="map-legend">
-                <span class="legend-item"><span class="legend-dot" style="background:#1DB860;box-shadow:0 0 0 1.5px #fff;"></span>Détecteur sur fût</span>
-                <span class="legend-item"><span class="legend-dot" style="background:#8B5CF6;box-shadow:0 0 0 1.5px #fff;"></span>Boucle magnétique</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#1DB860;box-shadow:0 0 0 1.5px #fff;"></span>Compteur actif</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#F59E0B;box-shadow:0 0 0 1.5px #fff;"></span>Délai de données</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#EF4444;box-shadow:0 0 0 1.5px #fff;"></span>Compteur inactif</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#29ABE2;box-shadow:0 0 0 1.5px #fff;"></span>Sélectionné</span>
@@ -1280,7 +1341,8 @@ for instance in data.keys():
 html_parts.append(f"const counterLocations = {json.dumps(counter_locations)};\n")
 html_parts.append(f"const gappyCounters = new Set({json.dumps(sorted(gappy_instances))});\n")
 html_parts.append(f"const anomalyDays = {json.dumps(anomaly_data)};\n")
-html_parts.append(f"const vfDataQuality = {json.dumps(vf_quality)};\n")
+all_quality = {**det_quality, **vf_quality}
+html_parts.append(f"const vfDataQuality = {json.dumps(all_quality)};\n")
 weather_js = {d: {k: v for k, v in w.items() if k != 'code'} for d, w in weather_data.items()}
 html_parts.append(f"const weatherData = {json.dumps(weather_js)};\n")
 
@@ -2097,12 +2159,10 @@ html_parts.append('''
         }
 
         function markerStyle(selected, gappy, type, group) {
-            let base = COLOR_DEFAULT;
-            if (!selected && type === 'boucle') {
-                if (group === 'C') base = COLOR_BOUCLE_STOPPED;
-                else if (group === 'B') base = COLOR_BOUCLE_LAG;
-                else base = COLOR_BOUCLE;
-            }
+            let base;
+            if      (group === 'C') base = COLOR_BOUCLE_STOPPED;  // rouge
+            else if (group === 'B') base = COLOR_BOUCLE_LAG;      // orange
+            else                    base = COLOR_DEFAULT;           // vert
             return { radius: 9, fillColor: selected ? COLOR_SELECTED : base, color: '#fff', weight: 2, fillOpacity: 0.92 };
         }
 
