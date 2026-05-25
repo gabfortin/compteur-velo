@@ -1160,7 +1160,7 @@ for arrondissement in sorted(by_arrondissement.keys()):
                              key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
     for instance, row in sorted_counters:
         label = counter_label(instance, row)
-        prefix = '[Boucle] ' if instance.startswith('vf-') else ''
+        prefix = '[Éco-Compteur] ' if instance.startswith('vf-') else ''
         html_parts.append(f'<option value="{instance}">{prefix}{label}</option>')
     html_parts.append('</optgroup>')
 
@@ -1309,7 +1309,7 @@ for arrondissement in sorted(by_arrondissement.keys()):
     counters = sorted(by_arrondissement[arrondissement],
                       key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
     entries = [{"value": inst,
-                "label": ('[Boucle] ' if inst.startswith('vf-') else '') + counter_label(inst, row)}
+                "label": ('[Éco-Compteur] ' if inst.startswith('vf-') else '') + counter_label(inst, row)}
                for inst, row in counters]
     html_parts.append(f"countersByArrondissement[{json.dumps(arrondissement)}] = {json.dumps(entries)};\n")
 
