@@ -650,6 +650,7 @@ html_parts = ['''<html>
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 8px;
+            margin-top: 14px;
             margin-bottom: 10px;
         }
         #datepickerWrapper {
@@ -937,7 +938,7 @@ html_parts = ['''<html>
             flex-shrink: 0;
         }
         .anomaly-info-btn {
-            cursor: help;
+            cursor: pointer;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -989,7 +990,7 @@ html_parts = ['''<html>
             .watermark { padding: 20px 10px; font-size: 14px; margin-top: 40px; }
             .period-buttons {
                 display: flex; flex-wrap: wrap; gap: 10px;
-                justify-content: center; margin-bottom: 20px;
+                justify-content: center; margin-top: 18px; margin-bottom: 20px;
                 grid-template-columns: unset;
             }
             .period-btn { padding: 10px 20px; font-size: 14px; flex: 0 1 auto; }
@@ -1087,6 +1088,79 @@ html_parts = ['''<html>
         @media (min-width: 768px) {
             #topbar { margin: 0 -20px; }
         }
+        /* ── Vue globale ── */
+        #global-page { max-width: 1200px; margin: 0 auto; padding: 0 12px 40px; }
+        #global-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+        .global-card {
+            background: linear-gradient(135deg, rgba(29,184,96,0.07), rgba(29,184,96,0.02));
+            border: 1.5px solid rgba(29,184,96,0.18);
+            border-radius: 12px;
+            padding: 20px 20px 18px;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+        .global-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(29,184,96,0.12);
+            border-color: rgba(29,184,96,0.35);
+        }
+        .global-card-title {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.8px; color: #6b7280; margin-bottom: 2px;
+        }
+        .global-card-date {
+            font-size: 12px; color: #9ca3af; margin-bottom: 8px;
+        }
+        .global-card-total {
+            font-size: 34px; font-weight: 800; color: #1DB860; line-height: 1.1;
+        }
+        .global-card-sub {
+            font-size: 11px; color: #9ca3af; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-top: 2px; margin-bottom: 14px;
+        }
+        .global-card-meta { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #4b5563; }
+        .global-card-meta strong { color: #111827; }
+        .global-card-clickable { cursor: pointer; }
+        .global-card-cta {
+            margin-top: 12px; font-size: 12px; font-weight: 600;
+            color: #1DB860; letter-spacing: 0.3px;
+        }
+        .global-top-row {
+            display: flex; align-items: baseline; gap: 6px;
+            cursor: pointer; border-radius: 5px; padding: 2px 4px; margin: 0 -4px;
+            transition: background 0.15s;
+        }
+        .global-top-row:hover { background: rgba(29,184,96,0.1); }
+        .global-top-rank { font-size: 13px; flex-shrink: 0; }
+        .global-top-vol { margin-left: auto; font-size: 12px; color: #6b7280; white-space: nowrap; }
+        #global-bottom {
+            display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px;
+        }
+        .global-section {
+            background: #fff; border: 1.5px solid #e5e7eb; border-radius: 12px;
+            padding: 18px 20px;
+        }
+        .global-section-title {
+            font-size: 13px; font-weight: 700; color: #111827;
+            margin-bottom: 14px; display: flex; align-items: center; gap: 7px;
+        }
+        .arr-row {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; margin-bottom: 9px;
+        }
+        .arr-name { width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+        .arr-bar-wrap { flex: 1; height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+        .arr-bar { height: 100%; background: linear-gradient(to right, #1DB860, #17a355); border-radius: 3px; }
+        .arr-vol { font-size: 11px; color: #9ca3af; white-space: nowrap; min-width: 52px; text-align: right; }
+        .net-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
+        .net-val { font-size: 32px; font-weight: 800; line-height: 1.1; }
+        .net-label { font-size: 11px; color: #6b7280; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+        @media (min-width: 768px) {
+            #global-page { padding: 0 20px 40px; }
+            #global-cards { grid-template-columns: repeat(3, 1fr); }
+            .global-card-total { font-size: 40px; }
+            #global-bottom { grid-template-columns: 2fr 1fr; }
+            .arr-name { width: 200px; }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
@@ -1094,6 +1168,7 @@ html_parts = ['''<html>
     <nav id="topbar">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
+            <button class="nav-link" id="nav-global" onclick="showView(\'global\')">Vue globale</button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
         <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
@@ -1106,26 +1181,6 @@ html_parts = ['''<html>
         <h1>Compteurs Vélo Montréal</h1>
     </div>
     <div class="container" id="main-container">
-        <div class="period-buttons desktop-only">
-            <button class="period-btn" data-days="0">Jour spécifique</button>
-            <button class="period-btn active" data-days="7">7 derniers jours</button>
-            <button class="period-btn" data-days="30">Dernier mois</button>
-            <button class="period-btn" data-days="90">3 derniers mois</button>
-            <button class="period-btn" data-days="180">6 derniers mois</button>
-            <button class="period-btn" data-days="-1">Tout</button>
-        </div>
-        <div class="select-wrapper mobile-only" style="margin-bottom:14px;">
-            <select id="periodSelectMobile">
-                <option value="0">Jour spécifique</option>
-                <option value="7" selected>7 derniers jours</option>
-                <option value="30">Dernier mois</option>
-                <option value="90">3 derniers mois</option>
-                <option value="180">6 derniers mois</option>
-                <option value="-1">Tout</option>
-            </select>
-        </div>
-        <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
-        <div id="dayLabel" class="day-label" style="display:none"></div>
         <div class="select-wrapper desktop-only">
         <select id="counterSelectDesktop">
             <option value="">Sélectionnez un compteur</option>
@@ -1185,6 +1240,26 @@ html_parts.append('''
         </select>
         </div>
         </div>
+        <div class="period-buttons desktop-only">
+            <button class="period-btn" data-days="0">Jour spécifique</button>
+            <button class="period-btn active" data-days="7">7 derniers jours</button>
+            <button class="period-btn" data-days="30">Dernier mois</button>
+            <button class="period-btn" data-days="90">3 derniers mois</button>
+            <button class="period-btn" data-days="180">6 derniers mois</button>
+            <button class="period-btn" data-days="-1">Tout</button>
+        </div>
+        <div class="select-wrapper mobile-only" style="margin-top:14px;margin-bottom:14px;">
+            <select id="periodSelectMobile">
+                <option value="0">Jour spécifique</option>
+                <option value="7" selected>7 derniers jours</option>
+                <option value="30">Dernier mois</option>
+                <option value="90">3 derniers mois</option>
+                <option value="180">6 derniers mois</option>
+                <option value="-1">Tout</option>
+            </select>
+        </div>
+        <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
+        <div id="dayLabel" class="day-label" style="display:none"></div>
         <div class="stats-row" id="statsRow" style="display:none">
             <div class="stat-card">
                 <div class="stat-value" id="statTotal">—</div>
@@ -1235,7 +1310,7 @@ html_parts.append('''
                 <strong class="desktop-only">Données potentiellement erronées</strong><strong class="mobile-only">Données suspectes</strong><span class="desktop-only"> — volumes anormalement bas détectés :</span><br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
             </div>
-            <span class="anomaly-info-btn" tabindex="0" data-tooltip="Deux méthodes complémentaires : (1) Z-score par jour de semaine — le taux horaire du jour est comparé à la moyenne (μ) et l'écart-type (σ) des autres mêmes jours de semaine ; signalé si taux &lt; μ−2,5σ ET &lt; 50 % de μ. (2) Jours adjacents — signalé si le taux est &lt; 20 % de la moyenne des jours complets dans ±6 jours (CV &lt; 0,6). Les jours sans aucune donnée dans la plage active du compteur sont aussi signalés si le volume attendu dépasse 25 % de la médiane journalière du compteur (plancher : 10 passages). Les jours de météo sévère (pluie &gt; 15 mm, neige &gt; 5 cm ou température max &lt; −15 °C) sont exclus de la détection.">ℹ</span>
+            <span class="anomaly-info-btn" tabindex="0" onclick="showView('methodo')" data-tooltip="Voir la méthodologie de détection">ℹ</span>
         </div>
         <div id="vfQualityWarning"><span class="warn-icon" id="vfQualityIcon"></span><span id="vfQualityText"></span></div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
@@ -1391,6 +1466,94 @@ for inst, bixi_days in bixi_near_counter.items():
         bixi_exceeds_days[inst] = exceeds
 
 html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
+
+# ── Vue globale : stats agrégées (compteurs groupes A + B) ────────────────────
+_active_g = [i for i in data if all_quality.get(i, {}).get('group') in ('A', 'B')]
+
+_g_daily   = defaultdict(int)
+_g_ctr_day = defaultdict(lambda: defaultdict(int))
+_g_hour_d  = defaultdict(lambda: defaultdict(int))
+
+for _inst in _active_g:
+    for _rows in data[_inst].values():
+        for _row in _rows:
+            _d = _row['periode'][:10]
+            try:
+                _v = int(_row['volume'])
+            except Exception:
+                continue
+            _g_daily[_d]           += _v
+            _g_ctr_day[_inst][_d]  += _v
+            try:
+                _g_hour_d[_d][int(_row['periode'][11:13])] += _v
+            except Exception:
+                pass
+
+def _gstat(dates):
+    total    = sum(_g_daily.get(d, 0) for d in dates)
+    coverage = sum(1 for i in _active_g if any(_g_ctr_day[i].get(d, 0) > 0 for d in dates))
+    i_tots   = {i: sum(_g_ctr_day[i].get(d, 0) for d in dates) for i in _active_g}
+    ranked   = sorted(i_tots, key=i_tots.get, reverse=True)
+    def _top(inst):
+        if not inst: return {'id': None, 'label': '', 'vol': 0}
+        r = first_row_for(inst)
+        lbl = re.sub(r'\s*\([^)]+\)\s*$', '', counter_label(inst, r)) if r else ''
+        return {'id': inst, 'label': lbl, 'vol': i_tots[inst]}
+    hrly     = defaultdict(int)
+    for d in dates:
+        for h, v in _g_hour_d.get(d, {}).items():
+            hrly[h] += v
+    return {
+        'total':     total,
+        'coverage':  coverage,
+        'active':    len(_active_g),
+        'top':       [_top(ranked[i] if i < len(ranked) else None) for i in range(2)],
+        'peak_hour': max(hrly, key=hrly.get) if hrly else None,
+    }
+
+_FR_MONTHS_SHORT = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']
+_FR_MONTHS_LONG  = ['janvier','février','mars','avril','mai','juin','juillet','août',
+                    'septembre','octobre','novembre','décembre']
+
+def _fmt_d(s):
+    dt = datetime.fromisoformat(s)
+    return f"{dt.day} {_FR_MONTHS_SHORT[dt.month - 1]}"
+
+_gs = {}
+if _g_daily:
+    _max_data = max(_g_daily.keys())
+    _today    = datetime.now().strftime('%Y-%m-%d')
+    # "Hier" = jour civil d'avant aujourd'hui; si données trop récentes (aujourd'hui),
+    # on recule d'un jour supplémentaire pour éviter les journées partielles.
+    _hier     = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    _hier_dt  = datetime.fromisoformat(_hier)
+    _week     = [(_hier_dt - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    _month    = sorted(d for d in _g_daily if d[:7] == _hier[:7] and d <= _hier)
+    # Classement des arrondissements (7 derniers jours)
+    _arr_vols = defaultdict(int)
+    for _inst in _active_g:
+        _arr = counter_locations.get(_inst, {}).get('arrondissement', 'Montréal')
+        for _d in _week:
+            _arr_vols[_arr] += _g_ctr_day[_inst].get(_d, 0)
+    _arr_rank = sorted(_arr_vols.items(), key=lambda x: x[1], reverse=True)[:6]
+
+    # Statut du réseau
+    _net = {g: sum(1 for q in all_quality.values() if q.get('group') == g) for g in ('A', 'B', 'C')}
+    _net['total'] = len(all_quality)
+
+    _gs = {
+        'yesterday': {**_gstat([_hier]),
+                      'subtitle': _fmt_d(_hier) + ' ' + _hier[:4]},
+        'week':      {**_gstat(_week),
+                      'subtitle': _fmt_d(_week[-1]) + ' – ' + _fmt_d(_week[0])},
+        'month':     {**_gstat(_month),
+                      'subtitle': _FR_MONTHS_LONG[int(_hier[5:7]) - 1].capitalize() + ' ' + _hier[:4]},
+        'arr_rank':  [{'name': a, 'vol': v} for a, v in _arr_rank],
+        'net_status': _net,
+    }
+    print(f"Vue globale : {len(_active_g)} compteurs actifs, hier = {_hier}, max données = {_max_data}.")
+
+html_parts.append(f"const globalStats = {json.dumps(_gs, ensure_ascii=False)};\n")
 
 html_parts.append('''
         function themeColor(color) { return color; }
@@ -2227,14 +2390,90 @@ html_parts.append('''
         }
 
         // ── Toggle vue Compteurs / Méthodologie ──────────────────────────────
+        // ── Vue globale ──────────────────────────────────────────────────────
+        function goToCounter(id) {
+            if (!id) return;
+            showView(\'main\');
+            setTimeout(() => setCounterFromMap(id), 0);
+        }
+
+        function renderGlobalPage() {
+            const s = globalStats;
+            if (!s || !s.yesterday) return;
+
+            const fmt = n => (n || 0).toLocaleString(\'fr-CA\');
+            const fmtPeak = h => h !== null && h !== undefined ? h + \'h–\' + (h + 1) + \'h\' : \'—\';
+
+            const periods = [
+                { key: \'yesterday\', label: \'Hier\',              icon: \'📅\' },
+                { key: \'week\',      label: \'7 derniers jours\',   icon: \'📆\' },
+                { key: \'month\',     label: \'Ce mois\',            icon: \'🗓️\' },
+            ];
+
+            document.getElementById(\'global-cards\').innerHTML = periods.map(p => {
+                const d = s[p.key];
+                const top1 = d.top && d.top[0];
+                const top2 = d.top && d.top[1];
+                const clickable = top1 && !!top1.id;
+                const topRow = (t, rank) => t && t.id
+                    ? \'<span class="global-top-row" onclick="event.stopPropagation();goToCounter(\\\'\' + t.id + \'\\\')">\' +
+                      \'<span class="global-top-rank">\' + rank + \'</span>\' +
+                      \'<strong>\' + (t.label || \'—\') + \'</strong>\' +
+                      \'<span class="global-top-vol">\' + fmt(t.vol) + \'</span>\' +
+                      \'</span>\'
+                    : \'\';
+                return \'<div class="global-card\' + (clickable ? \' global-card-clickable\' : \'\') + \'"\' +
+                    (clickable ? \' onclick="goToCounter(\\\'\' + top1.id + \'\\\')" title="Voir \' + (top1.label || \'\') + \'"\' : \'\') + \'>\' +
+                    \'<div class="global-card-title">\' + p.icon + \' \' + p.label + \'</div>\' +
+                    \'<div class="global-card-date">\' + (d.subtitle || \'\') + \'</div>\' +
+                    \'<div class="global-card-total">\' + fmt(d.total) + \'</div>\' +
+                    \'<div class="global-card-sub">passages</div>\' +
+                    \'<div class="global-card-meta">\' +
+                        \'<span>⏰ Pointe : <strong>\' + fmtPeak(d.peak_hour) + \'</strong></span>\' +
+                        topRow(top1, \'🥇\') +
+                        topRow(top2, \'🥈\') +
+                        \'<span>📍 \' + d.coverage + \' / \' + d.active + \' compteurs avec données</span>\' +
+                    \'</div>\' +
+                    (clickable ? \'<div class="global-card-cta">Voir le top compteur →</div>\' : \'\') +
+                \'</div>\';
+            }).join(\'\');
+
+            // ── Classement arrondissements ──
+            const maxVol = s.arr_rank && s.arr_rank.length ? s.arr_rank[0].vol : 1;
+            document.getElementById(\'global-arr\').innerHTML =
+                \'<div class="global-section-title">🏙️ Top arrondissements <span style="font-size:11px;font-weight:400;color:#9ca3af;">— 7 derniers jours</span></div>\' +
+                (s.arr_rank || []).map(a =>
+                    \'<div class="arr-row">\' +
+                        \'<span class="arr-name">\' + a.name + \'</span>\' +
+                        \'<div class="arr-bar-wrap"><div class="arr-bar" style="width:\' + Math.round(a.vol / maxVol * 100) + \'%"></div></div>\' +
+                        \'<span class="arr-vol">\' + fmt(a.vol) + \'</span>\' +
+                    \'</div>\'
+                ).join(\'\');
+
+            // ── Statut du réseau ──
+            const n = s.net_status || {};
+            document.getElementById(\'global-net\').innerHTML =
+                \'<div class="global-section-title">📡 Statut du réseau</div>\' +
+                \'<div class="net-grid">\' +
+                    \'<div><div class="net-val" style="color:#1DB860">\' + (n.A || 0) + \'</div><div class="net-label">Actifs</div></div>\' +
+                    \'<div><div class="net-val" style="color:#F59E0B">\' + (n.B || 0) + \'</div><div class="net-label">En retard</div></div>\' +
+                    \'<div><div class="net-val" style="color:#EF4444">\' + (n.C || 0) + \'</div><div class="net-label">Inactifs</div></div>\' +
+                \'</div>\' +
+                \'<p style="font-size:11px;color:#9ca3af;margin-top:14px;text-align:center;">\' + (n.total || 0) + \' compteurs au total</p>\';
+        }
+
         function showView(view) {
-            const isMain = view === \'main\';
-            document.getElementById(\'main-header\').style.display    = isMain ? \'\' : \'none\';
-            document.getElementById(\'main-container\').style.display = isMain ? \'\' : \'none\';
-            document.getElementById(\'methodo-page\').style.display   = isMain ? \'none\' : \'\';
+            const isMain   = view === \'main\';
+            const isGlobal = view === \'global\';
+            const isMeth   = view === \'methodo\';
+            document.getElementById(\'main-header\').style.display    = isMain   ? \'\' : \'none\';
+            document.getElementById(\'main-container\').style.display = isMain   ? \'\' : \'none\';
+            document.getElementById(\'global-page\').style.display    = isGlobal ? \'\' : \'none\';
+            document.getElementById(\'methodo-page\').style.display   = isMeth   ? \'\' : \'none\';
             document.getElementById(\'nav-compteurs\').classList.toggle(\'active\', isMain);
-            document.getElementById(\'nav-methodo\').classList.toggle(\'active\', !isMain);
-            // Remonter en haut de page lors du changement de vue
+            document.getElementById(\'nav-global\').classList.toggle(\'active\', isGlobal);
+            document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
+            if (isGlobal) renderGlobalPage();
             window.scrollTo({ top: 0, behavior: \'smooth\' });
         }
 
@@ -2337,6 +2576,20 @@ html_parts.append('''
         <h3>📅 Fenêtre temporelle</h3>
         <p>Seules les données des <strong>6 derniers mois glissants</strong> (180 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
         <p>Pour les boucles magnétiques, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des détecteurs sur fût.</p>
+      </div>
+    </div>
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ══ Page Vue globale ═══════════════════════════════════════════════ -->
+    <div id="global-page" style="display:none">
+      <div class="site-header" id="global-header">
+        <h1>Vue globale</h1>
+        <p class="subtitle" style="display:block">Passages agrégés de tous les compteurs actifs</p>
+      </div>
+      <div id="global-cards"></div>
+      <div id="global-bottom">
+        <div class="global-section" id="global-arr"></div>
+        <div class="global-section" id="global-net"></div>
       </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
