@@ -208,8 +208,22 @@ if git diff --staged --quiet; then
     echo "$LOG Aucun changement dans index.html — rien à publier."
 else
     git commit -m "Mise à jour automatique — $(date '+%Y-%m-%d')"
-    git push origin HEAD
-    echo "$LOG Publié avec succès sur GitHub."
+    # Retry push (jusqu'à 3 tentatives) pour absorber les erreurs serveur GitHub transitoires
+    PUSHED=false
+    for attempt in 1 2 3; do
+        if git push origin HEAD; then
+            PUSHED=true
+            break
+        fi
+        echo "$LOG Push échoué (tentative $attempt/3) — nouvelle tentative dans $((attempt * 15))s..."
+        sleep $((attempt * 15))
+    done
+    if [ "$PUSHED" = true ]; then
+        echo "$LOG Publié avec succès sur GitHub."
+    else
+        echo "$LOG ERREUR : push échoué après 3 tentatives. Le commit est conservé localement."
+        exit 1
+    fi
 fi
 
 echo "$LOG ── Mise à jour terminée ──"
