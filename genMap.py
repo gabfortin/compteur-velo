@@ -1386,7 +1386,7 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
         type_label = 'Éco-Compteur' if is_boucle else 'Détecteur SUM'
         type_cls   = 'boucle' if is_boucle else 'fut'
         type_url   = ('https://donnees.montreal.ca/dataset/velos-comptage'
-                      if is_boucle else 'https://donnees.montreal.ca/fr/dataset/cyclistes')
+                      if is_boucle else 'https://donnees.montreal.ca/dataset/velos-comptage')
         html_parts.append(f'<div id="{instance}" class="table-container">')
         html_parts.append(f'<h2>Compteur {instance} <a href="{type_url}" target="_blank" rel="noopener" class="counter-type-badge counter-type-{type_cls}">{type_label}</a></h2>')
         html_parts.append(f'<p><strong>Emplacement:</strong> {location}</p>')
@@ -2655,11 +2655,11 @@ html_parts.append('''
               <span class="source-card-icon">🚦</span>
               <div>
                 <div class="source-card-title">Détecteurs SUM <span class="mbadge mbadge-fut">Détecteur SUM</span></div>
-                <div class="source-card-sub">cyclistes.csv — Ville de Montréal</div>
+                <div class="source-card-sub">Vélos - comptage permanent — Ville de Montréal</div>
               </div>
             </div>
-            <div class="source-card-desc">Capteurs installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>.</div>
-            <a class="source-card-link" href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
+            <div class="source-card-desc">Capteurs installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>. Publié sur le même portail que les Éco-Compteurs depuis 2026.</div>
+            <a class="source-card-link" href="https://donnees.montreal.ca/dataset/velos-comptage" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
           </div>
           <div class="source-card">
             <div class="source-card-top">

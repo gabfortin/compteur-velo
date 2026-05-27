@@ -25,41 +25,60 @@ CSV_CHANGED=false
 BIXI_CHANGED=false
 COMPTEURS_CHANGED=false
 
-# ── Télécharger le CSV cyclistes ──────────────────────────────────────────────
-echo "$LOG Recherche de l'URL du CSV..."
+# ── Télécharger le CSV Détecteurs SUM (comptage permanent) ────────────────────
+# Depuis 2026 les données SUM sont publiées sur la même page que les Éco-Compteurs
+# sous le titre "Vélos - comptage permanent, ANNÉE".
+echo "$LOG Recherche de l'URL du CSV comptage permanent (SUM)..."
 CSV_URL=$(python3 - <<'EOF'
 import urllib.request, re, sys
+from datetime import datetime
+
+year = datetime.now().year
 try:
-    html = urllib.request.urlopen("https://donnees.montreal.ca/dataset/cyclistes").read().decode("utf-8")
-    m = re.search(r'href="([^"]+)"[^>]*title="Télécharger"', html, re.DOTALL)
+    req = urllib.request.Request(
+        "https://donnees.montreal.ca/dataset/velos-comptage",
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
+    html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
+    # Chercher un lien CSV contenant "permanent" et l'année courante
+    m = re.search(
+        r'href="([^"]*permanent[^"]*%d[^"]*\.csv[^"]*)"' % year,
+        html, re.IGNORECASE
+    )
     if not m:
-        m = re.search(r'title="Télécharger"[^>]*href="([^"]+)"', html, re.DOTALL)
+        m = re.search(
+            r'href="([^"]*%d[^"]*permanent[^"]*\.csv[^"]*)"' % year,
+            html, re.IGNORECASE
+        )
     if m:
         print(m.group(1))
     else:
-        sys.stderr.write("URL du CSV introuvable sur la page.\n")
+        sys.stderr.write("URL comptage permanent %d introuvable sur la page.\n" % year)
         sys.exit(1)
 except Exception as e:
-    sys.stderr.write(f"Erreur lors du scraping : {e}\n")
+    sys.stderr.write("Erreur scraping comptage permanent : %s\n" % e)
     sys.exit(1)
 EOF
-)
-echo "$LOG URL trouvée : $CSV_URL"
+) || true
 
-echo "$LOG Téléchargement du CSV cyclistes..."
-OLD_HASH=""
-[ -f cyclistes.csv ] && OLD_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
-curl -fsSL \
-  -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-  -H "Referer: https://donnees.montreal.ca/dataset/cyclistes" \
-  "$CSV_URL" -o cyclistes.csv
-echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
-NEW_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
-if [ "$OLD_HASH" != "$NEW_HASH" ]; then
-    echo "$LOG Nouveau CSV cyclistes détecté."
-    CSV_CHANGED=true
+if [ -n "$CSV_URL" ]; then
+    echo "$LOG URL trouvée : $CSV_URL"
+    OLD_HASH=""
+    [ -f cyclistes.csv ] && OLD_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
+    curl -fsSL \
+      -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+      -H "Referer: https://donnees.montreal.ca/dataset/velos-comptage" \
+      "$CSV_URL" -o cyclistes.csv
+    echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
+    NEW_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
+    if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+        echo "$LOG Nouveau CSV comptage permanent détecté."
+        CSV_CHANGED=true
+    else
+        echo "$LOG CSV comptage permanent identique à la version précédente."
+    fi
 else
-    echo "$LOG CSV cyclistes identique à la version précédente."
+    echo "$LOG URL comptage permanent introuvable — données existantes conservées."
 fi
 
 # ── Télécharger le CSV BIXI (si une nouvelle version est disponible) ───────────
@@ -148,15 +167,14 @@ try:
         headers={"User-Agent": "Mozilla/5.0"}
     )
     html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-    # Chercher le lien de téléchargement du fichier de l'année courante
-    m = re.search(
-        r'href="([^"]*comptage_velo_%d[^"]*\.csv[^"]*)"' % year,
-        html, re.IGNORECASE
-    )
-    if m:
-        print(m.group(1))
+    # Chercher le lien de téléchargement du fichier Éco-Compteur de l'année courante
+    # (exclure explicitement le fichier "permanent" qui est aussi sur cette page)
+    all_links = re.findall(r'href="([^"]*comptage_velo_%d[^"]*\.csv[^"]*)"' % year, html, re.IGNORECASE)
+    eco_links = [l for l in all_links if 'permanent' not in l.lower()]
+    if eco_links:
+        print(eco_links[0])
     else:
-        sys.stderr.write("URL compteurs %d introuvable sur la page.\n" % year)
+        sys.stderr.write("URL compteurs éco %d introuvable sur la page.\n" % year)
         sys.exit(1)
 except Exception as e:
     sys.stderr.write("Erreur scraping compteurs : %s\n" % e)

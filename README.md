@@ -51,9 +51,9 @@ python3 test_data.py   # Valide les données après génération
 
 ## Sources de données
 
-### `cyclistes.csv` — Détecteurs sur fût
+### `cyclistes.csv` — Détecteurs SUM (comptage permanent)
 
-Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/fr/dataset/cyclistes). Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
+Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/velos-comptage), sous le titre **« Vélos - comptage permanent »**. Depuis 2026, ces données sont publiées sur la même page que les Éco-Compteurs. Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
 
 Colonnes :
 
@@ -89,7 +89,7 @@ Colonnes :
 | `longitude`    | Longitude GPS                                         |
 | `latitude`     | Latitude GPS                                          |
 
-Ces données sont publiées pour l'année courante. L'URL de téléchargement suit le schéma `comptage_velo_{année}.csv` — `update.sh` scrape automatiquement l'URL correcte pour l'année en cours.
+Ces données sont publiées pour l'année courante. L'URL de téléchargement suit le schéma `comptage_velo_{année}.csv` (hors fichier `permanent`) — `update.sh` scrape automatiquement l'URL correcte pour l'année en cours, en excluant le fichier de comptage permanent.
 
 **Différences avec `cyclistes.csv` :**
 - Granularité 15 min (agrégée en horaire par `genMap.py`) vs horaire natif
@@ -550,17 +550,17 @@ Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Mont
 
 ```
 1. clone / git pull
-2. Scraper + télécharger cyclistes.csv       → CSV_CHANGED
+2. Scraper + télécharger cyclistes.csv       → CSV_CHANGED       (« Vélos - comptage permanent », même page que les éco-compteurs)
 3. Scraper + télécharger bixi.csv (ZIP)      → BIXI_CHANGED
-4. Scraper + télécharger compteurs.csv       → COMPTEURS_CHANGED
+4. Scraper + télécharger compteurs.csv       → COMPTEURS_CHANGED (fichier « comptage_velo_{année}.csv », éco-compteurs)
 5. Si aucun changement → exit 0
-6. python3 genMap.py                         (inclut le géocodage Nominatim si nouveaux capteurs)
+6. python3 genMap.py
 7. python3 test_data.py
 8. git add index.html velo_meta_cache.json
 9. git commit + git push si index.html a changé
 ```
 
-`compteurs.csv` est scrappé sur `https://donnees.montreal.ca/dataset/velos-comptage` en cherchant le lien `comptage_velo_{année}.csv` pour l'année courante — le script s'adapte automatiquement en début de nouvelle année.
+`cyclistes.csv` et `compteurs.csv` sont tous les deux scrappés sur `https://donnees.montreal.ca/dataset/velos-comptage`. Le script distingue les deux fichiers : `cyclistes.csv` cherche un lien contenant `permanent` et l'année ; `compteurs.csv` cherche `comptage_velo_{année}` en excluant les liens contenant `permanent`.
 
 `velo_meta_cache.json` est commité dans le dépôt pour que le cache Nominatim persiste entre les runs Docker. Si de nouveaux capteurs apparaissent dans `compteurs.csv` (nouveaux IDs non présents dans le cache), `genMap.py` les géocode lors de la génération et le cache mis à jour est commité dans le même commit que `index.html`.
 
