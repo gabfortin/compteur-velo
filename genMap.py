@@ -809,6 +809,52 @@ html_parts = ['''<html>
             color: #fff;
             border-color: transparent;
         }
+        #combineSection {
+            display: none;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(29,184,96,0.04);
+            border-radius: 8px;
+            border: 1.5px solid rgba(29,184,96,0.2);
+        }
+        #combineSectionInner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        #combineSectionInner label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1DB860;
+            white-space: nowrap;
+        }
+        .combine-select {
+            flex: 1;
+            min-width: 200px;
+            padding: 5px 10px;
+            border: 1.5px solid rgba(29,184,96,0.35);
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+        }
+        .combine-select:focus { box-shadow: 0 0 0 3px rgba(29,184,96,0.15); border-color: #1DB860; }
+        .combine-clear-btn {
+            padding: 4px 10px;
+            border: 1.5px solid rgba(220,38,38,0.35);
+            border-radius: 6px;
+            background: rgba(220,38,38,0.05);
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: none;
+        }
+        .combine-clear-btn:hover { background: rgba(220,38,38,0.12); }
         #dataWarning {
             display: none;
             align-items: flex-start;
@@ -1306,6 +1352,15 @@ html_parts.append('''
                 </div>
             </div>
         </div>
+        <div id="combineSection">
+          <div id="combineSectionInner">
+            <label>⊕ Combiner avec :</label>
+            <select id="combineSelect" class="combine-select">
+              <option value="">— Choisir un compteur —</option>
+            </select>
+            <button id="btnClearCombine" class="combine-clear-btn">✕ Retirer</button>
+          </div>
+        </div>
         <div id="chart-map-layout">
         <div id="chart-area">
         <div id="dataWarning"><span class="warn-icon">⚠️</span><span>Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence.</span></div>
@@ -1360,6 +1415,7 @@ html_parts.append('''
         const charts = {};
         const countersByArrondissement = {};
         let specificDate = null;
+        let combinedInstance = null;
 ''')
 
 DIRECTION_COLORS = ['#1DB860', '#29ABE2']
@@ -1737,6 +1793,34 @@ html_parts.append('''
             };
         }
 
+        function buildCombinedFilteredData(inst1, inst2, days) {
+            const d1 = buildFilteredData(inst1, days);
+            const d2 = buildFilteredData(inst2, days);
+            const map1 = {};
+            d1.labels.forEach((lbl, i) => { map1[lbl] = d1.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0); });
+            const map2 = {};
+            d2.labels.forEach((lbl, i) => { map2[lbl] = d2.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0); });
+            const allLabels = [...new Set([...d1.labels, ...d2.labels])].sort();
+            const combined = allLabels.map(lbl => (map1[lbl] || 0) + (map2[lbl] || 0));
+            return { labels: allLabels, datasets: [{ label: 'Total combiné', data: combined,
+                borderColor: themeColor('#1DB860'), backgroundColor: themeColor('rgba(29,184,96,0.15)'),
+                fill: true, tension: 0.3, borderWidth: 1.5, pointRadius: 2, pointHoverRadius: 5 }] };
+        }
+
+        function buildCombinedDailyData(inst1, inst2, days) {
+            const d1 = buildDailyData(inst1, days);
+            const d2 = buildDailyData(inst2, days);
+            const map1 = {};
+            d1.labels.forEach((lbl, i) => { map1[lbl] = d1.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0); });
+            const map2 = {};
+            d2.labels.forEach((lbl, i) => { map2[lbl] = d2.datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0); });
+            const allLabels = [...new Set([...d1.labels, ...d2.labels])].sort();
+            const combined = allLabels.map(lbl => (map1[lbl] || 0) + (map2[lbl] || 0));
+            const defBg = themeColor('rgba(29,184,96,0.75)'), defBd = themeColor('#1DB860');
+            return { labels: allLabels, datasets: [{ label: 'Total combiné', data: combined,
+                backgroundColor: defBg, borderColor: defBd, borderWidth: 1, borderRadius: 4 }] };
+        }
+
         const globalMaxDate = (function() {
             let max = null;
             for (let inst in allChartData) {
@@ -1781,11 +1865,20 @@ html_parts.append('''
 
         function updateStats(instance) {
             const statsRow = document.getElementById('statsRow');
-            if (!instance || !chartData[instance]) { statsRow.style.display = 'none'; return; }
-            const labels = chartData[instance].labels;
+            if (!instance) { statsRow.style.display = 'none'; return; }
+            let labels, datasets;
+            if (combinedInstance && allChartData[combinedInstance]) {
+                const combData = buildCombinedFilteredData(instance, combinedInstance, currentPeriod);
+                labels = combData.labels;
+                datasets = combData.datasets;
+            } else {
+                if (!chartData[instance]) { statsRow.style.display = 'none'; return; }
+                labels = chartData[instance].labels;
+                datasets = chartData[instance].datasets;
+            }
             // Combine all directions
             const combined = labels.map((_, i) =>
-                chartData[instance].datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
+                datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
             );
             const total = combined.reduce((a, b) => a + b, 0);
             const uniqueDays = new Set(labels.map(l => l.slice(0, 10))).size;
@@ -1807,7 +1900,12 @@ html_parts.append('''
                 const ctx = document.getElementById('chart-' + id);
                 if (ctx) {
                     const isDaily = viewMode === 'daily';
-                    const rawData = isDaily ? buildDailyData(id, currentPeriod) : chartData[id];
+                    let rawData = isDaily ? buildDailyData(id, currentPeriod) : chartData[id];
+                    if (combinedInstance && allChartData[combinedInstance]) {
+                        rawData = isDaily
+                            ? buildCombinedDailyData(id, combinedInstance, currentPeriod)
+                            : buildCombinedFilteredData(id, combinedInstance, currentPeriod);
+                    }
                     const type = isDaily ? 'bar' : 'line';
                     const isSingle = rawData.datasets.length === 1;
 
@@ -1838,7 +1936,8 @@ html_parts.append('''
                     }
 
                     // ── Visualisation des données manquantes ──
-                    const anomalies = (typeof anomalyDays !== 'undefined' && anomalyDays[id]) || {};
+                    // Désactivé en mode combiné (les anomalies n'appartiennent qu'au compteur principal)
+                    const anomalies = (!combinedInstance && typeof anomalyDays !== 'undefined' && anomalyDays[id]) || {};
                     const missingDaySet = new Set(
                         Object.entries(anomalies).filter(([, v]) => v.total === 0).map(([d]) => d)
                     );
@@ -1863,7 +1962,7 @@ html_parts.append('''
                                     chk.setDate(chk.getDate() + 1);
                                 }
                                 if (found) {
-                                    const x1 = xAxis.getPixelForIndex(i), x2 = xAxis.getPixelForIndex(i + 1);
+                                    const x1 = xAxis.getPixelForValue(i), x2 = xAxis.getPixelForValue(i + 1);
                                     c.fillRect(x1, area.top, x2 - x1, area.bottom - area.top);
                                 }
                             }
@@ -1872,7 +1971,7 @@ html_parts.append('''
                     } : null;
 
                     // Barres fantômes (vue par jour) — dataset réel pour que le hover fonctionne
-                    if (isDaily && missingDaySet.size) {
+                    if (!combinedInstance && isDaily && missingDaySet.size) {
                         const missingVals = data.labels.map(lbl => { const a = anomalies[lbl]; return (a && a.total === 0) ? a.expected : null; });
                         if (missingVals.some(v => v !== null)) {
                             data = { labels: data.labels, datasets: [...data.datasets, {
@@ -2094,6 +2193,12 @@ html_parts.append('''
         }
 
         function selectCounter(instance) {
+            // Reset combine state on counter switch
+            combinedInstance = null;
+            document.getElementById('btnClearCombine').style.display = 'none';
+            const nearbyCount = instance ? populateCombineSelect(instance) : 0;
+            document.getElementById('combineSection').style.display = (instance && nearbyCount > 0) ? 'block' : 'none';
+
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
             const noDataMsg = document.getElementById('noDataMsg');
             if (instance) {
@@ -2297,6 +2402,56 @@ html_parts.append('''
                 if (hasData) createChart(selected);
                 updateStats(selected);
                 updateDayLabel(selected);
+            }
+        });
+
+        // ── Combiner deux compteurs ──
+        function haversineM(lat1, lng1, lat2, lng2) {
+            const R = 6371000, rad = Math.PI / 180;
+            const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLng/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function populateCombineSelect(instance) {
+            const sel = document.getElementById('combineSelect');
+            sel.innerHTML = '<option value="">— Choisir un compteur —</option>';
+            const loc = counterLocations[instance];
+            if (!loc) return 0;
+            const MAX_DIST = 100; // mètres
+            const nearby = Object.entries(counterLocations)
+                .filter(([id, l]) => id !== instance && haversineM(loc.lat, loc.lng, l.lat, l.lng) <= MAX_DIST)
+                .sort((a, b) => haversineM(loc.lat, loc.lng, a[1].lat, a[1].lng)
+                              - haversineM(loc.lat, loc.lng, b[1].lat, b[1].lng));
+            nearby.forEach(([id, l]) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                const dist = Math.round(haversineM(loc.lat, loc.lng, l.lat, l.lng));
+                opt.textContent = `${l.label} (${dist} m)`;
+                sel.appendChild(opt);
+            });
+            return nearby.length;
+        }
+
+        document.getElementById('combineSelect').addEventListener('change', function() {
+            const instance = getSelectedCounter();
+            if (!instance) return;
+            combinedInstance = this.value || null;
+            document.getElementById('btnClearCombine').style.display = combinedInstance ? 'inline-block' : 'none';
+            if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+            createChart(instance);
+            updateStats(instance);
+        });
+
+        document.getElementById('btnClearCombine').addEventListener('click', function() {
+            combinedInstance = null;
+            document.getElementById('combineSelect').value = '';
+            this.style.display = 'none';
+            const instance = getSelectedCounter();
+            if (instance) {
+                if (charts[instance]) { charts[instance].destroy(); charts[instance] = null; }
+                createChart(instance);
+                updateStats(instance);
             }
         });
 
