@@ -199,6 +199,16 @@ fi
 echo "$LOG Génération du HTML..."
 python3 genMap.py
 
+# ── Incrémenter la version (patch) ────────────────────────────────────────────
+if [ -f version.txt ]; then
+    CURRENT_VERSION=$(cat version.txt | tr -d '[:space:]')
+    IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$CURRENT_VERSION"
+    V_PATCH=$((V_PATCH + 1))
+    NEW_VERSION="$V_MAJOR.$V_MINOR.$V_PATCH"
+    echo "$NEW_VERSION" > version.txt
+    echo "$LOG Version incrémentée : $CURRENT_VERSION → $NEW_VERSION"
+fi
+
 # ── Valider les données ────────────────────────────────────────────────────────
 echo "$LOG Validation des données..."
 python3 test_data.py
@@ -208,6 +218,7 @@ echo "$LOG Vérification des changements..."
 git add index.html
 # Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
 [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
+[ -f version.txt ] && git add version.txt
 
 if git diff --staged --quiet; then
     echo "$LOG Aucun changement dans index.html — rien à publier."

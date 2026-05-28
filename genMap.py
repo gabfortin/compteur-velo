@@ -9,6 +9,12 @@ from datetime import datetime, timedelta, timezone
 import math
 from statistics import mean, stdev, median
 
+try:
+    with open('version.txt') as _vf:
+        _APP_VERSION = _vf.read().strip()
+except FileNotFoundError:
+    _APP_VERSION = '?'
+
 # Compter le nombre total de lignes pour la barre de progression
 total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
 
@@ -646,6 +652,17 @@ html_parts = ['''<html>
         }
         .watermark a { color: rgba(29,184,96,0.6); text-decoration: none; transition: color 0.2s; }
         .watermark a:hover { color: #1DB860; }
+        .version-badge {
+            position: fixed;
+            bottom: 8px;
+            right: 12px;
+            font-size: 10px;
+            color: rgba(150,150,150,0.4);
+            font-family: monospace;
+            z-index: 999;
+            pointer-events: none;
+            user-select: none;
+        }
         .period-buttons {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1322,7 +1339,7 @@ html_parts.append('''
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="statPeak">—</div>
-                <div class="stat-label">Heure de pointe</div>
+                <div class="stat-label">Heures de pointe</div>
             </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;min-height:30px;gap:8px;">
@@ -1887,11 +1904,23 @@ html_parts.append('''
                 const h = label.slice(11, 13);
                 if (h) hourTotals[h] = (hourTotals[h] || 0) + combined[i];
             });
-            const peak = Object.entries(hourTotals).sort((a, b) => b[1] - a[1])[0];
+            const peaks = Object.entries(hourTotals).sort((a, b) => b[1] - a[1]);
+            const peak1 = peaks[0];
+            const peak2 = peak1
+                ? peaks.find(p => Math.abs(parseInt(p[0]) - parseInt(peak1[0])) >= 3) || null
+                : null;
             statsRow.style.display = 'grid';
             animateCount(document.getElementById('statTotal'), total);
             animateCount(document.getElementById('statAvg'), avg);
-            document.getElementById('statPeak').textContent = peak ? peak[0] + 'h' : '—';
+            const fmtAvg = p => '~' + Math.round(p[1] / uniqueDays);
+            if (peak1) {
+                const hours = peak1[0] + 'h' + (peak2 ? ' · ' + peak2[0] + 'h' : '');
+                const avgs  = fmtAvg(peak1) + (peak2 ? ' · ' + fmtAvg(peak2) : '') + ' passages/heure';
+                document.getElementById('statPeak').innerHTML =
+                    hours + '<br><span style="font-size:0.65em;opacity:0.65">' + avgs + '</span>';
+            } else {
+                document.getElementById('statPeak').textContent = '—';
+            }
         }
 
         function createChart(id) {
@@ -2798,6 +2827,7 @@ html_parts.append('''
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez l\'<a href="#" onclick="showView(\'methodo\');return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color=\'#1DB860\'" onmouseout="this.style.color=\'rgba(29,184,96,0.7)\'">onglet Méthodologie</a>.</p>
         <p style="font-size:0.7rem;color:#aaa;margin-top:4px;">Page mise à jour le ''' + datetime.now(timezone.utc).strftime('%Y-%m-%d à %H:%M') + ''' UTC</p>
     </div>
+    <div class="version-badge">v''' + _APP_VERSION + '''</div>
 </body>
 </html>
 ''')
