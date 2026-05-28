@@ -2406,6 +2406,32 @@ html_parts.append('''
         });
 
         // ── Combiner deux compteurs ──
+        // Paires exclues du dropdown "Combiner avec" :
+        // capteurs non-complémentaires (rues différentes, doublons, Eco-Display, etc.)
+        const EXCLUDED_COMBINE_PAIRS = new Set([
+            // ── 0–200 m ──
+            'vf-100060991|vf-100060992',  // Avenue Westmount + Avenue Lansdowne — rues différentes
+            'vf-100052600|vf-100061409',  // Rachel 3 (Angus) + Rachel/Angus — probable doublon
+            'vf-100034805|vf-100041114',  // Gouin/Lajeunesse + Eco-Display Parc Stanley
+            'vf-100011747|vf-100047030',  // Saint-Antoine/St-Urbain + Viger/St-Urbain — intersections ≠
+            'det-00385-01|det-00421-01',  // Canadiens&Peel + René-Lévesque&Peel — points ≠ sur Peel
+            // 'vf-300014995|vf-300014996' — REV St-Denis Duluth/Rachel : paire valide
+            'vf-100003032|vf-300034853',  // Berri1 + Ontario&Savoie — rues différentes
+            'det-00467-01|vf-100011747',  // Viger&St-Urbain + Saint-Antoine/St-Urbain — intersections ≠
+            // ── 200–300 m ──
+            'det-00967-13|det-00970-01',  // Boucherville&Notre-Dame + Notre-Dame&Curatteau — points ≠
+            'det-00789-01|vf-100055268',  // Bourbonnière&Sherbrooke + Rachel/PieIX — rues différentes
+            'det-00268-02|vf-300021685',  // L-H-LaFontaine&Perras Est + A25/Gouin — rues différentes
+            'det-00268-03|vf-300021685',  // L-H-LaFontaine&Perras Ouest + A25/Gouin — rues différentes
+            'vf-100012218|vf-100052603',  // Boyer/Rosemont + Piste des Carrières — voies différentes
+            'det-00385-01|det-00402-02',  // Canadiens&Peel + Peel&Saint-Antoine — points ≠ sur Peel
+            'det-00399-01|det-00402-01',  // Notre-Dame&Peel Sud + Peel&Saint-Antoine Nord — intersections ≠
+            'det-00399-02|det-00402-01',  // Notre-Dame&Peel Nord + Peel&Saint-Antoine Nord — intersections ≠
+            'vf-100012217|vf-300014996',  // Rachel/HôteldeVille + REV St-Denis/Rachel — intersections ≠
+            'det-01364-01|det-01725-01',  // Charlevoix&Wellington + Gaétan-Laberge&A-15 — rues différentes
+        ]);
+        function pairKey(a, b) { return [a, b].sort().join('|'); }
+
         function haversineM(lat1, lng1, lat2, lng2) {
             const R = 6371000, rad = Math.PI / 180;
             const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
@@ -2418,9 +2444,11 @@ html_parts.append('''
             sel.innerHTML = '<option value="">— Choisir un compteur —</option>';
             const loc = counterLocations[instance];
             if (!loc) return 0;
-            const MAX_DIST = 100; // mètres
+            const MAX_DIST = 300; // mètres
             const nearby = Object.entries(counterLocations)
-                .filter(([id, l]) => id !== instance && haversineM(loc.lat, loc.lng, l.lat, l.lng) <= MAX_DIST)
+                .filter(([id, l]) => id !== instance
+                    && haversineM(loc.lat, loc.lng, l.lat, l.lng) <= MAX_DIST
+                    && !EXCLUDED_COMBINE_PAIRS.has(pairKey(instance, id)))
                 .sort((a, b) => haversineM(loc.lat, loc.lng, a[1].lat, a[1].lng)
                               - haversineM(loc.lat, loc.lng, b[1].lat, b[1].lng));
             nearby.forEach(([id, l]) => {
@@ -2736,6 +2764,17 @@ html_parts.append('''
         <h3>📅 Fenêtre temporelle</h3>
         <p>Seules les données des <strong>6 derniers mois glissants</strong> (180 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
         <p>Pour les Éco-Compteurs, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des Détecteurs SUM.</p>
+      </div>
+
+      <!-- Combinaison de compteurs -->
+      <div class="methodo-section">
+        <h3>⊕ Combinaison de compteurs</h3>
+        <p>Lorsqu\'un compteur possède un voisin complémentaire à moins de <strong>300 m</strong>, un sélecteur <em>« Combiner avec… »</em> apparaît sous les contrôles du graphique. Choisir un compteur affiche la <strong>somme des deux flux</strong> en une seule courbe verte, et met à jour les statistiques (total, moyenne, heure de pointe) en conséquence.</p>
+        <p>Ce mode est conçu pour les paires de capteurs mesurant des <strong>directions inverses sur le même axe</strong> — typiquement deux capteurs situés de part et d\'autre d\'une piste bidirectionnelle ou d\'une intersection. La liste est filtrée par un algorithme de proximité (distance de Haversine) combiné à une liste d\'exclusion manuelle qui écarte les faux positifs géographiques (rues différentes, doublons, panneaux d\'affichage).</p>
+        <div class="algo-box">
+          <strong>Paires reconnues (15 au total) :</strong> les compteurs éligibles sont ceux dont la distance au capteur sélectionné est ≤ 300 m <em>et</em> qui ne figurent pas dans la liste d\'exclusion. Le dropdown affiche chaque voisin avec sa distance en mètres, trié du plus proche au plus éloigné.
+        </div>
+        <p>En mode combiné, la visualisation des anomalies (points rouges, zones grisées, barres fantômes) est désactivée — les anomalies étant définies par capteur individuel, elles ne s\'appliquent pas à un signal synthétique.</p>
       </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->

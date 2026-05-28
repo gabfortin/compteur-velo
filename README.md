@@ -371,6 +371,15 @@ Met le marker du compteur sélectionné en **bleu ciel** (`#29ABE2`), les détec
 #### `setCounterFromMap(instance)`
 Appelé lors d'un clic sur un marker Leaflet. Met à jour les dropdowns desktop et mobile, appelle `selectCounter`, et centre la carte sur le compteur.
 
+#### `buildCombinedFilteredData(inst1, inst2, days)` / `buildCombinedDailyData(inst1, inst2, days)`
+Construisent un dataset synthétique en fusionnant les données de deux compteurs. Pour chaque horodatage (ou journée), les volumes des deux sources sont sommés. Les labels résultants sont l'union triée des deux séries — les trous dans l'une des sources contribuent à `0` dans la somme.
+
+#### `haversineM(lat1, lng1, lat2, lng2)`
+Calcule la distance entre deux coordonnées GPS en mètres (formule de Haversine). Utilisée par `populateCombineSelect` pour filtrer les compteurs voisins.
+
+#### `populateCombineSelect(instance)`
+Peuple le dropdown « Combiner avec… » avec les compteurs situés à ≤ 300 m du compteur sélectionné, en excluant les faux positifs géographiques. Retourne le nombre de voisins valides — si 0, le panneau est masqué. Triés par distance croissante, avec la distance affichée en mètres.
+
 ### Sélection responsive des compteurs
 
 | Contexte | Interface |
@@ -513,6 +522,44 @@ En complément de la détection statistique, les anomalies sont croisées avec l
 | Mention bleue BIXI | Affiché quand des trajets BIXI confirment une anomalie sans la dépasser |
 | Barres oranges (vue Par jour) | Les barres correspondant à des jours anomaux apparaissent en orange |
 | Gaps (vue Dans le temps) | Les jours sans données apparaissent comme des interruptions dans la courbe |
+
+---
+
+## Combinaison de compteurs
+
+Lorsqu'un compteur sélectionné possède un voisin complémentaire à moins de **300 m**, un sélecteur « ⊕ Combiner avec… » apparaît dans l'interface. Il permet de superposer les flux de deux capteurs en un seul graphique (somme des passages).
+
+### Logique de filtrage
+
+1. **Distance de Haversine ≤ 300 m** entre les deux compteurs (coordonnées GPS de `counterLocations`)
+2. **Liste d'exclusion manuelle** (`EXCLUDED_COMBINE_PAIRS`) — paires géographiquement proches mais non-complémentaires (rues différentes, doublons, panneaux d'affichage Eco-Display, intersections distinctes sur la même avenue, etc.)
+
+### Paires valides (15)
+
+| Distance | Compteur A | Compteur B |
+|----------|-----------|-----------|
+| 0 m | Girouard & Terrebonne — Ouest `det-00118-01` | Girouard & Terrebonne `det-00118-02` |
+| 0 m | L-H-La-Fontaine & Perras — Est `det-00268-02` | L-H-La-Fontaine & Perras — Ouest `det-00268-03` |
+| 0 m | Notre-Dame & Peel — Sud `det-00399-01` | Notre-Dame & Peel — Nord `det-00399-02` |
+| 0 m | Côte-Ste-Catherine & Mont-Royal — Ouest `det-00523-01` | Côte-Ste-Catherine & Mont-Royal — Est `det-00523-02` |
+| 1 m | REV St-Denis/Castelnau SB `vf-300020816` | REV St-Denis/Castelnau NB `vf-300020817` |
+| 5 m | Berri & de la Gauchetière `det-02047-01` | Berri/de la Gauchetière `vf-300046832` |
+| 11 m | Rue Verdun côté Nord `vf-300041662` | Rue Verdun côté Sud `vf-300041663` |
+| 21 m | Côte-de-Liesse & Lucerne — Sud `det-13259-02` | Côte-de-Liesse & Lucerne — Nord `det-13259-03` |
+| 31 m | REV St-Denis/Carrières dir sud `vf-300014985` | REV St-Denis/Carrières dir nord `vf-300014986` |
+| 37 m | Henri-Bourassa & Saint-Vital — Ouest `det-08888-01` | Henri-Bourassa & Saint-Vital — Est `det-08888-02` |
+| 42 m | Saint-Urbain & Viger `det-00467-01` | Viger / Saint-Urbain `vf-100047030` |
+| 43 m | Ottawa & Peel — Nord `det-00401-01` | Ottawa & Peel — Sud `det-00401-02` |
+| 51 m | Peel & Saint-Antoine — Nord `det-00402-01` | Peel & Saint-Antoine — Sud `det-00402-02` |
+| 169 m | REV St-Denis/Duluth dir nord `vf-300014995` | REV St-Denis/Rachel dir sud `vf-300014996` |
+| 269 m | Henri-Bourassa / Tanguay `vf-300061935` | Henri-Bourassa / Loblaws `vf-300064654` |
+
+### Comportement en mode combiné
+
+- Le graphique affiche **une seule courbe verte** (somme des deux flux)
+- Les statistiques (total, moyenne/jour, heure de pointe) sont recalculées sur la somme
+- La visualisation des anomalies est **désactivée** (les anomalies sont définies par capteur individuel)
+- Changer de compteur principal **réinitialise** la combinaison
 
 ---
 
