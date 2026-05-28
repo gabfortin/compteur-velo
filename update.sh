@@ -25,44 +25,55 @@ CSV_CHANGED=false
 BIXI_CHANGED=false
 COMPTEURS_CHANGED=false
 
-# ── Télécharger le CSV Détecteurs SUM (comptage permanent) ────────────────────
-# Depuis 2026 les données SUM sont publiées sur la même page que les Éco-Compteurs
-# sous le titre "Vélos - comptage permanent, ANNÉE".
-echo "$LOG Recherche de l'URL du CSV comptage permanent (SUM)..."
-CSV_URL=$(python3 - <<'EOF'
-import urllib.request, re, sys
+# ── Récupérer les URLs via l'API CKAN (dataset velos-comptage) ────────────────
+# Les deux fichiers (SUM + Éco-Compteur) sont dans le même dataset depuis 2026.
+# L'API retourne du JSON structuré — plus fiable que le scraping HTML.
+echo "$LOG Interrogation de l'API CKAN pour le dataset velos-comptage..."
+CKAN_URLS=$(python3 - <<'EOF'
+import urllib.request, json, re, sys
 from datetime import datetime
 
 year = datetime.now().year
 try:
+    # Le slug "velos-comptage" nécessite une auth ; l'UUID est public.
     req = urllib.request.Request(
-        "https://donnees.montreal.ca/dataset/velos-comptage",
+        "https://donnees.montreal.ca/api/3/action/package_show?id=142ff2e9-7d0a-47d6-b4f6-dfeb97041daf",
         headers={"User-Agent": "Mozilla/5.0"}
     )
-    html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-    # Chercher un lien CSV contenant "permanent" et l'année courante
-    m = re.search(
-        r'href="([^"]*permanent[^"]*%d[^"]*\.csv[^"]*)"' % year,
-        html, re.IGNORECASE
-    )
-    if not m:
-        m = re.search(
-            r'href="([^"]*%d[^"]*permanent[^"]*\.csv[^"]*)"' % year,
-            html, re.IGNORECASE
-        )
-    if m:
-        print(m.group(1))
-    else:
-        sys.stderr.write("URL comptage permanent %d introuvable sur la page.\n" % year)
-        sys.exit(1)
-except Exception as e:
-    sys.stderr.write("Erreur scraping comptage permanent : %s\n" % e)
-    sys.exit(1)
-EOF
-) || true
+    data = json.loads(urllib.request.urlopen(req, timeout=15).read())
+    if not data.get('success'):
+        raise Exception("Réponse API invalide")
+    resources = data['result']['resources']
 
+    csv_url = ""
+    compteurs_url = ""
+    for r in resources:
+        url = r.get('url', '')
+        if not csv_url and url.lower().endswith('cyclistes.csv'):
+            csv_url = url
+        if not compteurs_url and re.search(r'comptage_velo_%d.*\.csv$' % year, url, re.IGNORECASE):
+            compteurs_url = url
+
+    if not csv_url:
+        sys.stderr.write("cyclistes.csv introuvable dans le dataset.\n")
+    if not compteurs_url:
+        sys.stderr.write("comptage_velo_%d.csv introuvable dans le dataset.\n" % year)
+
+    print(csv_url)
+    print(compteurs_url)
+except Exception as e:
+    sys.stderr.write("Erreur API CKAN : %s\n" % e)
+    print("")
+    print("")
+EOF
+)
+
+CSV_URL=$(echo "$CKAN_URLS"     | sed -n '1p')
+COMPTEURS_URL=$(echo "$CKAN_URLS" | sed -n '2p')
+
+# ── Télécharger le CSV Détecteurs SUM (cyclistes.csv) ─────────────────────────
 if [ -n "$CSV_URL" ]; then
-    echo "$LOG URL trouvée : $CSV_URL"
+    echo "$LOG URL cyclistes.csv : $CSV_URL"
     OLD_HASH=""
     [ -f cyclistes.csv ] && OLD_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
     curl -fsSL \
@@ -72,13 +83,13 @@ if [ -n "$CSV_URL" ]; then
     echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
     NEW_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
     if [ "$OLD_HASH" != "$NEW_HASH" ]; then
-        echo "$LOG Nouveau CSV comptage permanent détecté."
+        echo "$LOG Nouveau CSV cyclistes détecté."
         CSV_CHANGED=true
     else
-        echo "$LOG CSV comptage permanent identique à la version précédente."
+        echo "$LOG CSV cyclistes identique à la version précédente."
     fi
 else
-    echo "$LOG URL comptage permanent introuvable — données existantes conservées."
+    echo "$LOG URL cyclistes.csv introuvable — données existantes conservées."
 fi
 
 # ── Télécharger le CSV BIXI (si une nouvelle version est disponible) ───────────
@@ -154,33 +165,9 @@ else
     echo "$LOG URL BIXI introuvable — données existantes conservées."
 fi
 
-# ── Télécharger le CSV compteurs vélo (intervalles 15 min, année courante) ───
-echo "$LOG Recherche de l'URL compteurs vélo (${YEAR:-$(date +%Y)})..."
-COMPTEURS_URL=$(python3 - <<'EOF'
-import urllib.request, re, sys
-from datetime import datetime
-
-year = datetime.now().year
-try:
-    req = urllib.request.Request(
-        "https://donnees.montreal.ca/dataset/velos-comptage",
-        headers={"User-Agent": "Mozilla/5.0"}
-    )
-    html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-    # Chercher le lien de téléchargement du fichier Éco-Compteur de l'année courante
-    # (exclure explicitement le fichier "permanent" qui est aussi sur cette page)
-    all_links = re.findall(r'href="([^"]*comptage_velo_%d[^"]*\.csv[^"]*)"' % year, html, re.IGNORECASE)
-    eco_links = [l for l in all_links if 'permanent' not in l.lower()]
-    if eco_links:
-        print(eco_links[0])
-    else:
-        sys.stderr.write("URL compteurs éco %d introuvable sur la page.\n" % year)
-        sys.exit(1)
-except Exception as e:
-    sys.stderr.write("Erreur scraping compteurs : %s\n" % e)
-    sys.exit(1)
-EOF
-) || true
+# ── Télécharger le CSV Éco-Compteurs (compteurs.csv) ─────────────────────────
+# $COMPTEURS_URL est déjà résolu par l'appel API CKAN ci-dessus.
+echo "$LOG Traitement URL compteurs vélo (${YEAR:-$(date +%Y)})..."
 
 if [ -n "$COMPTEURS_URL" ]; then
     echo "$LOG URL trouvée : $COMPTEURS_URL"
