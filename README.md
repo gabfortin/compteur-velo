@@ -13,6 +13,12 @@ compteur-velo/
 ├── cyclistes.csv            # Détecteurs sur fût — portail données ouvertes Montréal — ignoré par git
 ├── compteurs.csv            # Boucles magnétiques — portail données ouvertes Montréal — ignoré par git
 ├── bixi.csv                 # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
+├── hist_cache.json          # Données historiques pré-calculées (2009–année précédente) — commité
+├── historique/              # CSV historiques bruts (2009–2025) — ignoré par git, non nécessaire en prod
+│   ├── comptage_velo_2009.csv
+│   ├── comptagevelo2010.csv … comptagevelo2018.csv
+│   ├── comptage_velo_2019.csv … comptage_velo_2025.csv
+│   └── localisation_des_compteurs_velo.csv
 ├── velo_meta_cache.json     # Cache Nominatim (arrondissement + rue des boucles magnétiques)
 ├── genMap.py                # Script de génération du site HTML
 ├── index.html               # Site généré (ne pas modifier manuellement)
@@ -24,7 +30,7 @@ compteur-velo/
 ├── entrypoint.sh            # Point d'entrée Docker (injecte les variables dans l'environnement cron)
 ├── .env                     # Variables d'environnement locales (ignoré par git)
 ├── .env.example             # Modèle de configuration
-├── .gitignore               # Exclut cyclistes.csv, bixi.csv, compteurs.csv et .env
+├── .gitignore               # Exclut cyclistes.csv, bixi.csv, compteurs.csv, historique/ et .env
 └── CNAME                    # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
 ```
 
@@ -33,18 +39,92 @@ compteur-velo/
 ## Flux de génération
 
 ```
-cyclistes.csv  ─┐
-compteurs.csv  ─┤──  genMap.py  →  index.html  →  GitHub Pages
-bixi.csv       ─┘
+cyclistes.csv   ─┐
+compteurs.csv   ─┤──  genMap.py  →  index.html  →  GitHub Pages
+bixi.csv        ─┤
+hist_cache.json ─┘
 ```
 
-`genMap.py` lit les trois CSV, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
+`genMap.py` lit les CSV de l'année courante et le cache historique, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
 
 Pour régénérer le site manuellement après une mise à jour du CSV :
 
 ```bash
 python3 genMap.py
 python3 test_data.py   # Valide les données après génération
+```
+
+---
+
+## Données historiques
+
+### Vue d'ensemble
+
+Le site intègre des données historiques allant de **2009 à l'année courante** pour alimenter deux fonctionnalités :
+
+1. **Vue Globale — graphique d'évolution annuelle** : un diagramme à barres montrant le total de passages par année (2009–présent) pour tous les compteurs combinés.
+2. **Vue Compteur — boutons d'historique** : pour les compteurs disposant de données antérieures, deux boutons apparaissent sous les contrôles du graphique principal :
+   - **📊 Comparer avec une année** : sélection de deux années (A et B), affichage du total annuel de chacune pour comparaison directe.
+   - **📅 Historique multi-années** : graphique annuel (total par année) ou mensuel (courbe Jan–Déc pour chaque année disponible).
+
+Les boutons sont masqués pour les compteurs qui n'ont pas de données antérieures à l'année courante (ex. nouveaux détecteurs SUM).
+
+### Sources CSV historiques (dossier `historique/`)
+
+Les fichiers historiques couvrent 2009 à 2025. Ils ne sont **pas commités sur GitHub** (trop volumineux) mais servent à générer `hist_cache.json`. Trois formats coexistent :
+
+| Années | Format | Colonnes clés |
+|--------|--------|---------------|
+| 2009 | Long — 15 min par capteur | `date`, `heure`, `id_compteur`, `nb_passage`, `longitude`, `latitude` |
+| 2010–2012, 2015–2018 | Large — colonnes = noms des compteurs, 1 ligne/jour | `Date` (DD/MM/YYYY), puis une colonne par compteur nommé |
+| 2013–2014 | Large — sans colonne heure | `Date` (YYYY-MM-DD), puis une colonne par compteur nommé |
+| 2019–2025 | Long — 15 min par capteur | `date`, `heure`, `id_compteur`, `nb_passages`, `longitude`, `latitude` |
+
+Pour les fichiers au format large (2010–2018), `genMap.py` fait correspondre les noms de colonnes aux identifiants numériques via `localisation_des_compteurs_velo.csv` et une liste d'alias codés en dur (ex. `"PierDup"` → `100003040`).
+
+### Cache historique — `hist_cache.json`
+
+Fichier JSON pré-calculé (~60 Ko) commité sur GitHub. Contient :
+
+```json
+{
+  "yearly":          { "2009": 2291276, "2010": 3495345, ..., "2025": 15391883 },
+  "counter_monthly": {
+    "vf-100003032": {
+      "2009": { "1": 2792, "2": 4152, ..., "12": 9955 },
+      "2019": { ... },
+      ...
+    }
+  }
+}
+```
+
+`yearly` : total de passages toutes sources confondues pour chaque année historique (2009–2025).  
+`counter_monthly` : passages mensuels par compteur (clé = identifiant `vf-XXXXXXX`), pour les années disponibles dans les fichiers longs (2009, 2019–2025) et pour certains compteurs nommés dans les fichiers larges (2010–2018).
+
+L'année courante (2026) n'est **pas** dans le cache — elle est calculée à chaque génération depuis `cyclistes.csv` et `compteurs.csv`.
+
+### Logique de chargement dans `genMap.py`
+
+```
+1. hist_cache.json présent ? → charger le cache (rapide, ~0 s)
+2. Sinon et historique/ présent ? → parser tous les CSV bruts (~26 s), sauvegarder le cache
+3. Sinon → ignorer les données historiques (site fonctionne sans)
+```
+
+Puis, dans tous les cas : ajouter les données de l'année courante depuis les fichiers live.
+
+### Mise à jour du cache
+
+Le cache couvre 2009–2025 et n'a pas besoin d'être mis à jour tant qu'aucun nouveau fichier historique n'est ajouté dans `historique/`. Lorsqu'un historique 2026 complet sera disponible (début 2027) :
+
+```bash
+# Sur une machine disposant du dossier historique/ mis à jour
+rm hist_cache.json
+python3 genMap.py           # reparse tout et régénère le cache
+git add hist_cache.json
+git commit -m "Update hist cache — add 2026 full year"
+git push
 ```
 
 ---
@@ -601,11 +681,13 @@ Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Mont
 3. Scraper + télécharger bixi.csv (ZIP)      → BIXI_CHANGED
 4. Scraper + télécharger compteurs.csv       → COMPTEURS_CHANGED (fichier « comptage_velo_{année}.csv », éco-compteurs)
 5. Si aucun changement → exit 0
-6. python3 genMap.py
+6. python3 genMap.py    → lit hist_cache.json + fichiers live → génère index.html
 7. python3 test_data.py
 8. git add index.html velo_meta_cache.json
 9. git commit + git push si index.html a changé
 ```
+
+> **Note** : `hist_cache.json` est lu mais jamais modifié par `update.sh`. Le dossier `historique/` n'est pas présent sur le serveur de production — `genMap.py` détecte l'absence du dossier et utilise uniquement le cache.
 
 `cyclistes.csv` et `compteurs.csv` sont tous les deux scrappés sur `https://donnees.montreal.ca/dataset/velos-comptage`. Le script distingue les deux fichiers : `cyclistes.csv` cherche un lien contenant `permanent` et l'année ; `compteurs.csv` cherche `comptage_velo_{année}` en excluant les liens contenant `permanent`.
 

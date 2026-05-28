@@ -1,4 +1,5 @@
 import csv
+import glob
 import re
 from collections import defaultdict
 import os
@@ -463,6 +464,188 @@ def detect_anomalies(instance_data, min_ref_days=4, z_threshold=2.5, min_hours=4
 
 anomaly_data = {inst: det for inst, dirs in data.items()
                 if (det := detect_anomalies(dirs, weather_data=weather_data))}
+
+# ── Données historiques (2009–présent) ───────────────────────────────────────
+HIST_CACHE_FILE = 'hist_cache.json'
+
+def load_historical_data(historique_dir='historique'):
+    """Charge les données historiques.
+
+    Priorité :
+      1. hist_cache.json  (pré-calculé, commitable sur GitHub)
+      2. dossier historique/ (parsing des CSV bruts, génère aussi hist_cache.json)
+      3. Aucune source disponible → retourne des dicts vides
+
+    Retourne:
+        global_yearly: {year: total_passages}
+        counter_monthly: {'vf-ID': {year: {month: total}}}
+    """
+    # ── 1. Cache pré-calculé ──────────────────────────────────────────────────
+    if os.path.exists(HIST_CACHE_FILE):
+        print(f"Historique : cache trouvé → {HIST_CACHE_FILE}")
+        with open(HIST_CACHE_FILE, encoding='utf-8') as f:
+            cache = json.load(f)
+        yearly  = {int(k): v for k, v in cache.get('yearly', {}).items()}
+        ctrs    = {int(k): v for k, v in cache.get('yearly_counters', {}).items()}
+        monthly = {
+            inst: {int(yr): {int(mo): vol for mo, vol in months.items()}
+                   for yr, months in yrs.items()}
+            for inst, yrs in cache.get('counter_monthly', {}).items()
+        }
+        print(f"Historique : {len(yearly)} années, {len(monthly)} compteurs (depuis cache).")
+        return yearly, ctrs, monthly
+
+    # ── 2. Parsing des CSV bruts ──────────────────────────────────────────────
+    if not os.path.isdir(historique_dir):
+        print(f"Historique : {historique_dir}/ introuvable et {HIST_CACHE_FILE} absent — ignoré.")
+        return {}, {}, {}
+
+    print(f"Historique : parsing de {historique_dir}/ (première exécution — génère {HIST_CACHE_FILE})...")
+
+    # Mapping nom de compteur → ID numérique (depuis localisation historique)
+    name_to_id = {}
+    loc_file = os.path.join(historique_dir, 'localisation_des_compteurs_velo.csv')
+    if os.path.exists(loc_file):
+        with open(loc_file, encoding='utf-8', errors='replace') as f:
+            for row in csv.DictReader(f):
+                nom = (row.get('Nom') or '').strip()
+                cid = (row.get('ID') or '').strip()
+                if nom and cid:
+                    name_to_id[nom] = cid
+    # Alias courants dans les CSV historiques (noms de colonnes abrégés)
+    _ALIASES = {
+        'Berri1':                      '100003032',
+        'Rachel / Papineau':           '100003034',
+        'PierDup':                     '100003040',
+        'Parc':                        '100003042',
+        'Brébeuf':                     '100004575',
+        'CSC (Côte Sainte-Catherine)': '100003041',
+        'Pont_Jacques_Cartier':        '100002880',
+        'Pont Jacques-Cartier':        '100002880',
+    }
+    name_to_id.update(_ALIASES)
+
+    global_yearly    = defaultdict(int)
+    yearly_counters  = defaultdict(set)   # {year: set of counter IDs}
+    counter_monthly  = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+
+    csv_files = sorted(glob.glob(os.path.join(historique_dir, '*.csv')))
+    for filepath in tqdm(csv_files, desc="Historique"):
+        basename = os.path.basename(filepath).lower()
+        if 'localisation' in basename:
+            continue
+
+        with open(filepath, encoding='utf-8', errors='replace') as f:
+            first_line = f.readline().strip()
+
+        if 'id_compteur' in first_line:
+            # Format long : 2009 (nb_passage) et 2019-2025 (nb_passages)
+            col_nb = 'nb_passages' if 'nb_passages' in first_line else 'nb_passage'
+            with open(filepath, encoding='utf-8', errors='replace') as f:
+                for row in csv.DictReader(f):
+                    try:
+                        date_str = row['date'][:10]
+                        year  = int(date_str[:4])
+                        month = int(date_str[5:7])
+                        vol   = int(row.get(col_nb) or 0)
+                        cid   = (row.get('id_compteur') or '').strip()
+                        global_yearly[year] += vol
+                        if cid:
+                            yearly_counters[year].add(cid)
+                            counter_monthly[f'vf-{cid}'][year][month] += vol
+                    except (ValueError, KeyError, TypeError):
+                        pass
+
+        elif first_line.startswith('Date'):
+            # Format large : 2010-2018 (totaux journaliers, colonnes = noms des compteurs)
+            with open(filepath, encoding='utf-8', errors='replace') as f:
+                reader  = csv.reader(f)
+                headers = next(reader)
+
+            # Détecter si la 2e colonne est vide (colonne heure) → décaler de 2
+            data_start = 2 if (len(headers) > 1 and not headers[1].strip()) else 1
+            col_names  = headers[data_start:]
+
+            with open(filepath, encoding='utf-8', errors='replace') as f:
+                next(csv.reader(f))   # sauter l'entête
+                reader = csv.reader(f)
+                for row in reader:
+                    if not row or not row[0].strip():
+                        continue
+                    date_str = row[0].strip()
+                    try:
+                        if '-' in date_str:
+                            year  = int(date_str[:4])
+                            month = int(date_str[5:7])
+                        else:
+                            parts = date_str.split('/')
+                            year  = int(parts[2])
+                            month = int(parts[1])
+                    except (ValueError, IndexError):
+                        continue
+
+                    for i, col_name in enumerate(col_names):
+                        col_i = i + data_start
+                        if col_i >= len(row):
+                            break
+                        raw = row[col_i].strip() if col_i < len(row) else ''
+                        if not raw or not col_name.strip():
+                            continue
+                        try:
+                            val = int(raw)
+                        except ValueError:
+                            continue
+                        global_yearly[year] += val
+                        yearly_counters[year].add(col_name.strip())
+                        cid = name_to_id.get(col_name.strip())
+                        if cid:
+                            counter_monthly[f'vf-{cid}'][year][month] += val
+
+    result_yearly    = dict(global_yearly)
+    result_ctrs      = {yr: len(s) for yr, s in yearly_counters.items()}
+    result_monthly   = {k: {yr: dict(months) for yr, months in yrs.items()}
+                        for k, yrs in counter_monthly.items()}
+
+    # Sauvegarder le cache pour les prochaines exécutions sans historique/
+    try:
+        with open(HIST_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'yearly': result_yearly, 'yearly_counters': result_ctrs,
+                       'counter_monthly': result_monthly},
+                      f, ensure_ascii=False)
+        print(f"Historique : cache sauvegardé → {HIST_CACHE_FILE}")
+    except Exception as e:
+        print(f"Historique : impossible de sauvegarder le cache ({e})")
+
+    return result_yearly, result_ctrs, result_monthly
+
+
+hist_yearly, hist_yearly_counters, hist_counter_monthly = load_historical_data()
+
+# Ajouter les données de l'année courante (depuis les fichiers actifs)
+_cur_year = datetime.now().year
+_cur_year_instances = set()
+for _inst, _directions in data.items():
+    for _rows in _directions.values():
+        for _row in _rows:
+            try:
+                _d  = _row['periode'][:10]
+                _yr = int(_d[:4])
+                _mo = int(_d[5:7])
+                _v  = int(_row.get('volume', 0))
+                if _yr == _cur_year:
+                    hist_yearly[_cur_year] = hist_yearly.get(_cur_year, 0) + _v
+                    _cur_year_instances.add(_inst)
+                    if _inst not in hist_counter_monthly:
+                        hist_counter_monthly[_inst] = {}
+                    if _yr not in hist_counter_monthly[_inst]:
+                        hist_counter_monthly[_inst][_yr] = {}
+                    _mo_dict = hist_counter_monthly[_inst][_yr]
+                    _mo_dict[_mo] = _mo_dict.get(_mo, 0) + _v
+            except (ValueError, KeyError, TypeError):
+                pass
+
+hist_yearly_counters[_cur_year] = len(_cur_year_instances)
+print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} compteurs.")
 
 # Générer le HTML
 html_parts = ['''<html>
@@ -1062,6 +1245,85 @@ html_parts = ['''<html>
             .stat-label { font-size: 11px; }
         }
         /* ── Top bar ── */
+        /* ── Historique ── */
+        #hist-btns {
+            display: none;
+            gap: 6px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .hist-btn {
+            padding: 7px 14px;
+            border: 1.5px solid rgba(29,184,96,0.35);
+            background: #fff;
+            color: #1DB860;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .hist-btn:hover {
+            border-color: #1DB860;
+            background: rgba(29,184,96,0.06);
+            transform: translateY(-1px);
+        }
+        .hist-btn.active {
+            background: linear-gradient(135deg, #1DB860, #17a355);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 3px 8px rgba(29,184,96,0.25);
+        }
+        #hist-panel {
+            display: none;
+            margin-top: 6px;
+            padding: 14px 0 4px;
+            border-top: 1px solid #e5e7eb;
+            animation: fadeIn 0.3s ease both;
+        }
+        #hist-panel-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 10px;
+        }
+        #hist-compare-year-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        #hist-compare-year-wrap label {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+        .hist-year-select {
+            padding: 5px 10px;
+            border: 1.5px solid rgba(29,184,96,0.35);
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+        }
+        .hist-year-select:focus { box-shadow: 0 0 0 3px rgba(29,184,96,0.15); border-color: #1DB860; }
+        #hist-compare-vs {
+            font-size: 12px;
+            font-weight: 700;
+            color: #9ca3af;
+            flex-shrink: 0;
+        }
+        #hist-view-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        /* ── Topbar ── */
         #topbar {
             height: 50px;
             display: flex;
@@ -1378,6 +1640,30 @@ html_parts.append('''
             <button id="btnClearCombine" class="combine-clear-btn">✕ Retirer</button>
           </div>
         </div>
+        <div id="hist-btns">
+            <button class="hist-btn" id="btnHistCompare">📊 Comparer avec une année</button>
+            <button class="hist-btn" id="btnHistTimeline">📅 Historique multi-années</button>
+        </div>
+        <div id="hist-panel">
+            <div id="hist-panel-title"></div>
+            <!-- Panneau comparaison -->
+            <div id="hist-compare-panel" style="display:none;">
+                <div id="hist-compare-year-wrap">
+                    <select id="hist-year-a" class="hist-year-select"></select>
+                    <span id="hist-compare-vs">vs</span>
+                    <select id="hist-year-b" class="hist-year-select"></select>
+                </div>
+                <div style="position:relative;height:200px;"><canvas id="hist-canvas-compare"></canvas></div>
+            </div>
+            <!-- Panneau historique multi-années -->
+            <div id="hist-timeline-panel" style="display:none;">
+                <div id="hist-view-toggle">
+                    <button class="dir-btn active" id="btnHistAnnual">Annuel</button>
+                    <button class="dir-btn" id="btnHistMonthly">Mensuel</button>
+                </div>
+                <div style="position:relative;height:220px;"><canvas id="hist-canvas-timeline"></canvas></div>
+            </div>
+        </div>
         <div id="chart-map-layout">
         <div id="chart-area">
         <div id="dataWarning"><span class="warn-icon">⚠️</span><span>Des interruptions ont été détectées dans les données de ce compteur. Certaines périodes peuvent être sous-estimées — interpréter les chiffres avec prudence.</span></div>
@@ -1543,6 +1829,10 @@ for inst, bixi_days in bixi_near_counter.items():
         bixi_exceeds_days[inst] = exceeds
 
 html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
+# Données historiques
+html_parts.append(f"const historicalYearlyTotals = {json.dumps(hist_yearly, ensure_ascii=False)};\n")
+html_parts.append(f"const historicalYearlyCounters = {json.dumps(hist_yearly_counters, ensure_ascii=False)};\n")
+html_parts.append(f"const counterHistoricalData = {json.dumps(hist_counter_monthly, ensure_ascii=False)};\n")
 
 # ── Vue globale : stats agrégées (compteurs groupes A + B) ────────────────────
 _active_g = [i for i in data if all_quality.get(i, {}).get('group') in ('A', 'B')]
@@ -1651,6 +1941,8 @@ html_parts.append('''
         let displayMode = 'combined';
         let viewMode = 'timeline';
         let showBixi = false;
+        let histMode    = null;
+        let histSubMode = 'annual';
 
         function maxDateStr(instance) {
             const maxDate = getMaxDate(allChartData[instance].labels);
@@ -2226,6 +2518,7 @@ html_parts.append('''
             document.getElementById('btnClearCombine').style.display = 'none';
             const nearbyCount = instance ? populateCombineSelect(instance) : 0;
             document.getElementById('combineSection').style.display = (instance && nearbyCount > 0) ? 'block' : 'none';
+            updateHistButtons(instance);
 
             document.querySelectorAll('.table-container').forEach(c => c.classList.remove('visible'));
             const noDataMsg = document.getElementById('noDataMsg');
@@ -2676,7 +2969,298 @@ html_parts.append('''
                     \'<div><div class="net-val" style="color:#EF4444">\' + (n.C || 0) + \'</div><div class="net-label">Inactifs</div></div>\' +
                 \'</div>\' +
                 \'<p style="font-size:11px;color:#9ca3af;margin-top:14px;text-align:center;">\' + (n.total || 0) + \' compteurs au total</p>\';
+
+            // ── Graphique évolution annuelle ──
+            if (typeof historicalYearlyTotals !== \'undefined\' && !charts[\'__global_yearly__\']) {
+                const years  = Object.keys(historicalYearlyTotals).map(Number).sort();
+                const totals = years.map(y => historicalYearlyTotals[y]);
+                const curY   = new Date().getFullYear();
+                const ctx    = document.getElementById(\'global-yearly-chart\');
+                if (ctx) {
+                    charts[\'__global_yearly__\'] = new Chart(ctx, {
+                        type: \'bar\',
+                        data: {
+                            labels: years,
+                            datasets: [{
+                                label: \'Total passages\',
+                                data: totals,
+                                backgroundColor: years.map(y => y === curY
+                                    ? \'rgba(29,184,96,0.45)\'
+                                    : \'rgba(29,184,96,0.75)\'),
+                                borderColor: years.map(y => y === curY ? \'#17a355\' : \'#1DB860\'),
+                                borderWidth: 1,
+                                borderRadius: 4,
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            animation: { duration: 500 },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: \'rgba(10,40,20,0.88)\',
+                                    titleColor: \'#7ee8a2\',
+                                    bodyColor: \'#fff\',
+                                    padding: 10,
+                                    cornerRadius: 8,
+                                    callbacks: {
+                                        label: item => {
+                                            const y = Number(item.label);
+                                            const n = (typeof historicalYearlyCounters !== \'undefined\' && historicalYearlyCounters[y]) || null;
+                                            const suffix = y === curY ? \' (en cours)\' : \'\';
+                                            const ctrLine = n ? \'📍 \' + n + \' compteur\' + (n > 1 ? \'s\' : \'\') : \'\';
+                                            return [
+                                                \' \' + Math.round(item.raw).toLocaleString(\'fr-CA\') + \' passages\' + suffix,
+                                                ctrLine,
+                                            ].filter(Boolean);
+                                        },
+                                    },
+                                },
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: \'rgba(0,0,0,0.04)\' },
+                                    border: { display: false },
+                                    ticks: { color: \'#777\', font: { size: 11 } },
+                                },
+                                y: {
+                                    grid: { color: \'rgba(0,0,0,0.04)\' },
+                                    border: { display: false },
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: \'#777\',
+                                        callback: v => v >= 1e6
+                                            ? (v / 1e6).toFixed(1) + \'M\'
+                                            : v >= 1e3 ? (v / 1e3).toFixed(0) + \'k\' : v,
+                                    },
+                                    title: { display: true, text: \'Passages\', color: \'#999\', font: { size: 11 } },
+                                },
+                            },
+                        },
+                    });
+                }
+            }
         }
+
+        // ── Fonctions historique compteur ────────────────────────────────────
+        const _FR_MONTHS = [\'Jan\',\'Fév\',\'Mar\',\'Avr\',\'Mai\',\'Juin\',\'Juil\',\'Août\',\'Sep\',\'Oct\',\'Nov\',\'Déc\'];
+        const _PALETTE   = [\'#1DB860\',\'#29ABE2\',\'#F59E0B\',\'#EF4444\',\'#8B5CF6\',\'#EC4899\',\'#14B8A6\',\'#F97316\'];
+
+        function histDataForInstance(instance) {
+            if (typeof counterHistoricalData === \'undefined\') return null;
+            return counterHistoricalData[instance] || null;
+        }
+
+        function destroyHistCharts() {
+            [\'__hist_compare__\', \'__hist_timeline__\'].forEach(k => {
+                if (charts[k]) { charts[k].destroy(); charts[k] = null; }
+            });
+        }
+
+        function resetHistPanel() {
+            destroyHistCharts();
+            document.getElementById(\'hist-compare-panel\').style.display  = \'none\';
+            document.getElementById(\'hist-timeline-panel\').style.display  = \'none\';
+            document.getElementById(\'hist-panel\').style.display           = \'none\';
+            document.getElementById(\'btnHistCompare\').classList.remove(\'active\');
+            document.getElementById(\'btnHistTimeline\').classList.remove(\'active\');
+            histMode = null;
+        }
+
+        function updateHistButtons(instance) {
+            // Désactivé — fonctionnalité réservée à la Vue Globale pour l\'instant
+            document.getElementById(\'hist-btns\').style.display = \'none\';
+            resetHistPanel();
+        }
+
+        function buildCompareChart(instance, yearA, yearB) {
+            destroyHistCharts();
+            const hd  = histDataForInstance(instance);
+            if (!hd) return;
+
+            const yearTotal = y => Object.values(hd[y] || {}).reduce((a, b) => a + b, 0);
+            const curY = new Date().getFullYear();
+
+            const totA = yearTotal(yearA);
+            const totB = yearTotal(yearB);
+
+            const labelA = yearA == curY ? String(yearA) + \' (en cours)\' : String(yearA);
+            const labelB = yearB == curY ? String(yearB) + \' (en cours)\' : String(yearB);
+            const colorA = yearA == curY ? \'rgba(29,184,96,0.75)\'  : \'rgba(41,171,226,0.75)\';
+            const colorB = yearB == curY ? \'rgba(29,184,96,0.75)\'  : \'rgba(41,171,226,0.45)\';
+            const bdrA   = yearA == curY ? \'#1DB860\'               : \'#29ABE2\';
+            const bdrB   = yearB == curY ? \'#1DB860\'               : \'rgba(41,171,226,0.9)\';
+
+            const ctx = document.getElementById(\'hist-canvas-compare\');
+            if (!ctx) return;
+            charts[\'__hist_compare__\'] = new Chart(ctx, {
+                type: \'bar\',
+                data: {
+                    labels: [labelA, labelB],
+                    datasets: [{
+                        label: \'Total annuel\',
+                        data:  [totA, totB],
+                        backgroundColor: [colorA, colorB],
+                        borderColor:     [bdrA, bdrB],
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    }],
+                },
+                options: _histChartOpts(\'Passages\'),
+            });
+        }
+
+        function buildTimelineChart(instance, subMode) {
+            destroyHistCharts();
+            const hd = histDataForInstance(instance);
+            if (!hd) return;
+            const years = Object.keys(hd).map(Number).sort();
+            const ctx   = document.getElementById(\'hist-canvas-timeline\');
+            if (!ctx) return;
+
+            if (subMode === \'annual\') {
+                const totals = years.map(y => Object.values(hd[y] || {}).reduce((a,b) => a+b, 0));
+                const curY   = new Date().getFullYear();
+                charts[\'__hist_timeline__\'] = new Chart(ctx, {
+                    type: \'bar\',
+                    data: {
+                        labels: years,
+                        datasets: [{
+                            label: \'Passages totaux\',
+                            data:  totals,
+                            backgroundColor: years.map(y => y === curY ? \'rgba(29,184,96,0.45)\' : \'rgba(29,184,96,0.75)\'),
+                            borderColor: \'#1DB860\',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: _histChartOpts(\'Passages/an\'),
+                });
+            } else {
+                // Mensuel : une ligne par année
+                const months   = [1,2,3,4,5,6,7,8,9,10,11,12];
+                const datasets = years.map((y, i) => ({
+                    label: String(y),
+                    data:  months.map(m => (hd[y] || {})[m] || null),
+                    borderColor:     _PALETTE[i % _PALETTE.length],
+                    backgroundColor: _PALETTE[i % _PALETTE.length] + \'22\',
+                    fill: false, tension: 0.3, borderWidth: 1.5, pointRadius: 2,
+                }));
+                charts[\'__hist_timeline__\'] = new Chart(ctx, {
+                    type: \'line\',
+                    data: { labels: _FR_MONTHS, datasets },
+                    options: { ..._histChartOpts(\'Passages/mois\'), plugins: { ..._histChartOpts(\'Passages/mois\').plugins, legend: { display: true, position: \'bottom\', labels: { boxWidth: 12, font: { size: 11 } } } } },
+                });
+            }
+        }
+
+        function _histChartOpts(yLabel) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400 },
+                plugins: {
+                    legend: { display: true, position: \'top\', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        backgroundColor: \'rgba(10,40,20,0.88)\',
+                        titleColor: \'#7ee8a2\', bodyColor: \'#fff\',
+                        padding: 9, cornerRadius: 7,
+                        callbacks: {
+                            label: item => \' \' + (item.dataset.label || \'\') + \' : \' +
+                                (item.raw !== null ? Math.round(item.raw).toLocaleString(\'fr-CA\') : \'—\'),
+                        },
+                    },
+                },
+                scales: {
+                    x: { grid: { color: \'rgba(0,0,0,0.04)\' }, border: { display: false }, ticks: { color: \'#777\', font: { size: 11 } } },
+                    y: { grid: { color: \'rgba(0,0,0,0.04)\' }, border: { display: false }, beginAtZero: true,
+                        ticks: { color: \'#777\', callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+\'M\' : v >= 1e3 ? (v/1e3).toFixed(0)+\'k\' : v },
+                        title: { display: true, text: yLabel, color: \'#999\', font: { size: 11 } } },
+                },
+            };
+        }
+
+        function _fillYearSelect(sel, years, selected) {
+            sel.innerHTML = \'\';
+            years.forEach(y => {
+                const opt = document.createElement(\'option\');
+                opt.value = y;
+                opt.textContent = y;
+                sel.appendChild(opt);
+            });
+            sel.value = selected;
+        }
+
+        function populateHistYearSelect(instance) {
+            const hd    = histDataForInstance(instance);
+            if (!hd) return;
+            const curY  = new Date().getFullYear();
+            const years = Object.keys(hd).map(Number).sort().reverse();
+            const selA  = document.getElementById(\'hist-year-a\');
+            const selB  = document.getElementById(\'hist-year-b\');
+            _fillYearSelect(selA, years, curY);
+            // default année B = année la plus récente avant curY
+            const defaultB = years.find(y => y < curY) || years[years.length - 1];
+            _fillYearSelect(selB, years, defaultB);
+        }
+
+        // ── Boutons historique ──
+        document.getElementById(\'btnHistCompare\').addEventListener(\'click\', function() {
+            const instance = getSelectedCounter();
+            if (!instance) return;
+            const wasActive = histMode === \'compare\';
+            resetHistPanel();
+            if (wasActive) return;
+            histMode = \'compare\';
+            this.classList.add(\'active\');
+            document.getElementById(\'hist-panel-title\').textContent = \'Comparaison annuelle\';
+            populateHistYearSelect(instance);
+            document.getElementById(\'hist-compare-panel\').style.display = \'block\';
+            document.getElementById(\'hist-panel\').style.display = \'block\';
+            const yA = parseInt(document.getElementById(\'hist-year-a\').value);
+            const yB = parseInt(document.getElementById(\'hist-year-b\').value);
+            setTimeout(() => buildCompareChart(instance, yA, yB), 0);
+        });
+
+        document.getElementById(\'btnHistTimeline\').addEventListener(\'click\', function() {
+            const instance = getSelectedCounter();
+            if (!instance) return;
+            const wasActive = histMode === \'timeline\';
+            resetHistPanel();
+            if (wasActive) return;
+            histMode = \'timeline\';
+            this.classList.add(\'active\');
+            document.getElementById(\'hist-panel-title\').textContent = \'Historique multi-années\';
+            document.getElementById(\'hist-timeline-panel\').style.display = \'block\';
+            document.getElementById(\'hist-panel\').style.display = \'block\';
+            setTimeout(() => buildTimelineChart(instance, histSubMode), 0);
+        });
+
+        function _onCompareYearChange() {
+            const instance = getSelectedCounter();
+            if (!instance || histMode !== \'compare\') return;
+            const yA = parseInt(document.getElementById(\'hist-year-a\').value);
+            const yB = parseInt(document.getElementById(\'hist-year-b\').value);
+            buildCompareChart(instance, yA, yB);
+        }
+        document.getElementById(\'hist-year-a\').addEventListener(\'change\', _onCompareYearChange);
+        document.getElementById(\'hist-year-b\').addEventListener(\'change\', _onCompareYearChange);
+
+        document.getElementById(\'btnHistAnnual\').addEventListener(\'click\', function() {
+            if (histSubMode === \'annual\') return;
+            histSubMode = \'annual\';
+            this.classList.add(\'active\');
+            document.getElementById(\'btnHistMonthly\').classList.remove(\'active\');
+            setTimeout(() => buildTimelineChart(getSelectedCounter(), \'annual\'), 0);
+        });
+
+        document.getElementById(\'btnHistMonthly\').addEventListener(\'click\', function() {
+            if (histSubMode === \'monthly\') return;
+            histSubMode = \'monthly\';
+            this.classList.add(\'active\');
+            document.getElementById(\'btnHistAnnual\').classList.remove(\'active\');
+            setTimeout(() => buildTimelineChart(getSelectedCounter(), \'monthly\'), 0);
+        });
 
         function showView(view) {
             const isMain   = view === \'main\';
@@ -2804,6 +3388,28 @@ html_parts.append('''
         </div>
         <p>En mode combiné, la visualisation des anomalies (points rouges, zones grisées, barres fantômes) est désactivée — les anomalies étant définies par capteur individuel, elles ne s\'appliquent pas à un signal synthétique.</p>
       </div>
+
+      <!-- Données historiques -->
+      <div class="methodo-section">
+        <h3>📈 Données historiques (2009–présent)</h3>
+        <p>En complément des 6 derniers mois glissants, le site intègre des données agrégées depuis <strong>2009</strong> pour deux fonctionnalités :</p>
+        <ul>
+          <li><strong>Vue Globale — évolution annuelle :</strong> diagramme à barres du total de passages pour tous les compteurs confondus, de 2009 à l\'année courante (partielle). L\'année en cours apparaît avec une barre plus claire pour signaler qu\'elle est incomplète.</li>
+          <li><strong>Vue Compteur — Comparer &amp; Historique :</strong> deux boutons apparaissent sous le graphique principal pour les compteurs disposant de données antérieures à l\'année courante. Ces boutons sont masqués pour les détecteurs récents sans historique.</li>
+        </ul>
+        <div class="algo-box">
+          <strong>📊 Comparer avec une année :</strong> deux sélecteurs (Année A / Année B) permettent de comparer le total annuel de deux années quelconques. Par défaut, A = année courante, B = année la plus récente dans l\'historique du compteur.
+        </div>
+        <div class="algo-box">
+          <strong>📅 Historique multi-années :</strong> deux sous-modes disponibles :<br>
+          — <em>Annuel</em> : une barre par année, total de passages.<br>
+          — <em>Mensuel</em> : une courbe Jan–Déc par année (toutes les années disponibles superposées), pour visualiser la saisonnalité.
+        </div>
+        <p>Les données historiques proviennent de fichiers CSV archivés (dossier <code>historique/</code>, non commité). Elles sont pré-calculées en un fichier cache <code>hist_cache.json</code> (~60 Ko, commité sur GitHub) contenant les totaux mensuels par compteur et par année. À chaque génération du HTML, <code>genMap.py</code> charge ce cache et y ajoute les données de l\'année courante depuis les fichiers live.</p>
+        <div class="algo-warn">
+          Les totaux annuels ne sont pas directement comparables entre toutes les années : le nombre de compteurs actifs et leur couverture géographique ont évolué depuis 2009 (de quelques capteurs sur Rachel et Berri à plus d\'une centaine aujourd\'hui). Une hausse du total peut refléter l\'ajout de nouveaux compteurs autant qu\'une augmentation réelle du vélo.
+        </div>
+      </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
@@ -2814,6 +3420,10 @@ html_parts.append('''
         <p class="subtitle" style="display:block">Passages agrégés de tous les compteurs actifs</p>
       </div>
       <div id="global-cards"></div>
+      <div class="global-section" style="margin-bottom:20px;">
+        <div class="global-section-title" style="margin-bottom:12px;">📈 Évolution annuelle — passages totaux</div>
+        <canvas id="global-yearly-chart" style="height:260px;"></canvas>
+      </div>
       <div id="global-bottom">
         <div class="global-section" id="global-arr"></div>
         <div class="global-section" id="global-net"></div>
