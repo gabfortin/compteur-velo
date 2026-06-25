@@ -1,0 +1,68 @@
+name: Mise à jour quotidienne
+
+on:
+  schedule:
+    # 08:15 heure de Montréal en hiver (EST = UTC-5) → 13:15 UTC.
+    # En été (EDT = UTC-4), GitHub Actions ne suit pas le fuseau horaire
+    # local : ce déclencheur s'exécutera alors à 09:15 heure de Montréal.
+    - cron: '15 13 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-site
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dépendances
+        run: pip install --no-cache-dir tqdm
+
+      - name: Télécharger les données (cyclistes.csv, bixi.csv, compteurs.csv)
+        run: |
+          chmod +x fetch_data.sh
+          ./fetch_data.sh
+
+      - name: Générer le HTML
+        run: python3 genMap.py
+
+      - name: Incrémenter la version (patch)
+        run: |
+          if [ -f version.txt ]; then
+            CURRENT_VERSION=$(tr -d '[:space:]' < version.txt)
+            IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$CURRENT_VERSION"
+            echo "$V_MAJOR.$V_MINOR.$((V_PATCH + 1))" > version.txt
+            echo "Version incrémentée : $CURRENT_VERSION → $(cat version.txt)"
+          fi
+
+      - name: Valider les données
+        run: python3 test_data.py
+
+      - name: Publier sur GitHub
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add index.html
+          [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
+          [ -f version.txt ] && git add version.txt
+
+          if git diff --staged --quiet; then
+            echo "Aucun changement dans index.html — rien à publier."
+            exit 0
+          fi
+
+          git commit -m "Mise à jour automatique — $(date '+%Y-%m-%d')"
+          git push

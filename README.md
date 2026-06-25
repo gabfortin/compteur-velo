@@ -24,9 +24,12 @@ compteur-velo/
 ├── index.html               # Site généré (ne pas modifier manuellement)
 ├── favico.png               # Icône de l'application
 ├── test_data.py             # Suite de tests de validation des données
-├── update.sh                # Script de mise à jour automatique (télécharge CSV → génère HTML → publie)
-├── Dockerfile               # Image Docker pour l'automatisation (cron quotidien)
-├── docker-compose.yml       # Orchestration du conteneur d'automatisation
+├── .github/workflows/
+│   └── update.yml           # Automatisation principale — cron GitHub Actions quotidien
+├── fetch_data.sh            # Téléchargement des 3 CSV — partagé entre update.yml et update.sh
+├── update.sh                # Pipeline d'automatisation alternatif (auto-hébergement Docker)
+├── Dockerfile               # Image Docker pour l'automatisation alternative (cron quotidien)
+├── docker-compose.yml       # Orchestration du conteneur d'automatisation alternative
 ├── entrypoint.sh            # Point d'entrée Docker (injecte les variables dans l'environnement cron)
 ├── .env                     # Variables d'environnement locales (ignoré par git)
 ├── .env.example             # Modèle de configuration
@@ -660,9 +663,52 @@ Le script charge `cyclistes.csv` et `compteurs.csv` (si présent) pour établir 
 
 ---
 
-## Automatisation — Docker
+## Automatisation — GitHub Actions (recommandé)
 
-Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Montréal** via cron. Il clone ou met à jour le dépôt GitHub, télécharge les CSV depuis les portails de données ouvertes, régénère `index.html`, valide les données, puis publie si des changements sont détectés.
+La méthode principale d'automatisation est un **workflow GitHub Actions** planifié, qui ne nécessite aucun serveur à maintenir. Tout tourne sur l'infrastructure de GitHub, gratuitement pour un dépôt public.
+
+### Fichier — `.github/workflows/update.yml`
+
+```
+1. Déclenchement : cron quotidien (13:15 UTC ≈ 08:15 heure de Montréal) ou manuel (workflow_dispatch)
+2. actions/checkout      → clone le dépôt dans le runner
+3. actions/setup-python  → installe Python 3.11
+4. pip install tqdm
+5. ./fetch_data.sh        → télécharge cyclistes.csv, bixi.csv, compteurs.csv
+6. python3 genMap.py      → lit hist_cache.json + fichiers téléchargés → génère index.html
+7. Incrémente version.txt (patch)
+8. python3 test_data.py
+9. git add + commit + push (uniquement si index.html a changé)
+```
+
+`fetch_data.sh` est un script partagé entre ce workflow et `update.sh` (voir section Docker ci-dessous) — toute la logique de scraping/téléchargement (API CKAN, scraping BIXI, extraction du ZIP) vit dans ce seul fichier pour éviter la duplication.
+
+> **Note sur le fuseau horaire** : la syntaxe `cron` de GitHub Actions est toujours en UTC et ne suit pas les changements d'heure été/hiver. Le déclencheur `15 13 * * *` correspond à 08h15 en heure normale de l'Est (hiver) et glissera à 09h15 en heure avancée de l'Est (été). Ce décalage d'une heure deux fois par an est sans conséquence pour une mise à jour quotidienne.
+>
+> **Note sur le cache CSV** : contrairement au conteneur Docker (qui persiste les CSV entre les exécutions et ne retélécharge que si le hash change), chaque exécution GitHub Actions démarre sur un runner neuf sans fichiers précédents. `fetch_data.sh` télécharge donc les données à chaque run, et `genMap.py` régénère systématiquement `index.html` — la protection contre les commits inutiles se fait uniquement à l'étape finale (`git diff --staged --quiet`), qui ne publie que si le contenu généré a réellement changé.
+
+### Permissions requises
+
+Le workflow déclare `permissions: contents: write` — aucun secret ni token personnel n'est nécessaire. `actions/checkout` configure automatiquement l'authentification Git avec le `GITHUB_TOKEN` intégré, qui a le droit de push sur le même dépôt grâce à cette permission.
+
+> Si le dépôt a une règle de protection de branche sur `main` qui bloque les push directs (même depuis Actions), il faut soit assouplir la règle pour le bot `github-actions[bot]`, soit passer par un Personal Access Token stocké en secret.
+
+### Déclencher manuellement
+
+Dans l'onglet **Actions** du dépôt GitHub → sélectionner le workflow **« Mise à jour quotidienne »** → **Run workflow**. Équivalent à `workflow_dispatch`, utile pour tester ou forcer une mise à jour hors cron.
+
+### Limites connues des workflows planifiés GitHub Actions
+
+- Un cron peut être retardé de quelques minutes en période de forte charge sur l'infrastructure GitHub — sans conséquence pour un job quotidien.
+- GitHub désactive automatiquement les workflows planifiés après **60 jours d'inactivité du dépôt** (aucun push/commit). Comme ce dépôt reçoit des commits automatiques chaque jour où les données changent, ce cas ne devrait pas se présenter ; sinon, il suffit de relancer manuellement une fois pour réactiver le cron.
+
+---
+
+## Automatisation alternative — Docker (auto-hébergement)
+
+Une alternative à GitHub Actions, utile pour auto-héberger l'automatisation sur son propre serveur plutôt que de dépendre de l'infrastructure GitHub. Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Montréal** via cron. Il clone ou met à jour le dépôt GitHub, télécharge les CSV depuis les portails de données ouvertes, régénère `index.html`, valide les données, puis publie si des changements sont détectés.
+
+> ⚠️ Ne pas exécuter les deux méthodes d'automatisation simultanément sur le même dépôt — cela produirait des commits dupliqués (l'un constatant que index.html n'a pas changé après que l'autre l'a déjà publié, ce qui est inoffensif, mais redondant).
 
 ### Fichiers impliqués
 
@@ -671,20 +717,19 @@ Le conteneur Docker exécute `update.sh` tous les jours à **08h15 heure de Mont
 | `Dockerfile`       | Image `python:3.11-slim` + git + cron + tqdm. Cron configuré à 08h15 |
 | `docker-compose.yml` | Monte `./logs` dans `/var/log`, charge `.env`, redémarre toujours  |
 | `entrypoint.sh`    | Exporte les variables d'env vers `/etc/environment` pour que cron y ait accès, puis lance `cron -f` |
-| `update.sh`        | Pipeline complet : clone/pull → télécharge les 3 CSV → `genMap.py` → `test_data.py` → commit + push |
+| `update.sh`        | Pipeline complet : clone/pull → `fetch_data.sh` → `genMap.py` → `test_data.py` → commit + push |
+| `fetch_data.sh`    | Téléchargement des 3 CSV (partagé avec le workflow GitHub Actions, voir section précédente) |
 
 ### Pipeline `update.sh`
 
 ```
 1. clone / git pull
-2. Scraper + télécharger cyclistes.csv       → CSV_CHANGED       (« Vélos - comptage permanent », même page que les éco-compteurs)
-3. Scraper + télécharger bixi.csv (ZIP)      → BIXI_CHANGED
-4. Scraper + télécharger compteurs.csv       → COMPTEURS_CHANGED (fichier « comptage_velo_{année}.csv », éco-compteurs)
-5. Si aucun changement → exit 0
-6. python3 genMap.py    → lit hist_cache.json + fichiers live → génère index.html
-7. python3 test_data.py
-8. git add index.html velo_meta_cache.json
-9. git commit + git push si index.html a changé
+2. ./fetch_data.sh  (cyclistes.csv → CSV_CHANGED, bixi.csv → BIXI_CHANGED, compteurs.csv → COMPTEURS_CHANGED)
+3. Si aucun changement → exit 0
+4. python3 genMap.py    → lit hist_cache.json + fichiers live → génère index.html
+5. python3 test_data.py
+6. git add index.html velo_meta_cache.json
+7. git commit + git push si index.html a changé
 ```
 
 > **Note** : `hist_cache.json` est lu mais jamais modifié par `update.sh`. Le dossier `historique/` n'est pas présent sur le serveur de production — `genMap.py` détecte l'absence du dossier et utilise uniquement le cache.
@@ -730,7 +775,7 @@ docker compose exec velo-updater /app/update.sh
 
 Le site est hébergé sur **GitHub Pages** (branche `main`). Le fichier `CNAME` définit le domaine personnalisé (`compteur.gabfortin.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
 
-Chaque `push` sur `main` déclenche automatiquement le déploiement. En production, c'est `update.sh` qui s'en charge. En développement local :
+Chaque `push` sur `main` déclenche automatiquement le déploiement. En production, c'est le workflow GitHub Actions (`update.yml`) qui s'en charge. En développement local :
 
 ```bash
 python3 genMap.py        # Régénère index.html

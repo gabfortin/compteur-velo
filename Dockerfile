@@ -18,8 +18,8 @@ RUN pip install --no-cache-dir tqdm
 
 # Scripts
 WORKDIR /app
-COPY update.sh entrypoint.sh crontab /app/
-RUN chmod +x /app/update.sh /app/entrypoint.sh
+COPY update.sh fetch_data.sh entrypoint.sh crontab /app/
+RUN chmod +x /app/update.sh /app/fetch_data.sh /app/entrypoint.sh
 
 RUN touch /var/log/update.log
 
