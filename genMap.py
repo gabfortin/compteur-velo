@@ -1733,7 +1733,9 @@ for instance, directions in data.items():
         rows = directions[direction]
         if not rows:
             continue
-        date_vol = {row['periode'][:16]: int(row['volume']) for row in rows}
+        date_vol = defaultdict(int)
+        for row in rows:
+            date_vol[row['periode'][:16]] += int(row['volume'])
         volumes = [date_vol.get(d) for d in all_dates]
         datasets.append({
             'label': 'Passages' if direction == 'N/A' else direction,
