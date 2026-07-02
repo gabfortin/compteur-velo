@@ -75,11 +75,16 @@ def classify_det_quality(det_data):
         last_complete = max((d for d, hrs in hours_per_day.items() if len(hrs) >= 12), default=None)
         last_any      = max(hours_per_day.keys()) if hours_per_day else None
 
+        # Le lag est calculé par rapport à la date du jour (et non au max du
+        # jeu de données) : si la source elle-même n'a pas été rafraîchie
+        # depuis longtemps, tous les compteurs seraient sinon « à jour » les
+        # uns par rapport aux autres alors qu'ils sont en réalité périmés.
         group    = 'A'
         lag_days = None
         if global_max and last_any:
-            lag_any      = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_any)).days
-            lag_complete = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_complete)).days if last_complete else 999
+            now = datetime.now()
+            lag_any      = (now - datetime.fromisoformat(last_any)).days
+            lag_complete = (now - datetime.fromisoformat(last_complete)).days if last_complete else 999
             if lag_any > 30:
                 group = 'C'
             elif lag_complete > 7:
@@ -87,8 +92,8 @@ def classify_det_quality(det_data):
         else:
             group = 'C'
 
-        if group == 'B' and last_complete and global_max:
-            lag_days = (datetime.fromisoformat(global_max) - datetime.fromisoformat(last_complete)).days
+        if group == 'B' and last_complete:
+            lag_days = (datetime.now() - datetime.fromisoformat(last_complete)).days
 
         quality[instance] = {
             'group':         group,
@@ -199,11 +204,16 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
         last_complete = max(complete_days) if complete_days else None
         last_any      = max(hours_per_day.keys()) if hours_per_day else None
 
+        # Le lag est calculé par rapport à la date du jour (et non au max du
+        # jeu de données) : si la source elle-même n'a pas été rafraîchie
+        # depuis longtemps, tous les compteurs seraient sinon « à jour » les
+        # uns par rapport aux autres alors qu'ils sont en réalité périmés.
         group    = 'A'
         lag_days = None
         if global_max_str and last_any:
-            lag_any      = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_any)).days
-            lag_complete = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_complete)).days if last_complete else 999
+            now = datetime.now()
+            lag_any      = (now - datetime.fromisoformat(last_any)).days
+            lag_complete = (now - datetime.fromisoformat(last_complete)).days if last_complete else 999
             if lag_any > 30:
                 group = 'C'   # Plus de données récentes → inactif / désaffecté
             elif lag_complete > 7:
@@ -211,8 +221,8 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
         else:
             group = 'C'
 
-        if group == 'B' and last_complete and global_max_str:
-            lag_days = (datetime.fromisoformat(global_max_str) - datetime.fromisoformat(last_complete)).days
+        if group == 'B' and last_complete:
+            lag_days = (datetime.now() - datetime.fromisoformat(last_complete)).days
 
         vf_quality[instance_id] = {
             'group':         group,
