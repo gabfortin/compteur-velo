@@ -661,13 +661,8 @@ print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} com
 html_parts = ['''<html>
 <head>
     <meta charset="utf-8">
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YGPDF0GH27"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-YGPDF0GH27');
-    </script>
+    <script data-goatcounter="https://gabfortin.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3444,7 +3439,7 @@ html_parts.append('''
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
     <div class="watermark">
-        <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a></p>
+        <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a></p>
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez l\'<a href="#" onclick="showView(\'methodo\');return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color=\'#1DB860\'" onmouseout="this.style.color=\'rgba(29,184,96,0.7)\'">onglet Méthodologie</a>.</p>
         <p style="font-size:0.7rem;color:#aaa;margin-top:4px;">Page mise à jour le ''' + datetime.now(timezone.utc).strftime('%Y-%m-%d à %H:%M') + ''' UTC</p>
