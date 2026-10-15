@@ -331,8 +331,12 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
 
 **Données injectées dans le JS :**
 
+Pour alléger le HTML (~7 Mo au lieu de ~18 Mo pour 12 mois), le détail horaire n'est conservé que pour les `HOURLY_DAYS` (90) derniers jours de chaque compteur, comptés depuis sa dernière donnée. Au-delà, seuls les totaux journaliers (`allDailyData`) sont intégrés, et le profil par heure (`hourProfile`) est précalculé pour les périodes de 6 et 12 mois afin que l'heure de pointe reste exacte.
+
 ```javascript
-// Données horaires par instance et direction
+const HOURLY_DAYS = 90;
+
+// Données horaires par instance et direction (HOURLY_DAYS derniers jours)
 allChartData['det-00709-01'] = {
     labels: ["2025-11-04 14:00", ...],
     datasets: [
@@ -345,6 +349,13 @@ allChartData['vf-100012217'] = {
     labels: ["2026-01-01 10:00", ...],
     datasets: [{ label: 'Passages', color: '#1DB860', data: [...] }]
 };
+
+// Totaux journaliers sur la fenêtre complète (12 mois) — une série par direction,
+// dans le même ordre que allChartData[...].datasets
+allDailyData['det-00709-01'] = { labels: ["2025-10-15", ...], data: [[310, ...], [295, ...]] };
+
+// Passages par heure de la journée (0–23), toutes directions, pour les périodes > HOURLY_DAYS
+hourProfile['det-00709-01'] = { "180": [12, 4, ...], "365": [20, 7, ...] };
 
 // Compteurs par arrondissement (pour le dropdown mobile)
 // Préfixe '[Boucle] ' pour les boucles magnétiques
@@ -383,7 +394,9 @@ Tout le JavaScript est inline dans le HTML généré.
 
 | Variable                    | Contenu                                                                              |
 |-----------------------------|--------------------------------------------------------------------------------------|
-| `allChartData`              | Données brutes des 12 derniers mois, par instance                                    |
+| `allChartData`              | Données horaires des `HOURLY_DAYS` (90) derniers jours, par instance                 |
+| `allDailyData`              | Totaux journaliers des 12 derniers mois, par instance et direction                   |
+| `hourProfile`               | Profil horaire précalculé (heure de pointe) pour les périodes de 180 et 365 jours    |
 | `chartData`                 | Données filtrées pour la période active, par instance                                |
 | `charts`                    | Instances Chart.js créées (cache)                                                    |
 | `markers`                   | Markers Leaflet, par instance                                                        |
@@ -407,15 +420,19 @@ Tout le JavaScript est inline dans le HTML généré.
 #### `buildFilteredData(instance, days)`
 Filtre les données horaires pour la période active en se basant sur `globalMaxDate` (pas la date du système). Garantit qu'un compteur avec un CSV en retard affiche quand même ses données récentes.
 
-- `days = 0` : filtre sur `specificDate` uniquement
-- `days > 0` : retourne les N derniers jours à partir de `globalMaxDate`
+- `days = 0` : filtre sur `specificDate` uniquement (le sélecteur de date est limité à la plage horaire disponible)
+- `0 < days ≤ HOURLY_DAYS` : retourne les N derniers jours à partir de `globalMaxDate`
+- `days > HOURLY_DAYS` : délègue à `buildDailyData` (données journalières seulement ; la vue timeline est masquée)
 
 Selon `displayMode` :
 - `'combined'` : somme de toutes les directions en un seul dataset vert (défaut)
 - `'separate'` : un dataset par direction (vert / bleu ciel)
 
 #### `buildDailyData(instance, days)`
-Agrège les données horaires en totaux journaliers pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
+Lit les totaux journaliers de `allDailyData` pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
+
+#### Écran de chargement
+Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement des données inline. Il est retiré à la fin du script principal, après l'initialisation de la carte, avec un repli sur l'événement `load` pour ne jamais bloquer la page en cas d'erreur JS.
 
 #### `createChart(id)`
 Crée le graphique Chart.js pour le compteur donné. Si `showBixi` est actif et que `bixiNearby[id]` contient des données pour la période affichée, un dataset BIXI est ajouté :
@@ -659,7 +676,7 @@ Le script charge `cyclistes.csv` et `compteurs.csv` (si présent) pour établir 
 
 - Toutes les instances de `cyclistes.csv` sont présentes dans le HTML
 - Aucune instance inconnue dans le HTML (les `vf-` de `compteurs.csv` sont acceptées)
-- Pour chaque instance `det-` : labels, volumes et nombre de directions correspondent exactement au CSV
+- Pour chaque instance `det-` : labels horaires (`HOURLY_DAYS` derniers jours), volumes, totaux journaliers (12 mois) et nombre de directions correspondent exactement au CSV
 - Tous les arrondissements de `cyclistes.csv` ont un `<optgroup>` correspondant (des groupes supplémentaires pour les boucles magnétiques sont acceptés)
 
 ---

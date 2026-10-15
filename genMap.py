@@ -16,8 +16,13 @@ try:
 except FileNotFoundError:
     _APP_VERSION = '?'
 
-# Fenêtre glissante de données détaillées (horaires) intégrées au HTML
+# Fenêtre glissante de données intégrées au HTML
 WINDOW_DAYS = 365
+# Au-delà de HOURLY_DAYS (comptés depuis la dernière donnée de chaque compteur),
+# seuls les totaux journaliers sont intégrés — allège le HTML de ~50 %.
+HOURLY_DAYS = 90
+# Périodes > HOURLY_DAYS pour lesquelles le profil horaire (heure de pointe) est précalculé
+PROFILE_PERIODS = (180, 365)
 
 # Compter le nombre total de lignes pour la barre de progression
 total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
@@ -1501,10 +1506,39 @@ html_parts = ['''<html>
             #global-bottom { grid-template-columns: 2fr 1fr; }
             .arr-name { width: 200px; }
         }
+        /* Écran de chargement — visible pendant le téléchargement des données inline */
+        #loading-screen {
+            position: fixed; inset: 0; z-index: 10000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: #f0faf4; color: #374151;
+            transition: opacity 0.35s ease;
+        }
+        #loading-screen.done { opacity: 0; pointer-events: none; }
+        .loading-wheel {
+            width: 52px; height: 52px; border-radius: 50%;
+            border: 5px solid rgba(29,184,96,0.18); border-top-color: #1DB860;
+            animation: loading-spin 0.9s linear infinite;
+        }
+        .loading-title { font-size: 18px; font-weight: 700; color: #111827; }
+        .loading-sub   { font-size: 13px; color: #6b7280; margin-top: -10px; }
+        @keyframes loading-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .loading-wheel { animation-duration: 2.5s; } }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
+    <div id="loading-screen" role="status" aria-live="polite">
+        <div class="loading-wheel"></div>
+        <div class="loading-title">Compteurs Vélo Montréal</div>
+        <div class="loading-sub">Chargement des données des 12 derniers mois…</div>
+    </div>
+    <script>
+        // Repli : ne jamais laisser l'écran de chargement bloquer la page (ex. erreur JS)
+        window.addEventListener("load", () => setTimeout(() => {
+            const ld = document.getElementById("loading-screen");
+            if (ld) ld.remove();
+        }, 500));
+    </script>
     <nav id="topbar">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
@@ -1720,7 +1754,9 @@ html_parts.append('''
         </div>
     </div>
     <script>
-        const allChartData = {};
+        const allChartData = {};   // horaire, HOURLY_DAYS derniers jours
+        const allDailyData = {};   // totaux journaliers, fenêtre complète
+        const hourProfile  = {};   // {période: [24 totaux par heure]} pour périodes > HOURLY_DAYS
         const markers = {};
         let map;
         const chartData = {};
@@ -1734,26 +1770,44 @@ DIRECTION_COLORS = ['#1DB860', '#29ABE2']
 DIRECTION_FILLS  = ['rgba(29,184,96,0.15)', 'rgba(41,171,226,0.15)']
 
 # Ajouter les données des graphiques et le mapping arrondissement → compteurs
+html_parts.append(f"const HOURLY_DAYS = {HOURLY_DAYS};\n")
 for instance, directions in data.items():
     if not first_row_for(instance):
         continue
-    all_dates = sorted(set(row['periode'][:16] for rows in directions.values() for row in rows))
-    datasets = []
+    all_hours = set(row['periode'][:16] for rows in directions.values() for row in rows)
+    if not all_hours:
+        continue
+    # Fenêtres ancrées sur la dernière donnée du compteur (comme le JS)
+    max_day = datetime.fromisoformat(max(all_hours)[:10])
+    hourly_from = (max_day - timedelta(days=HOURLY_DAYS - 1)).strftime('%Y-%m-%d')
+    hour_labels = sorted(h for h in all_hours if h[:10] >= hourly_from)
+    all_days    = sorted(set(h[:10] for h in all_hours))
+    datasets, daily_series = [], []
+    profile = {p: [0] * 24 for p in PROFILE_PERIODS}
+    profile_from = {p: (max_day - timedelta(days=p - 1)).strftime('%Y-%m-%d') for p in PROFILE_PERIODS}
     for i, direction in enumerate(sorted(directions.keys())):
         rows = directions[direction]
         if not rows:
             continue
-        date_vol = defaultdict(int)
+        hour_vol = defaultdict(int)
+        day_vol  = defaultdict(int)
         for row in rows:
-            date_vol[row['periode'][:16]] += int(row['volume'])
-        volumes = [date_vol.get(d) for d in all_dates]
+            v = int(row['volume'])
+            hour_vol[row['periode'][:16]] += v
+            day_vol[row['periode'][:10]]  += v
+            for p in PROFILE_PERIODS:
+                if row['periode'][:10] >= profile_from[p]:
+                    profile[p][int(row['periode'][11:13])] += v
         datasets.append({
             'label': 'Passages' if direction == 'N/A' else direction,
             'color': DIRECTION_COLORS[i % len(DIRECTION_COLORS)],
             'fill':  DIRECTION_FILLS[i % len(DIRECTION_FILLS)],
-            'data':  volumes
+            'data':  [hour_vol.get(h) for h in hour_labels]
         })
-    html_parts.append(f"allChartData['{instance}'] = {{ labels: {json.dumps(all_dates)}, datasets: {json.dumps(datasets)} }};\n")
+        daily_series.append([day_vol.get(d) for d in all_days])
+    html_parts.append(f"allChartData['{instance}'] = {{ labels: {json.dumps(hour_labels)}, datasets: {json.dumps(datasets)} }};\n")
+    html_parts.append(f"allDailyData['{instance}'] = {{ labels: {json.dumps(all_days)}, data: {json.dumps(daily_series)} }};\n")
+    html_parts.append(f"hourProfile['{instance}'] = {json.dumps({str(p): v for p, v in profile.items()})};\n")
 
 for arrondissement in sorted(by_arrondissement.keys()):
     counters = sorted(by_arrondissement[arrondissement],
@@ -1956,16 +2010,19 @@ html_parts.append('''
         let histMode    = null;
         let histSubMode = 'annual';
 
+        function dateStr(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
         function maxDateStr(instance) {
             const maxDate = getMaxDate(allChartData[instance].labels);
-            if (!maxDate) return null;
-            const yyyy = maxDate.getFullYear();
-            const mm = String(maxDate.getMonth() + 1).padStart(2, '0');
-            const dd = String(maxDate.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
+            return maxDate ? dateStr(maxDate) : null;
         }
 
         function buildFilteredData(instance, days) {
+            // Au-delà de HOURLY_DAYS, seules les données journalières existent
+            // (la vue timeline est alors désactivée).
+            if (days > HOURLY_DAYS) return buildDailyData(instance, days);
             const allLabels = allChartData[instance].labels;
             const allDatasets = allChartData[instance].datasets;
             // Ancrer la fenêtre sur la date max propre à ce compteur,
@@ -2048,12 +2105,13 @@ html_parts.append('''
         }
 
         function buildDailyData(instance, days) {
-            const allLabels = allChartData[instance].labels;
-            const allDatasets = allChartData[instance].datasets;
-            const instMax = getMaxDate(allLabels) || globalMaxDate;
+            const daily = allDailyData[instance];
+            const allLabels = daily.labels;
+            const allDatasets = allChartData[instance].datasets.map((ds, k) => ({ ...ds, data: daily.data[k] }));
+            const instMax = getMaxDate(allChartData[instance].labels) || globalMaxDate;
             if (!instMax) return { labels: [], datasets: [] };
-            const cutoff = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
-            const indices = allLabels.map((l, i) => parseLabel(l) >= cutoff ? i : -1).filter(i => i >= 0);
+            const cutoffStr = dateStr(new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1)));
+            const indices = allLabels.map((l, i) => l >= cutoffStr ? i : -1).filter(i => i >= 0);
             const daySet = {};
             indices.forEach(i => { daySet[allLabels[i].slice(0, 10)] = true; });
             let dayList = Object.keys(daySet).sort();
@@ -2197,10 +2255,20 @@ html_parts.append('''
             const uniqueDays = new Set(labels.map(l => l.slice(0, 10))).size;
             const avg = uniqueDays > 0 ? Math.round(total / uniqueDays) : 0;
             const hourTotals = {};
-            labels.forEach((label, i) => {
-                const h = label.slice(11, 13);
-                if (h) hourTotals[h] = (hourTotals[h] || 0) + combined[i];
-            });
+            if (currentPeriod > HOURLY_DAYS) {
+                // Données journalières seulement : profil horaire précalculé
+                [instance, combinedInstance].filter(Boolean).forEach(inst => {
+                    const prof = hourProfile[inst] && hourProfile[inst][currentPeriod];
+                    if (prof) prof.forEach((v, h) => {
+                        if (v) { const k = String(h).padStart(2, '0'); hourTotals[k] = (hourTotals[k] || 0) + v; }
+                    });
+                });
+            } else {
+                labels.forEach((label, i) => {
+                    const h = label.slice(11, 13);
+                    if (h) hourTotals[h] = (hourTotals[h] || 0) + combined[i];
+                });
+            }
             const peaks = Object.entries(hourTotals).sort((a, b) => b[1] - a[1]);
             const peak1 = peaks[0];
             const peak2 = peak1
@@ -2412,11 +2480,11 @@ html_parts.append('''
         }
 
         function updateViewToggle() {
-            const show = currentPeriod >= 7;
+            const show = currentPeriod >= 7 && currentPeriod <= HOURLY_DAYS;
             const isMobile = window.innerWidth < 768;
             document.getElementById('viewToggle').style.display = show && !isMobile ? 'flex' : 'none';
             document.getElementById('viewToggleMobile').style.display = show && isMobile ? 'block' : 'none';
-            if (!show && viewMode !== 'timeline') {
+            if (currentPeriod === 0 && viewMode !== 'timeline') {
                 viewMode = 'timeline';
                 document.getElementById('btnTimeline').classList.add('active');
                 document.getElementById('btnDaily').classList.remove('active');
@@ -2640,7 +2708,11 @@ html_parts.append('''
                 const instance = getSelectedCounter();
                 if (instance && allChartData[instance]) {
                     specificDate = maxDateStr(instance);
-                    document.getElementById('specificDatePicker').value = specificDate;
+                    const picker = document.getElementById('specificDatePicker');
+                    const labels = allChartData[instance].labels;
+                    if (labels.length) picker.min = labels[0].slice(0, 10);
+                    picker.max = specificDate;
+                    picker.value = specificDate;
                 }
                 wrapper.style.display = 'block';
             } else {
@@ -3282,6 +3354,14 @@ html_parts.append('''
             window.scrollTo({ top: 0, behavior: \'smooth\' });
         }
 
+        // Masquer l\'écran de chargement après l\'initialisation (carte incluse, setTimeout ci-dessus)
+        setTimeout(() => {
+            const ld = document.getElementById("loading-screen");
+            if (!ld) return;
+            ld.classList.add("done");
+            setTimeout(() => ld.remove(), 400);
+        }, 0);
+
     </script>
 
     <!-- ══ Page Méthodologie ═══════════════════════════════════════════════ -->
@@ -3380,6 +3460,7 @@ html_parts.append('''
       <div class="methodo-section">
         <h3>📅 Fenêtre temporelle</h3>
         <p>Seules les données des <strong>12 derniers mois glissants</strong> (365 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
+        <p>Le détail <strong>horaire</strong> (vue timeline, jour spécifique) couvre les <strong>90 derniers jours</strong> de chaque compteur ; au-delà, les vues 6 et 12 mois s\'appuient sur les totaux journaliers, et l\'heure de pointe est précalculée à partir des données horaires complètes.</p>
         <p>Pour les Éco-Compteurs, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des Détecteurs SUM.</p>
       </div>
 

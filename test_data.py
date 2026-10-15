@@ -39,6 +39,7 @@ def parse_periode(s):
     return datetime.fromisoformat(s)
 
 cutoff = datetime.now() - timedelta(days=365)
+HOURLY_DAYS = 90   # doit correspondre à genMap.py
 
 # csv_data[instance][direction] = [(label, volume), ...]
 csv_data = defaultdict(lambda: defaultdict(list))
@@ -67,14 +68,20 @@ for inst in csv_data:
 
 # Construire les données combinées par instance (union des timestamps, somme des directions)
 def combined_for_instance(inst):
-    """Retourne (labels_sorted, volumes_summed) toutes directions confondues."""
+    """Retourne (labels, volumes, jours, volumes_jour) toutes directions confondues.
+    L'horaire est limité aux HOURLY_DAYS derniers jours du compteur (comme genMap.py)."""
     totals = defaultdict(int)
+    day_totals = defaultdict(int)
     for rows in csv_data[inst].values():
         for label, vol in rows:
             totals[label] += vol
-    labels = sorted(totals.keys())
+            day_totals[label[:10]] += vol
+    max_day = datetime.fromisoformat(max(totals)[:10])
+    hourly_from = (max_day - timedelta(days=HOURLY_DAYS - 1)).strftime('%Y-%m-%d')
+    labels = sorted(l for l in totals if l[:10] >= hourly_from)
     volumes = [totals[l] for l in labels]
-    return labels, volumes
+    days = sorted(day_totals)
+    return labels, volumes, days, [day_totals[d] for d in days]
 
 print(f"  Instances trouvées : {len(csv_data)}")
 print(f"  Période couverte   : depuis {cutoff.strftime('%Y-%m-%d')}")
@@ -116,6 +123,17 @@ for inst, labels_json, datasets_json in matches:
 
 print(f"  Instances trouvées : {len(html_data)}")
 
+daily_pattern = r"allDailyData\['([^']+)'\]\s*=\s*\{\s*labels:\s*(\[.*?\]),\s*data:\s*(\[\[.*?\]\])\s*\};"
+html_daily = {}
+for inst, labels_json, data_json in re.findall(daily_pattern, html, re.DOTALL):
+    labels = json.loads(labels_json)
+    series = json.loads(data_json)
+    html_daily[inst] = {
+        'labels':   labels,
+        'combined': [sum(s[i] or 0 for s in series) for i in range(len(labels))],
+    }
+print(f"  Instances journalières : {len(html_daily)}")
+
 # ─── 3. Tests ────────────────────────────────────────────────────────────────
 
 print("\n=== Tests de couverture ===")
@@ -138,7 +156,17 @@ print("\n=== Tests de données par instance ===")
 label_re = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 
 for inst in sorted(csv_instances & html_instances):
-    csv_labels, csv_volumes = combined_for_instance(inst)
+    csv_labels, csv_volumes, csv_days, csv_day_volumes = combined_for_instance(inst)
+
+    daily = html_daily.get(inst)
+    check(f"[{inst}] Données journalières présentes", daily is not None)
+    if daily:
+        check(f"[{inst}] Jours identiques ({len(csv_days)} attendus)",
+              daily['labels'] == csv_days,
+              f"HTML={len(daily['labels'])}, CSV={len(csv_days)}")
+        check(f"[{inst}] Totaux journaliers identiques",
+              daily['combined'] == csv_day_volumes,
+              f"Premier écart : {next((f'{d} html={a} csv={b}' for d,a,b in zip(csv_days, daily['combined'], csv_day_volumes) if a!=b), 'N/A')}")
     html_labels  = html_data[inst]['labels']
     html_volumes = html_data[inst]['combined']
 
