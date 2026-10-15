@@ -1587,7 +1587,6 @@ html_parts.append('''
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
             <button class="period-btn" data-days="365">12 derniers mois</button>
-            <button class="period-btn" data-days="-1">Tout</button>
         </div>
         <div class="select-wrapper mobile-only" style="margin-top:14px;margin-bottom:14px;">
             <select id="periodSelectMobile">
@@ -1597,7 +1596,6 @@ html_parts.append('''
                 <option value="90">3 derniers mois</option>
                 <option value="180">6 derniers mois</option>
                 <option value="365">12 derniers mois</option>
-                <option value="-1">Tout</option>
             </select>
         </div>
         <div id="datepickerWrapper"><input type="date" id="specificDatePicker"></div>
@@ -1979,8 +1977,6 @@ html_parts.append('''
             if (days === 0) {
                 if (!specificDate) return { labels: [], datasets: [] };
                 indices = allLabels.map((l, i) => l.startsWith(specificDate) ? i : -1).filter(i => i >= 0);
-            } else if (days === -1) {
-                indices = allLabels.map((_, i) => i);
             } else {
                 if (!instMax) return { labels: [], datasets: [] };
                 const cutoffDate = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
@@ -2055,14 +2051,9 @@ html_parts.append('''
             const allLabels = allChartData[instance].labels;
             const allDatasets = allChartData[instance].datasets;
             const instMax = getMaxDate(allLabels) || globalMaxDate;
-            let indices;
-            if (days === -1) {
-                indices = allLabels.map((_, i) => i);
-            } else {
-                if (!instMax) return { labels: [], datasets: [] };
-                const cutoff = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
-                indices = allLabels.map((l, i) => parseLabel(l) >= cutoff ? i : -1).filter(i => i >= 0);
-            }
+            if (!instMax) return { labels: [], datasets: [] };
+            const cutoff = new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1));
+            const indices = allLabels.map((l, i) => parseLabel(l) >= cutoff ? i : -1).filter(i => i >= 0);
             const daySet = {};
             indices.forEach(i => { daySet[allLabels[i].slice(0, 10)] = true; });
             let dayList = Object.keys(daySet).sort();
@@ -2421,7 +2412,7 @@ html_parts.append('''
         }
 
         function updateViewToggle() {
-            const show = currentPeriod >= 7 || currentPeriod === -1;
+            const show = currentPeriod >= 7;
             const isMobile = window.innerWidth < 768;
             document.getElementById('viewToggle').style.display = show && !isMobile ? 'flex' : 'none';
             document.getElementById('viewToggleMobile').style.display = show && isMobile ? 'block' : 'none';
@@ -2656,7 +2647,7 @@ html_parts.append('''
                 wrapper.style.display = 'none';
             }
             updateViewToggle();
-            if (days >= 30 || days === -1) {
+            if (days >= 30) {
                 viewMode = 'daily';
                 document.getElementById('btnDaily').classList.add('active');
                 document.getElementById('btnTimeline').classList.remove('active');

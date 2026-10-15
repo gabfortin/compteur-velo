@@ -48,7 +48,7 @@ bixi.csv        ─┤
 hist_cache.json ─┘
 ```
 
-`genMap.py` lit les CSV de l'année courante et le cache historique, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
+`genMap.py` lit les CSV des années courante et précédente (fenêtre glissante de 12 mois) et le cache historique, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
 
 Pour régénérer le site manuellement après une mise à jour du CSV :
 
@@ -136,7 +136,7 @@ git push
 
 ### `cyclistes.csv` — Détecteurs SUM (comptage permanent)
 
-Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/velos-comptage), sous le titre **« Vélos - comptage permanent »**. Depuis 2026, ces données sont publiées sur la même page que les Éco-Compteurs. Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
+Fichier CSV construit à partir du [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/fr/dataset/cyclistes), où les données sont publiées par année sous les titres **« Velos - Comptage AAAA - Ville »** (`cyclistes_AAAA.csv`). `fetch_data.sh` télécharge les fichiers de l'année courante et de l'année précédente et les fusionne dans `cyclistes.csv`. L'ancien fichier unique `cyclistes.csv` du portail n'est plus mis à jour depuis août 2026 ; il ne sert qu'en repli. Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
 
 Colonnes :
 
@@ -151,7 +151,7 @@ Colonnes :
 | `rue_2`          | Rue secondaire / intersection                                                         |
 | `numeroVoie`     | Numéro de voie du compteur                                                            |
 | `direction`      | Direction comptée (Nord, Sud, Est, Ouest)                                             |
-| `periode`        | Horodatage ISO avec fuseau horaire (ex. `2025-11-04 14:00:00-05`)                    |
+| `periode`        | Horodatage ISO (ex. `2026-04-02 14:00` ; `2025-01-01 14:00:00` dans le fichier 2025) |
 | `volume`         | Nombre de passages sur la période                                                     |
 | `vitesseMoyenne` | Vitesse moyenne des cyclistes (km/h)                                                  |
 
@@ -159,7 +159,7 @@ Seules les lignes `agg_code = "h"` (données horaires) sont utilisées par `genM
 
 ### `compteurs.csv` — Boucles magnétiques
 
-Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/dataset/velos-comptage). Contient les passages en intervalles de 15 minutes des boucles magnétiques encastrées dans la chaussée.
+Fichier CSV téléchargé depuis le [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/fr/dataset/cyclistes) (titres **« Velos - Comptage AAAA - Eco-Compteur »**). Contient les passages en intervalles de 15 minutes des boucles magnétiques encastrées dans la chaussée.
 
 Colonnes :
 
@@ -172,7 +172,7 @@ Colonnes :
 | `longitude`    | Longitude GPS                                         |
 | `latitude`     | Latitude GPS                                          |
 
-Ces données sont publiées pour l'année courante. L'URL de téléchargement suit le schéma `comptage_velo_{année}.csv` (hors fichier `permanent`) — `update.sh` scrape automatiquement l'URL correcte pour l'année en cours, en excluant le fichier de comptage permanent.
+Ces données sont publiées par année selon le schéma `comptage_velo_{année}.csv`. `fetch_data.sh` télécharge les fichiers de l'année courante et de l'année précédente et les fusionne dans `compteurs.csv`. Les lignes sans `nb_passages` (présentes dans le fichier 2025) sont ignorées par `genMap.py`.
 
 **Différences avec `cyclistes.csv` :**
 - Granularité 15 min (agrégée en horaire par `genMap.py`) vs horaire natif
@@ -208,16 +208,18 @@ data[row['instance']][row['direction']].append(row)
 
 Certains compteurs ont deux directions (ex. Est + Ouest). Les regrouper séparément évite les timestamps dupliqués et les volumes gonflés.
 
-Les données sont ensuite filtrées pour ne garder que les 180 derniers jours :
+Les données sont ensuite filtrées pour ne garder que les `WINDOW_DAYS` (365) derniers jours :
 
 ```python
-def is_within_last_6_months(date_str):
+WINDOW_DAYS = 365
+
+def is_within_window(date_str):
     clean = re.sub(r'[+-]\d{2}$', '', date_str.strip('"').strip())
     row_date = datetime.fromisoformat(clean)
-    return row_date >= datetime.now() - timedelta(days=180)
+    return row_date >= datetime.now() - timedelta(days=WINDOW_DAYS)
 ```
 
-> **Note** : le fuseau horaire (`-05` / `-04`) est retiré avec une regex ciblant la fin de la chaîne. Un simple `.replace('-05', '')` corromprait les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
+> **Note** : le fuseau horaire éventuel (`-05` / `-04`, présent dans l'ancien `cyclistes.csv`) est retiré avec une regex ciblant la fin de la chaîne. Un simple `.replace('-05', '')` corromprait les dates contenant ces chiffres dans le jour (ex. `2025-10-05`).
 
 ### Étape 2 — Intégration de `compteurs.csv` (boucles magnétiques)
 
@@ -247,11 +249,11 @@ Après la fusion, tout le pipeline (détection de lacunes, détection d'anomalie
 
 ### Étape 3 — Données météo
 
-`fetch_weather_data()` interroge [Open-Meteo](https://open-meteo.com/) (gratuit, sans clé API) en deux passes pour couvrir les 6 derniers mois sans discontinuité :
+`fetch_weather_data()` interroge [Open-Meteo](https://open-meteo.com/) (gratuit, sans clé API) en deux passes pour couvrir les 12 derniers mois sans discontinuité :
 
 | Source | URL | Couverture |
 |--------|-----|------------|
-| API archive (ERA5) | `archive-api.open-meteo.com/v1/archive` | J-182 à J-0 (lag ~5 jours) |
+| API archive (ERA5) | `archive-api.open-meteo.com/v1/archive` | J-367 à J-0 (lag ~5 jours) |
 | API forecast | `api.open-meteo.com/v1/forecast` | `past_days=10` (comble le lag de l'archive) |
 
 Les deux résultats sont fusionnés, les données forecast prenant priorité pour les dates récentes.
@@ -306,7 +308,7 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
     <nav #topbar>        ← Barre de navigation : liens Pistes / Compteurs + lien profil gabfortin.com
     .site-header         ← Logo, titre, sous-titre (liens vers données ouvertes Ville + BIXI)
     .container
-      .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / Tout)
+      .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / 365j)
       .select-wrapper.desktop-only
         <select>         ← Dropdown unique groupé par arrondissement (desktop)
                             Détecteurs sur fût en premier, boucles magnétiques en second dans chaque groupe
@@ -367,7 +369,7 @@ const bixiNearby = { "det-00709-01": { "2026-01-23": 59, ... } };
 // Jours où BIXI > compteur
 const bixiExceedsDays = { "det-00709-01": { "2026-01-23": { counter: 0, bixi: 59 } } };
 
-// Météo quotidienne de Montréal (Open-Meteo, 6 derniers mois)
+// Météo quotidienne de Montréal (Open-Meteo, 12 derniers mois)
 const weatherData = { "2026-05-21": { tmax: 15.1, tmin: 7.2, precip: 0, snow: 0, icon: "🌤️" } };
 ```
 
@@ -381,14 +383,14 @@ Tout le JavaScript est inline dans le HTML généré.
 
 | Variable                    | Contenu                                                                              |
 |-----------------------------|--------------------------------------------------------------------------------------|
-| `allChartData`              | Données brutes des 6 derniers mois, par instance                                     |
+| `allChartData`              | Données brutes des 12 derniers mois, par instance                                    |
 | `chartData`                 | Données filtrées pour la période active, par instance                                |
 | `charts`                    | Instances Chart.js créées (cache)                                                    |
 | `markers`                   | Markers Leaflet, par instance                                                        |
 | `countersByArrondissement`  | Liste de compteurs par arrondissement (pour dropdown mobile)                         |
 | `counterLocations`          | Coordonnées GPS, métadonnées et type (`'fut'` / `'boucle'`) par instance             |
 | `globalMaxDate`             | Date la plus récente parmi tous les compteurs — référence commune pour filtrer       |
-| `currentPeriod`             | Nombre de jours de la période active (`-1` = tout, défaut : `7`)                    |
+| `currentPeriod`             | Nombre de jours de la période active (`0` = jour spécifique, défaut : `7`)          |
 | `displayMode`               | `'combined'` (défaut) ou `'separate'` (toggle bi-directionnel)                      |
 | `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)                    |
 | `showBixi`                  | `false` — overlay BIXI désactivé par défaut                                         |
@@ -406,7 +408,6 @@ Tout le JavaScript est inline dans le HTML généré.
 Filtre les données horaires pour la période active en se basant sur `globalMaxDate` (pas la date du système). Garantit qu'un compteur avec un CSV en retard affiche quand même ses données récentes.
 
 - `days = 0` : filtre sur `specificDate` uniquement
-- `days = -1` : retourne toutes les données sans filtre
 - `days > 0` : retourne les N derniers jours à partir de `globalMaxDate`
 
 Selon `displayMode` :
@@ -529,7 +530,7 @@ Certains compteurs présentent des interruptions prolongées dans leurs données
 
 ### Détection — `has_significant_gaps()`
 
-Exécutée en Python dans `genMap.py` après le filtrage des 6 derniers mois. Un compteur est flaggé si **l'une ou l'autre** condition est vraie dans sa plage active (première à dernière donnée) :
+Exécutée en Python dans `genMap.py` après le filtrage des 12 derniers mois. Un compteur est flaggé si **l'une ou l'autre** condition est vraie dans sa plage active (première à dernière donnée) :
 
 | Critère | Seuil |
 |---------|-------|
@@ -552,7 +553,7 @@ En plus des lacunes, `genMap.py` détecte les jours dont le volume de passages e
 
 ### Détection — `detect_anomalies()`
 
-Exécutée après le filtrage des 6 derniers mois. Pour chaque instance, les totaux journaliers sont calculés en agrégeant toutes les directions et toutes les heures. Seuls les jours avec **≥ 18 heures de données** sont inclus.
+Exécutée après le filtrage des 12 derniers mois. Pour chaque instance, les totaux journaliers sont calculés en agrégeant toutes les directions et toutes les heures. Seuls les jours avec **≥ 18 heures de données** sont inclus.
 
 Un jour est signalé comme anomalie si l'**une ou l'autre** des deux méthodes suivantes est déclenchée :
 
@@ -734,7 +735,7 @@ Une alternative à GitHub Actions, utile pour auto-héberger l'automatisation su
 
 > **Note** : `hist_cache.json` est lu mais jamais modifié par `update.sh`. Le dossier `historique/` n'est pas présent sur le serveur de production — `genMap.py` détecte l'absence du dossier et utilise uniquement le cache.
 
-`cyclistes.csv` et `compteurs.csv` sont tous les deux scrappés sur `https://donnees.montreal.ca/dataset/velos-comptage`. Le script distingue les deux fichiers : `cyclistes.csv` cherche un lien contenant `permanent` et l'année ; `compteurs.csv` cherche `comptage_velo_{année}` en excluant les liens contenant `permanent`.
+Les URLs de `cyclistes.csv` et `compteurs.csv` sont résolues via l'API CKAN du portail (`package_show` sur l'UUID du dataset [cyclistes](https://donnees.montreal.ca/fr/dataset/cyclistes)). Le script cherche `cyclistes_{année}.csv` (repli : `cyclistes.csv`) et `comptage_velo_{année}.csv`, ainsi que les fichiers de l'année précédente, puis fusionne chaque paire (fenêtre de 12 mois).
 
 `velo_meta_cache.json` est commité dans le dépôt pour que le cache Nominatim persiste entre les runs Docker. Si de nouveaux capteurs apparaissent dans `compteurs.csv` (nouveaux IDs non présents dans le cache), `genMap.py` les géocode lors de la génération et le cache mis à jour est commité dans le même commit que `index.html`.
 
