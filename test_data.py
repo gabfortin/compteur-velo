@@ -29,7 +29,7 @@ def check(name, condition, detail=""):
     else:
         fail(name, detail)
 
-# ─── 1. Charger le CSV (données horaires uniquement, 6 derniers mois) ────────
+# ─── 1. Charger le CSV (données horaires uniquement, 12 derniers mois) ───────
 
 print("\n=== Chargement du CSV ===")
 
@@ -38,7 +38,7 @@ def parse_periode(s):
     s = re.sub(r'[+-]\d{2}$', '', s).strip()
     return datetime.fromisoformat(s)
 
-cutoff = datetime.now() - timedelta(days=180)
+cutoff = datetime.now() - timedelta(days=365)
 
 # csv_data[instance][direction] = [(label, volume), ...]
 csv_data = defaultdict(lambda: defaultdict(list))
@@ -163,7 +163,7 @@ for inst in sorted(csv_instances & html_instances):
           f"Labels malformés : {bad_labels[:3]}")
 
     old = [l for l in html_labels if datetime.fromisoformat(l) < cutoff]
-    check(f"[{inst}] Aucune donnée hors période 6 mois",
+    check(f"[{inst}] Aucune donnée hors période 12 mois",
           len(old) == 0,
           f"{len(old)} entrées trop anciennes, ex: {old[:2]}")
 

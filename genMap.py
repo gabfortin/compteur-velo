@@ -16,6 +16,9 @@ try:
 except FileNotFoundError:
     _APP_VERSION = '?'
 
+# Fenêtre glissante de données détaillées (horaires) intégrées au HTML
+WINDOW_DAYS = 365
+
 # Compter le nombre total de lignes pour la barre de progression
 total_lines = sum(1 for line in open('cyclistes.csv', encoding='utf-8')) - 1  # Soustraire la ligne d'en-tête
 
@@ -27,19 +30,19 @@ with open('cyclistes.csv', 'r', encoding='utf-8') as f:
         if row['agg_code'] == 'h':
             data[row['instance']][row['direction']].append(row)
 
-# Filtrer les données pour garder les 6 derniers mois
-def is_within_last_6_months(date_str):
+# Filtrer les données pour garder les 12 derniers mois
+def is_within_window(date_str):
     try:
         clean = re.sub(r'[+-]\d{2}$', '', date_str.strip('"').strip())
         row_date = datetime.fromisoformat(clean)
-        cutoff_date = datetime.now() - timedelta(days=180)
+        cutoff_date = datetime.now() - timedelta(days=WINDOW_DAYS)
         return row_date >= cutoff_date
     except:
         return False
 
 for instance in data.keys():
     for direction in data[instance].keys():
-        data[instance][direction] = [row for row in data[instance][direction] if is_within_last_6_months(row['periode'])]
+        data[instance][direction] = [row for row in data[instance][direction] if is_within_window(row['periode'])]
 
 # ── Classifier les compteurs sur fût (det-) ───────────────────────────────────
 def classify_det_quality(det_data):
@@ -147,6 +150,8 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
     with open(filepath, encoding='utf-8') as f:
         for row in tqdm(csv.DictReader(f), desc="velo-full (agrégation 15 min → h)"):
             cid = row['id_compteur']
+            if not row['nb_passages'].strip():
+                continue                                    # valeur manquante (fréquent en 2025)
             hh = row['heure'][:2]                           # 'HH' de 'HH:MM:SS'
             hour_key = f"{row['date']} {hh}:00:00"
             hourly[cid][hour_key] += int(row['nb_passages'])
@@ -173,8 +178,8 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
         if cid in localisation_noms:
             meta_cache[cid]['rue_1'] = localisation_noms[cid]
 
-    # Construire la structure compatible avec data{} (last 6 months, même filtre)
-    cutoff = datetime.now() - timedelta(days=180)
+    # Construire la structure compatible avec data{} (fenêtre WINDOW_DAYS, même filtre)
+    cutoff = datetime.now() - timedelta(days=WINDOW_DAYS)
     result = {}
 
     # Date max globale dans le fichier (toutes sources confondues) pour classifier les groupes
@@ -308,7 +313,7 @@ def is_bad_weather(w):
 def fetch_weather_data():
     """Météo quotidienne de Montréal via Open-Meteo (archive + forecast récent)."""
     LAT, LNG = 45.5017, -73.5673
-    start = (datetime.now() - timedelta(days=182)).strftime('%Y-%m-%d')
+    start = (datetime.now() - timedelta(days=WINDOW_DAYS + 2)).strftime('%Y-%m-%d')
     today = datetime.now().strftime('%Y-%m-%d')
     result = {}
     sources = [
@@ -1581,6 +1586,7 @@ html_parts.append('''
             <button class="period-btn" data-days="30">Dernier mois</button>
             <button class="period-btn" data-days="90">3 derniers mois</button>
             <button class="period-btn" data-days="180">6 derniers mois</button>
+            <button class="period-btn" data-days="365">12 derniers mois</button>
             <button class="period-btn" data-days="-1">Tout</button>
         </div>
         <div class="select-wrapper mobile-only" style="margin-top:14px;margin-bottom:14px;">
@@ -1590,6 +1596,7 @@ html_parts.append('''
                 <option value="30">Dernier mois</option>
                 <option value="90">3 derniers mois</option>
                 <option value="180">6 derniers mois</option>
+                <option value="365">12 derniers mois</option>
                 <option value="-1">Tout</option>
             </select>
         </div>
@@ -3381,7 +3388,7 @@ html_parts.append('''
       <!-- Fenêtre temporelle -->
       <div class="methodo-section">
         <h3>📅 Fenêtre temporelle</h3>
-        <p>Seules les données des <strong>6 derniers mois glissants</strong> (180 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
+        <p>Seules les données des <strong>12 derniers mois glissants</strong> (365 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
         <p>Pour les Éco-Compteurs, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des Détecteurs SUM.</p>
       </div>
 
@@ -3399,7 +3406,7 @@ html_parts.append('''
       <!-- Données historiques -->
       <div class="methodo-section">
         <h3>📈 Données historiques (2009–présent)</h3>
-        <p>En complément des 6 derniers mois glissants, le site intègre des données agrégées depuis <strong>2009</strong> pour deux fonctionnalités :</p>
+        <p>En complément des 12 derniers mois glissants, le site intègre des données agrégées depuis <strong>2009</strong> pour deux fonctionnalités :</p>
         <ul>
           <li><strong>Vue Globale — évolution annuelle :</strong> diagramme à barres du total de passages pour tous les compteurs confondus, de 2009 à l\'année courante (partielle). L\'année en cours apparaît avec une barre plus claire pour signaler qu\'elle est incomplète.</li>
           <li><strong>Vue Compteur — Comparer &amp; Historique :</strong> deux boutons apparaissent sous le graphique principal pour les compteurs disposant de données antérieures à l\'année courante. Ces boutons sont masqués pour les détecteurs récents sans historique.</li>

@@ -13,17 +13,17 @@ CSV_CHANGED=false
 BIXI_CHANGED=false
 COMPTEURS_CHANGED=false
 
-# ── Récupérer les URLs via l'API CKAN (dataset velos-comptage) ────────────────
+# ── Récupérer les URLs via l'API CKAN (dataset cyclistes) ────────────────────
 # Les deux fichiers (SUM + Éco-Compteur) sont dans le même dataset depuis 2026.
 # L'API retourne du JSON structuré — plus fiable que le scraping HTML.
-echo "$LOG Interrogation de l'API CKAN pour le dataset velos-comptage..."
+echo "$LOG Interrogation de l'API CKAN pour le dataset cyclistes..."
 CKAN_URLS=$(python3 - <<'EOF'
 import urllib.request, json, re, sys
 from datetime import datetime
 
 year = datetime.now().year
 try:
-    # Le slug "velos-comptage" nécessite une auth ; l'UUID est public.
+    # UUID du dataset (slug actuel : "cyclistes").
     req = urllib.request.Request(
         "https://donnees.montreal.ca/api/3/action/package_show?id=142ff2e9-7d0a-47d6-b4f6-dfeb97041daf",
         headers={"User-Agent": "Mozilla/5.0"}
@@ -33,41 +33,71 @@ try:
         raise Exception("Réponse API invalide")
     resources = data['result']['resources']
 
-    csv_url = ""
-    compteurs_url = ""
-    for r in resources:
-        url = r.get('url', '')
-        if not csv_url and url.lower().endswith('cyclistes.csv'):
-            csv_url = url
-        if not compteurs_url and re.search(r'comptage_velo_%d.*\.csv$' % year, url, re.IGNORECASE):
-            compteurs_url = url
+    # Depuis oct. 2026, les détecteurs SUM sont publiés par année
+    # (« Velos - Comptage AAAA - Ville » → cyclistes_AAAA.csv). L'ancien
+    # cyclistes.csv n'est plus mis à jour ; on ne l'utilise qu'en repli.
+    def find(pattern):
+        for r in resources:
+            url = r.get('url', '')
+            if re.search(pattern, url, re.IGNORECASE):
+                return url
+        return ""
+
+    csv_url = find(r'/cyclistes_%d\.csv$' % year)
+    if not csv_url:
+        sys.stderr.write("cyclistes_%d.csv introuvable — repli sur cyclistes.csv.\n" % year)
+        csv_url = find(r'/cyclistes\.csv$')
+    compteurs_url = find(r'comptage_velo_%d.*\.csv$' % year)
+    # La fenêtre de 12 mois de genMap.py déborde toujours sur l'année
+    # précédente : on récupère aussi ces fichiers.
+    csv_prev_url       = find(r'/cyclistes_%d\.csv$' % (year - 1))
+    compteurs_prev_url = find(r'comptage_velo_%d.*\.csv$' % (year - 1))
 
     if not csv_url:
-        sys.stderr.write("cyclistes.csv introuvable dans le dataset.\n")
+        sys.stderr.write("CSV cyclistes introuvable dans le dataset.\n")
     if not compteurs_url:
         sys.stderr.write("comptage_velo_%d.csv introuvable dans le dataset.\n" % year)
 
     print(csv_url)
     print(compteurs_url)
+    print(csv_prev_url)
+    print(compteurs_prev_url)
 except Exception as e:
     sys.stderr.write("Erreur API CKAN : %s\n" % e)
-    print("")
-    print("")
+    print("\n\n\n")
 EOF
 )
 
 CSV_URL=$(echo "$CKAN_URLS"     | sed -n '1p')
 COMPTEURS_URL=$(echo "$CKAN_URLS" | sed -n '2p')
+CSV_PREV_URL=$(echo "$CKAN_URLS"  | sed -n '3p')
+COMPTEURS_PREV_URL=$(echo "$CKAN_URLS" | sed -n '4p')
+
+# Télécharge $2 (année courante) dans $1, précédé de $3 (année précédente,
+# optionnel, en-tête retiré du second fichier) — même schéma de colonnes.
+fetch_merged() {
+    local out="$1" cur_url="$2" prev_url="$3"
+    local ua="User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    local ref="Referer: https://donnees.montreal.ca/dataset/cyclistes"
+    curl -fsSL -H "$ua" -H "$ref" "$cur_url" -o "$out.cur"
+    if [ -n "$prev_url" ]; then
+        echo "$LOG URL année précédente : $prev_url"
+        curl -fsSL -H "$ua" -H "$ref" "$prev_url" -o "$out.prev"
+        { cat "$out.prev"; tail -n +2 "$out.cur"; } > "$out"
+        rm -f "$out.prev" "$out.cur"
+    else
+        echo "$LOG Fichier de l'année précédente introuvable — année courante seulement."
+        mv "$out.cur" "$out"
+    fi
+}
 
 # ── Télécharger le CSV Détecteurs SUM (cyclistes.csv) ─────────────────────────
+# Années courante + précédente fusionnées dans cyclistes.csv.
 if [ -n "$CSV_URL" ]; then
-    echo "$LOG URL cyclistes.csv : $CSV_URL"
+    echo "$LOG URL cyclistes (année courante) : $CSV_URL"
     OLD_HASH=""
     [ -f cyclistes.csv ] && OLD_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
-    curl -fsSL \
-      -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-      -H "Referer: https://donnees.montreal.ca/dataset/velos-comptage" \
-      "$CSV_URL" -o cyclistes.csv
+    fetch_merged cyclistes.csv "$CSV_URL" "$CSV_PREV_URL"
     echo "$LOG CSV téléchargé ($(du -sh cyclistes.csv | cut -f1))"
     NEW_HASH=$(md5sum cyclistes.csv | cut -d' ' -f1)
     if [ "$OLD_HASH" != "$NEW_HASH" ]; then
@@ -161,10 +191,7 @@ if [ -n "$COMPTEURS_URL" ]; then
     echo "$LOG URL trouvée : $COMPTEURS_URL"
     OLD_HASH_C=""
     [ -f compteurs.csv ] && OLD_HASH_C=$(md5sum compteurs.csv | cut -d' ' -f1)
-    curl -fsSL \
-      -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-      -H "Referer: https://donnees.montreal.ca/dataset/velos-comptage" \
-      "$COMPTEURS_URL" -o compteurs.csv
+    fetch_merged compteurs.csv "$COMPTEURS_URL" "$COMPTEURS_PREV_URL"
     echo "$LOG Fichier téléchargé ($(du -sh compteurs.csv | cut -f1))"
     NEW_HASH_C=$(md5sum compteurs.csv | cut -d' ' -f1)
     if [ "$OLD_HASH_C" != "$NEW_HASH_C" ]; then
