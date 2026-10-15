@@ -668,7 +668,7 @@ hist_yearly_counters[_cur_year] = len(_cur_year_instances)
 print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} compteurs.")
 
 # Générer le HTML
-html_parts = ['''<html>
+html_parts = ['''<html lang="fr">
 <head>
     <meta charset="utf-8">
     <script data-goatcounter="https://gabfortin.goatcounter.com/count"
@@ -678,6 +678,32 @@ html_parts = ['''<html>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
+    <link rel="apple-touch-icon" href="favico.png">
+    <meta name="description" content="Passages de cyclistes à Montréal, compteur par compteur : graphiques horaires et journaliers, carte et historique depuis 2009, à partir des données ouvertes de la Ville. Mis à jour chaque jour.">
+    <meta name="author" content="Gabriel Fortin">
+    <meta name="theme-color" content="#1DB860">
+    <link rel="canonical" href="https://velo.gabfortin.com/">
+    <!-- Aperçu lors du partage (Open Graph / Twitter) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Compteurs Vélo Montréal">
+    <meta property="og:locale" content="fr_CA">
+    <meta property="og:url" content="https://velo.gabfortin.com/">
+    <meta property="og:title" content="Compteurs Vélo Montréal">
+    <meta property="og:description" content="Passages de cyclistes, compteur par compteur, mis à jour chaque jour à partir des données ouvertes de Montréal.">
+    <meta property="og:image" content="https://velo.gabfortin.com/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Compteurs Vélo Montréal — passages de cyclistes, compteur par compteur">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Compteurs Vélo Montréal">
+    <meta name="twitter:description" content="Passages de cyclistes, compteur par compteur, mis à jour chaque jour à partir des données ouvertes de Montréal.">
+    <meta name="twitter:image" content="https://velo.gabfortin.com/og-image.png">
+    <script type="application/ld+json">
+    {"@context": "https://schema.org", "@type": "WebSite", "name": "Compteurs Vélo Montréal",
+     "url": "https://velo.gabfortin.com/", "inLanguage": "fr-CA",
+     "description": "Passages de cyclistes à Montréal, compteur par compteur, à partir des données ouvertes de la Ville.",
+     "author": {"@type": "Person", "name": "Gabriel Fortin", "url": "https://gabfortin.com"}}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">

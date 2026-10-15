@@ -23,6 +23,7 @@ compteur-velo/
 ├── genMap.py                # Script de génération du site HTML
 ├── index.html               # Site généré (ne pas modifier manuellement)
 ├── favico.png               # Icône de l'application
+├── og-image.png             # Image d’aperçu lors du partage (Open Graph, 1200×630)
 ├── test_data.py             # Suite de tests de validation des données
 ├── .github/workflows/
 │   └── update.yml           # Automatisation principale — cron GitHub Actions quotidien
