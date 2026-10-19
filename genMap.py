@@ -1597,12 +1597,53 @@ html_parts = ['''<html lang="fr">
         .net-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
         .net-val { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
         .net-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+        /* ── Vélo d\'hiver — thème glace ── */
+        #hiver-page {
+            max-width: 1200px; margin: 0 auto; padding: 0 12px 40px; position: relative;
+            --accent: #0EA5D8;
+            --accent-strong: #0A7FAE;
+            --accent-soft: rgba(14,165,216,0.12);
+            --accent-ring: rgba(14,165,216,0.22);
+            --glass: rgba(233,248,253,0.55);
+            --glass-strong: rgba(233,248,253,0.75);
+            --glass-soft: rgba(233,248,253,0.34);
+            --glass-border: rgba(255,255,255,0.8);
+        }
+        #hiver-page::before {
+            content: \'\';
+            position: fixed;
+            inset: -10vmax;
+            z-index: -2;
+            background:
+                radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.35), transparent 62%),
+                radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.28), transparent 62%),
+                radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.20), transparent 62%),
+                radial-gradient(36vmax 36vmax at 8% 92%,  rgba(165,243,252,0.32), transparent 62%),
+                linear-gradient(160deg, #eef9fd 0%, #e4f3fb 50%, #eaf2fb 100%);
+            animation: meshDrift 28s ease-in-out infinite alternate;
+        }
+        #hiver-page h1 {
+            background: linear-gradient(120deg, #0f1f17 30%, #0A7FAE 100%);
+            -webkit-background-clip: text;
+                    background-clip: text;
+        }
+        #nav-hiver.active { color: #0A7FAE; }
+        #hiver-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+        .hiver-chart-row { display: flex; flex-direction: column; gap: 20px; }
+        .hiver-chart-col { flex: 1; min-width: 0; }
+        .hiver-chart-col > div:first-child { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: center; }
+        .hiver-chart-canvas { position: relative; height: 220px; }
+        .net-grid-4 { grid-template-columns: repeat(2, 1fr); }
         @media (min-width: 768px) {
             #global-page { padding: 0 20px 40px; }
             #global-cards { grid-template-columns: repeat(3, 1fr); }
             .global-card-total { font-size: 42px; }
             #global-bottom { grid-template-columns: 2fr 1fr; }
             .arr-name { width: 200px; }
+            #hiver-page { padding: 0 20px 40px; }
+            #hiver-cards { grid-template-columns: repeat(4, 1fr); }
+            .hiver-chart-row { flex-direction: row; }
+            .net-grid-4 { grid-template-columns: repeat(4, 1fr); }
         }
         /* Écran de chargement — visible pendant le téléchargement des données inline */
         #loading-screen {
@@ -1653,6 +1694,7 @@ html_parts = ['''<html lang="fr">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
             <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
+            <button class="nav-link" id="nav-hiver" onclick="showView(\'hiver\')"><span class="nav-label-full">Vélo d\'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
         <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
@@ -3229,6 +3271,344 @@ html_parts.append('''
             }
         }
 
+        // ── Vélo d\'hiver ──────────────────────────────────────────────────────
+        const WINTER_MONTHS_SET = new Set([11, 12, 1, 2, 3]);
+        const DOW_LABELS_FR = [\'Lundi\', \'Mardi\', \'Mercredi\', \'Jeudi\', \'Vendredi\', \'Samedi\', \'Dimanche\'];
+        const HIVER_CAT_COLORS = { doux: \'#38BDF8\', pluie: \'#2563EB\', froid: \'#8B5CF6\', neige: \'#06B6D4\' };
+        let _hiverGlobalDaily = null;
+
+        function isWinterDate(dateStr) {
+            return WINTER_MONTHS_SET.has(parseInt(dateStr.slice(5, 7), 10));
+        }
+
+        function dailyTotalsFor(instance) {
+            const d = allDailyData[instance];
+            const out = {};
+            if (!d) return out;
+            d.labels.forEach((date, i) => {
+                let tot = 0;
+                d.data.forEach(series => { const v = series[i]; if (v != null) tot += v; });
+                out[date] = tot;
+            });
+            return out;
+        }
+
+        function hiverGlobalDaily() {
+            if (_hiverGlobalDaily) return _hiverGlobalDaily;
+            const out = {};
+            Object.keys(counterLocations).forEach(inst => {
+                const daily = dailyTotalsFor(inst);
+                Object.entries(daily).forEach(([date, v]) => { out[date] = (out[date] || 0) + v; });
+            });
+            _hiverGlobalDaily = out;
+            return out;
+        }
+
+        function winterSeasonLabel(dateStr) {
+            const y = parseInt(dateStr.slice(0, 4), 10);
+            const m = parseInt(dateStr.slice(5, 7), 10);
+            return m >= 11
+                ? y + \'–\' + String((y + 1) % 100).padStart(2, \'0\')
+                : (y - 1) + \'–\' + String(y % 100).padStart(2, \'0\');
+        }
+
+        function computeWinterStats(dailyMap) {
+            const dowSum = Array(7).fill(0), dowCount = Array(7).fill(0);
+            const dowTempSum = Array(7).fill(0), dowTempCount = Array(7).fill(0);
+            const cats = {
+                doux:  { sum: 0, count: 0 },
+                pluie: { sum: 0, count: 0 },
+                froid: { sum: 0, count: 0 },
+                neige: { sum: 0, count: 0 },
+            };
+            let coldestRidden = null, snowiestRidden = null, busiest = null;
+            let winterTotal = 0, winterDays = 0, snowDaysTotal = 0, snowDaysRidden = 0;
+
+            Object.entries(dailyMap).forEach(([date, v]) => {
+                if (!isWinterDate(date)) return;
+                winterTotal += v;
+                winterDays++;
+                const dow = (new Date(date + \'T00:00:00\').getDay() + 6) % 7;
+                dowSum[dow] += v;
+                dowCount[dow]++;
+                if (busiest === null || v > busiest.v) busiest = { date, v };
+
+                const w = weatherData[date];
+                if (!w) return;
+                if (w.tmax != null) { dowTempSum[dow] += w.tmax; dowTempCount[dow]++; }
+                const snow = w.snow || 0, precip = w.precip || 0, tmax = w.tmax;
+                if (snow >= 1) {
+                    cats.neige.sum += v; cats.neige.count++;
+                    snowDaysTotal++;
+                    if (v > 0) snowDaysRidden++;
+                } else if (tmax != null && tmax <= -10) {
+                    cats.froid.sum += v; cats.froid.count++;
+                } else if (precip > 5) {
+                    cats.pluie.sum += v; cats.pluie.count++;
+                } else {
+                    cats.doux.sum += v; cats.doux.count++;
+                }
+                if (v > 0 && (coldestRidden === null || w.tmin < coldestRidden.tmin)) {
+                    coldestRidden = { date, tmin: w.tmin, v };
+                }
+                if (v > 0 && snow > 0 && (snowiestRidden === null || snow > snowiestRidden.snow)) {
+                    snowiestRidden = { date, snow, v };
+                }
+            });
+
+            return {
+                avgPassages: dowSum.map((s, i) => dowCount[i] ? Math.round(s / dowCount[i]) : null),
+                avgTemp: dowTempSum.map((s, i) => dowTempCount[i] ? +(s / dowTempCount[i]).toFixed(1) : null),
+                cats, coldestRidden, snowiestRidden, busiest,
+                winterTotal, winterDays, snowDaysTotal, snowDaysRidden,
+            };
+        }
+
+        function computeHistoricalWinterTrend() {
+            const totals = {}, counters = {};
+            if (typeof counterHistoricalData === \'undefined\') return { totals, counters };
+            Object.entries(counterHistoricalData).forEach(([inst, years]) => {
+                Object.entries(years).forEach(([yrStr, months]) => {
+                    const yr = parseInt(yrStr, 10);
+                    Object.entries(months).forEach(([moStr, vol]) => {
+                        const mo = parseInt(moStr, 10);
+                        if (![11, 12, 1, 2, 3].includes(mo)) return;
+                        const season = mo >= 11
+                            ? yr + \'–\' + String((yr + 1) % 100).padStart(2, \'0\')
+                            : (yr - 1) + \'–\' + String(yr % 100).padStart(2, \'0\');
+                        totals[season] = (totals[season] || 0) + vol;
+                        (counters[season] = counters[season] || new Set()).add(inst);
+                    });
+                });
+            });
+            return { totals, counters };
+        }
+
+        function populateHiverCounterSelect() {
+            const sel = document.getElementById(\'hiverCounterSelect\');
+            if (!sel || sel.dataset.filled) return;
+            sel.dataset.filled = \'1\';
+            Object.keys(countersByArrondissement).sort().forEach(arr => {
+                const og = document.createElement(\'optgroup\');
+                og.label = arr;
+                countersByArrondissement[arr].forEach(c => {
+                    if (!allDailyData[c.value]) return;
+                    const opt = document.createElement(\'option\');
+                    opt.value = c.value;
+                    opt.textContent = c.label;
+                    og.appendChild(opt);
+                });
+                if (og.children.length) sel.appendChild(og);
+            });
+            sel.addEventListener(\'change\', function() {
+                renderHiverDowCharts(this.value);
+            });
+        }
+
+        function renderHiverFacts() {
+            const el = document.getElementById(\'hiver-cards\');
+            if (!el) return;
+            const stats = computeWinterStats(hiverGlobalDaily());
+            const fmt = n => (n || 0).toLocaleString(\'fr-CA\');
+            const fmtDate = d => d ? new Date(d + \'T00:00:00\').toLocaleDateString(\'fr-CA\', { day: \'numeric\', month: \'long\', year: \'numeric\' }) : \'—\';
+            const pctSnowRidden = stats.snowDaysTotal ? Math.round(stats.snowDaysRidden / stats.snowDaysTotal * 100) : 0;
+
+            const cards = [
+                {
+                    icon: \'❄️\', title: "Hiver dernier", date: "Nov. à mars, tous compteurs",
+                    total: fmt(stats.winterTotal), sub: \'passages\',
+                    meta: "<span>📆 Sur <strong>" + fmt(stats.winterDays) + "</strong> jours de données</span>",
+                },
+                {
+                    icon: \'🥶\', title: "Jour le plus froid pédalé", date: stats.coldestRidden ? fmtDate(stats.coldestRidden.date) : \'—\',
+                    total: stats.coldestRidden ? stats.coldestRidden.tmin.toFixed(1) + \'°C\' : \'—\', sub: \'minimum ce jour\',
+                    meta: stats.coldestRidden ? "<span>🚲 <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages quand même</span>" : \'\',
+                },
+                {
+                    icon: \'🏆\', title: "Record d\'achalandage hivernal", date: stats.busiest ? fmtDate(stats.busiest.date) : \'—\',
+                    total: stats.busiest ? fmt(stats.busiest.v) : \'—\', sub: \'passages en 1 jour\', meta: \'\',
+                },
+                {
+                    icon: \'🌨️\', title: "Jours de neige, pédalés quand même", date: fmt(stats.snowDaysTotal) + \' jours de neige (≥1 cm)\',
+                    total: pctSnowRidden + \'%\', sub: \'de ces jours avec des cyclistes\',
+                    meta: "<span>🚲 <strong>" + fmt(stats.snowDaysRidden) + "</strong> / " + fmt(stats.snowDaysTotal) + " jours</span>",
+                },
+            ];
+
+            el.innerHTML = cards.map(c =>
+                "<div class=\'global-card\'>" +
+                    "<div class=\'global-card-title\'>" + c.icon + \' \' + c.title + "</div>" +
+                    "<div class=\'global-card-date\'>" + c.date + "</div>" +
+                    "<div class=\'global-card-total\'>" + c.total + "</div>" +
+                    "<div class=\'global-card-sub\'>" + c.sub + "</div>" +
+                    (c.meta ? "<div class=\'global-card-meta\'>" + c.meta + "</div>" : \'\') +
+                "</div>"
+            ).join(\'\');
+        }
+
+        function renderHiverTrendChart() {
+            if (charts[\'__hiver_trend__\']) return;
+            const { totals, counters } = computeHistoricalWinterTrend();
+            const seasons = Object.keys(totals).sort();
+            const ctx = document.getElementById(\'hiver-trend-chart\');
+            if (!ctx || !seasons.length) return;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const curSeason = isWinterDate(todayStr) ? winterSeasonLabel(todayStr) : null;
+            charts[\'__hiver_trend__\'] = new Chart(ctx, {
+                type: \'bar\',
+                data: {
+                    labels: seasons,
+                    datasets: [{
+                        label: \'Passages (nov–mar)\',
+                        data: seasons.map(s => totals[s]),
+                        backgroundColor: seasons.map(s => s === curSeason ? \'rgba(14,165,216,0.45)\' : \'rgba(14,165,216,0.75)\'),
+                        borderColor: seasons.map(s => s === curSeason ? \'#0A7FAE\' : \'#0EA5D8\'),
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    animation: { duration: 500 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: \'rgba(7,33,51,0.90)\',
+                            titleColor: \'#8FE0FB\',
+                            bodyColor: \'#fff\',
+                            padding: 10,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: item => {
+                                    const s = item.label;
+                                    const n = counters[s] ? counters[s].size : 0;
+                                    const suffix = s === curSeason ? \' (en cours)\' : \'\';
+                                    return [
+                                        \' \' + Math.round(item.raw).toLocaleString(\'fr-CA\') + \' passages\' + suffix,
+                                        n ? \'📍 \' + n + \' compteur\' + (n > 1 ? \'s\' : \'\') : \'\',
+                                    ].filter(Boolean);
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { grid: { color: \'rgba(0,0,0,0.04)\' }, border: { display: false }, ticks: { color: \'#777\', font: { size: 11 } } },
+                        y: {
+                            grid: { color: \'rgba(0,0,0,0.04)\' }, border: { display: false }, beginAtZero: true,
+                            ticks: { color: \'#777\', callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + \'M\' : v >= 1e3 ? (v / 1e3).toFixed(0) + \'k\' : v },
+                            title: { display: true, text: \'Passages\', color: \'#999\', font: { size: 11 } },
+                        },
+                    },
+                },
+            });
+        }
+
+        function renderHiverWeatherBreakdown(stats) {
+            const el = document.getElementById(\'hiver-weather-breakdown\');
+            if (!el) return;
+            const fmt = n => (n || 0).toLocaleString(\'fr-CA\');
+            const defs = [
+                { key: \'doux\',  icon: \'🙂\', label: \'Jours doux (référence)\' },
+                { key: \'pluie\', icon: \'🌧️\', label: \'Pluie / verglas (>5 mm)\' },
+                { key: \'froid\', icon: \'🥶\', label: \'≤ -10 °C (sans neige)\' },
+                { key: \'neige\', icon: \'❄️\', label: \'Neige (≥1 cm)\' },
+            ];
+            el.innerHTML = defs.map(d => {
+                const c = stats.cats[d.key];
+                const avg = c.count ? Math.round(c.sum / c.count) : null;
+                return "<div>" +
+                    "<div class=\'net-val\' style=\'color:" + HIVER_CAT_COLORS[d.key] + "\'>" + (avg !== null ? fmt(avg) : \'—\') + "</div>" +
+                    "<div class=\'net-label\'>" + d.icon + \' \' + d.label + "</div>" +
+                    "<div style=\'font-size:11px;color:var(--faint);margin-top:2px;\'>" + c.count + (c.count === 1 ? \' jour\' : \' jours\') + "</div>" +
+                "</div>";
+            }).join(\'\');
+        }
+
+        function renderHiverRecords(stats, instance) {
+            const el = document.getElementById(\'hiver-records\');
+            if (!el) return;
+            const fmt = n => (n || 0).toLocaleString(\'fr-CA\');
+            const fmtDate = d => d ? new Date(d + \'T00:00:00\').toLocaleDateString(\'fr-CA\', { day: \'numeric\', month: \'long\', year: \'numeric\' }) : \'—\';
+            const label = instance === \'__all__\' ? \'tous les compteurs\' : ((counterLocations[instance] && counterLocations[instance].label) || instance);
+            const rows = [];
+            if (stats.busiest) {
+                rows.push("<p>🏆 Journée la plus achalandée de l\'hiver pour <strong>" + label + "</strong> : <strong>" + fmtDate(stats.busiest.date) + "</strong>, avec <strong>" + fmt(stats.busiest.v) + "</strong> passages.</p>");
+            }
+            if (stats.coldestRidden) {
+                rows.push("<p>🥶 Malgré <strong>" + stats.coldestRidden.tmin.toFixed(1) + " °C</strong> le " + fmtDate(stats.coldestRidden.date) + ", <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages ont tout de même été comptés.</p>");
+            }
+            if (stats.snowiestRidden) {
+                rows.push("<p>❄️ Le " + fmtDate(stats.snowiestRidden.date) + ", sous " + stats.snowiestRidden.snow.toFixed(1) + " cm de neige, <strong>" + fmt(stats.snowiestRidden.v) + "</strong> cyclistes ont quand même été comptés.</p>");
+            }
+            el.innerHTML = "<div class=\'global-section-title\'>📌 Faits marquants — " + label + "</div>" +
+                (rows.length ? rows.join(\'\') : "<p style=\'color:var(--faint);font-size:13px;\'>Pas assez de données hivernales pour ce compteur.</p>");
+        }
+
+        function renderHiverDowCharts(instance) {
+            const dailyMap = instance === \'__all__\' ? hiverGlobalDaily() : dailyTotalsFor(instance);
+            const stats = computeWinterStats(dailyMap);
+            const labels = DOW_LABELS_FR;
+
+            [\'__hiver_dow_passages__\', \'__hiver_dow_temp__\'].forEach(k => {
+                if (charts[k]) { charts[k].destroy(); charts[k] = null; }
+            });
+
+            const ctx1 = document.getElementById(\'hiver-dow-chart\');
+            if (ctx1) {
+                charts[\'__hiver_dow_passages__\'] = new Chart(ctx1, {
+                    type: \'bar\',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: \'Passages moyens\',
+                            data: stats.avgPassages,
+                            backgroundColor: \'rgba(14,165,216,0.75)\',
+                            borderColor: \'#0EA5D8\',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: { ..._histChartOpts(\'Passages / jour\'), plugins: { ..._histChartOpts(\'Passages / jour\').plugins, legend: { display: false } } },
+                });
+            }
+            const ctx2 = document.getElementById(\'hiver-temp-chart\');
+            if (ctx2) {
+                charts[\'__hiver_dow_temp__\'] = new Chart(ctx2, {
+                    type: \'line\',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: \'Température max. moyenne\',
+                            data: stats.avgTemp,
+                            borderColor: \'#22D3EE\',
+                            backgroundColor: \'rgba(34,211,238,0.18)\',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 1.5,
+                            pointRadius: 3,
+                            pointBackgroundColor: \'#22D3EE\',
+                        }],
+                    },
+                    options: { ..._histChartOpts(\'°C\'), plugins: { ..._histChartOpts(\'°C\').plugins, legend: { display: false } } },
+                });
+            }
+
+            renderHiverWeatherBreakdown(stats);
+            renderHiverRecords(stats, instance);
+        }
+
+        function getSelectedHiverCounter() {
+            const sel = document.getElementById(\'hiverCounterSelect\');
+            return sel ? sel.value : \'__all__\';
+        }
+
+        function renderHiverPage() {
+            populateHiverCounterSelect();
+            renderHiverFacts();
+            renderHiverTrendChart();
+            renderHiverDowCharts(getSelectedHiverCounter());
+        }
+
         // ── Fonctions historique compteur ────────────────────────────────────
         const _FR_MONTHS = [\'Jan\',\'Fév\',\'Mar\',\'Avr\',\'Mai\',\'Juin\',\'Juil\',\'Août\',\'Sep\',\'Oct\',\'Nov\',\'Déc\'];
         const _PALETTE   = [\'#1DB860\',\'#29ABE2\',\'#F59E0B\',\'#EF4444\',\'#8B5CF6\',\'#EC4899\',\'#14B8A6\',\'#F97316\'];
@@ -3452,15 +3832,19 @@ html_parts.append('''
         function showView(view) {
             const isMain   = view === \'main\';
             const isGlobal = view === \'global\';
+            const isHiver  = view === \'hiver\';
             const isMeth   = view === \'methodo\';
             document.getElementById(\'main-header\').style.display    = isMain   ? \'\' : \'none\';
             document.getElementById(\'main-container\').style.display = isMain   ? \'\' : \'none\';
             document.getElementById(\'global-page\').style.display    = isGlobal ? \'\' : \'none\';
+            document.getElementById(\'hiver-page\').style.display     = isHiver  ? \'\' : \'none\';
             document.getElementById(\'methodo-page\').style.display   = isMeth   ? \'\' : \'none\';
             document.getElementById(\'nav-compteurs\').classList.toggle(\'active\', isMain);
             document.getElementById(\'nav-global\').classList.toggle(\'active\', isGlobal);
+            document.getElementById(\'nav-hiver\').classList.toggle(\'active\', isHiver);
             document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
             if (isGlobal) renderGlobalPage();
+            if (isHiver) renderHiverPage();
             window.scrollTo({ top: 0, behavior: \'smooth\' });
         }
 
@@ -3624,6 +4008,44 @@ html_parts.append('''
         <div class="global-section" id="global-arr"></div>
         <div class="global-section" id="global-net"></div>
       </div>
+    </div>
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ══ Page Vélo d\'hiver ═══════════════════════════════════════════════ -->
+    <div id="hiver-page" style="display:none">
+      <div class="site-header" id="hiver-header">
+        <h1>❄️ Vélo d\'hiver à Montréal</h1>
+        <p class="subtitle" style="display:block">Novembre à mars — le vélo ne s\'arrête pas pour l\'hiver</p>
+      </div>
+      <div id="hiver-cards"></div>
+      <div class="global-section" style="margin-bottom:20px;">
+        <div class="global-section-title" style="margin-bottom:12px;">📊 Évolution du vélo d\'hiver au fil des années</div>
+        <canvas id="hiver-trend-chart" style="height:260px;"></canvas>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Total des passages de novembre à mars, tous compteurs confondus. Le nombre de compteurs actifs a augmenté au fil des années (voir l\'info-bulle) — une partie de la hausse reflète l\'ajout de nouveaux capteurs plutôt qu\'une hausse équivalente de l\'achalandage.</p>
+      </div>
+      <div class="global-section" style="margin-bottom:20px;">
+        <div class="global-section-title" style="margin-bottom:12px;">🔍 Explorer un compteur l\'hiver</div>
+        <div class="select-wrapper" style="max-width:480px;margin-bottom:18px;">
+          <select id="hiverCounterSelect">
+            <option value="__all__">Tous les compteurs — moyenne combinée</option>
+          </select>
+        </div>
+        <div class="hiver-chart-row">
+          <div class="hiver-chart-col">
+            <div>Passages moyens par jour de semaine</div>
+            <div class="hiver-chart-canvas"><canvas id="hiver-dow-chart"></canvas></div>
+          </div>
+          <div class="hiver-chart-col">
+            <div>Température maximale moyenne par jour</div>
+            <div class="hiver-chart-canvas"><canvas id="hiver-temp-chart"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top:22px;">
+          <div class="global-section-title" style="margin-bottom:10px;font-size:12px;">🌡️ Achalandage moyen par type de journée</div>
+          <div id="hiver-weather-breakdown" class="net-grid net-grid-4"></div>
+        </div>
+      </div>
+      <div class="global-section" id="hiver-records"></div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
