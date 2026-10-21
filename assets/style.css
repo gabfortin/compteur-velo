@@ -828,7 +828,7 @@ button.nav-link.active { background: #fff; }
     transition: color 0.25s, background 0.25s;
 }
 #topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
-@media (min-width: 400px) and (max-width: 767px) {
+@media (min-width: 360px) and (max-width: 767px) {
     #topbar-instagram { display: flex; }
 }
 /* Menu du profil : mobile seulement (Méthodologie y est déplacée) */
