@@ -1668,6 +1668,33 @@ html_parts = ['''<html lang="fr">
             .hiver-chart-row { flex-direction: row; }
             .net-grid-4 { grid-template-columns: repeat(4, 1fr); }
         }
+        /* ── Vue Arrondissement ── */
+        #arr-page { max-width: 1200px; margin: 0 auto; padding: 0 12px 40px; }
+        #arr-page .global-section { margin-bottom: 20px; }
+        #arr-picker { max-width: 420px; margin: 0 auto 20px; }
+        #arr-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+        #arr-map { height: 320px; border-radius: var(--r-md); overflow: hidden; z-index: 0; }
+        .arr-counter-row { cursor: pointer; border-radius: 8px; padding: 4px 6px; margin: 0 -6px 6px; transition: background 0.15s; }
+        .arr-counter-row:hover { background: rgba(255,255,255,0.7); }
+        .arr-counter-row .arr-name { width: 52%; }
+        .arr-type { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; margin-right: 4px; }
+        .arr-chart { position: relative; height: 240px; }
+        .arr-days-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+        .arr-weather { color: var(--muted); font-size: 12px; }
+        .arr-note { font-size: 11px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+        @media (max-width: 767px) {
+            #topbar-nav .nav-link { padding: 8px 8px; font-size: 12.5px; }
+            .arr-counter-row { flex-wrap: wrap; row-gap: 4px; }
+            .arr-counter-row .arr-name { width: 100%; white-space: normal; }
+        }
+        @media (min-width: 768px) {
+            #arr-page { padding: 0 20px 40px; }
+            #arr-cards { grid-template-columns: repeat(4, 1fr); }
+            #arr-map { height: 380px; }
+        }
+        @media (min-width: 1024px) {
+            .arr-days-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+        }
         /* ── BIXI — thème rouge ── */
         #bixi-page {
             max-width: 1200px; margin: 0 auto; padding: 0 12px 40px;
@@ -1694,16 +1721,16 @@ html_parts = ['''<html lang="fr">
         .bixi-note { font-size: 11px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
         .bixi-up   { color: #15803d; font-weight: 600; }
         .bixi-down { color: #b91c1c; font-weight: 600; }
-        .bixi-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .bixi-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text-2); white-space: nowrap; }
-        .bixi-table th {
+        .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+        .data-table th {
             font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
             color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--hairline);
         }
-        .bixi-table td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
-        .bixi-table th:first-child, .bixi-table td:first-child { text-align: left; }
-        .bixi-table tr:last-child td { border-bottom: none; }
-        .bixi-table td strong { color: var(--text); }
+        .data-table td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
+        .data-table th:first-child, .data-table td:first-child { text-align: left; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table td strong { color: var(--text); }
         .bixi-chart-row { display: flex; flex-direction: column; gap: 20px; margin-top: 22px; }
         .bixi-chart-col { flex: 1; min-width: 0; }
         .bixi-chart-col > div:first-child { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: center; }
@@ -1762,6 +1789,7 @@ html_parts = ['''<html lang="fr">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
             <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
+            <button class="nav-link" id="nav-arr" onclick="showView(\'arr\')"><span class="nav-label-full">Arrondissements</span><span class="nav-label-short">Arrond.</span></button>
             <button class="nav-link" id="nav-hiver" onclick="showView(\'hiver\')"><span class="nav-label-full">Vélo d\'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-bixi" onclick="showView(\'bixi\')">BIXI</button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
@@ -1837,7 +1865,7 @@ for arrondissement in sorted(by_arrondissement.keys()):
                              key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
     for instance, row in sorted_counters:
         label = counter_label(instance, row)
-        prefix = '[Éco-Compteur] ' if instance.startswith('vf-') else '[SUM] '
+        prefix = '[Capteur au sol] ' if instance.startswith('vf-') else '[Capteur photo/vidéo] '
         html_parts.append(f'<option value="{instance}">{prefix}{label}</option>')
     html_parts.append('</optgroup>')
 
@@ -1978,7 +2006,7 @@ for instance, directions in tqdm(data.items(), desc="Génération HTML"):
         location = (f"{row['arrondissement']} - {row['rue_1']} & {rue2}"
                     if rue2 else f"{row['arrondissement']} - {row['rue_1']}")
         is_boucle  = instance.startswith('vf-')
-        type_label = 'Éco-Compteur' if is_boucle else 'Détecteur SUM'
+        type_label = 'Capteur au sol' if is_boucle else 'Capteur photo/vidéo'
         type_cls   = 'boucle' if is_boucle else 'fut'
         type_url   = 'https://donnees.montreal.ca/dataset/cyclistes'
         html_parts.append(f'<div id="{instance}" class="table-container">')
@@ -2061,7 +2089,7 @@ for arrondissement in sorted(by_arrondissement.keys()):
     counters = sorted(by_arrondissement[arrondissement],
                       key=lambda x: (x[0].startswith('vf-'), x[1]['rue_1'], x[1].get('rue_2', '')))
     entries = [{"value": inst,
-                "label": ('[Éco-Compteur] ' if inst.startswith('vf-') else '[SUM] ') + counter_label(inst, row)}
+                "label": ('[Capteur au sol] ' if inst.startswith('vf-') else '[Capteur photo/vidéo] ') + counter_label(inst, row)}
                for inst, row in counters]
     html_parts.append(f"countersByArrondissement[{json.dumps(arrondissement)}] = {json.dumps(entries)};\n")
 
@@ -3715,6 +3743,245 @@ html_parts.append('''
             renderHiverDowCharts(getSelectedHiverCounter());
         }
 
+        // ── Vue Arrondissement ───────────────────────────────────────────────
+        const ARR_TYPE_LABEL = { fut: "Capteur photo/vidéo", boucle: "Capteur au sol" };
+        const ARR_TYPE_STYLE = { fut: "background:rgba(29,184,96,0.12);color:#15803d", boucle: "background:rgba(139,92,246,0.12);color:#6d28d9" };
+        let arrMap = null, arrLayer = null, arrReady = false;
+
+        function arrNames() {
+            return Object.keys(countersByArrondissement)
+                .filter(a => countersByArrondissement[a].some(c => allDailyData[c.value]))
+                .sort((a, b) => a.localeCompare(b, "fr"));
+        }
+
+        // Total quotidien d'un compteur (null si aucune direction n'a de donnée)
+        function arrCounterDaily(inst) {
+            const d = allDailyData[inst], out = {};
+            d.labels.forEach((date, i) => {
+                let tot = null;
+                d.data.forEach(s => { const v = s[i]; if (v != null) tot = (tot || 0) + v; });
+                if (tot != null) out[date] = tot;
+            });
+            return out;
+        }
+
+        function arrStats(arr) {
+            const ids = countersByArrondissement[arr].map(c => c.value).filter(id => allDailyData[id]);
+            const per = {}, span = {};
+            ids.forEach(id => {
+                per[id] = arrCounterDaily(id);
+                const ds = Object.keys(per[id]).sort();
+                span[id] = ds.length ? [ds[0], ds[ds.length - 1]] : null;
+            });
+            const dates = [...new Set(ids.flatMap(id => Object.keys(per[id])))].sort();
+            const shift = (d, k) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
+            // Un compteur est attendu un jour donné s'il a transmis dans les 7 jours avant ou après
+            // (les compteurs retirés l'hiver ne rendent donc pas tous les jours d'hiver incomplets)
+            const expected = (id, d) => {
+                for (let k = 1; k <= 7; k++) if (per[id][shift(d, -k)] != null || per[id][shift(d, k)] != null) return true;
+                return false;
+            };
+            const totals = {}, complete = [];
+            dates.forEach(d => {
+                let tot = 0, ok = true, n = 0;
+                ids.forEach(id => {
+                    const sp = span[id];
+                    if (!sp || d < sp[0] || d > sp[1]) return;
+                    const v = per[id][d];
+                    if (v != null) tot += v;
+                    else if (!expected(id, d)) return;
+                    n++;
+                    // Jour comparable : chaque compteur attendu a transmis, sans anomalie, et ce
+                    // n'est ni sa première ni sa dernière journée (souvent incomplètes)
+                    const anom = typeof anomalyDays !== "undefined" && anomalyDays[id] && anomalyDays[id][d];
+                    if (v == null || anom || d === sp[0] || d === sp[1]) ok = false;
+                });
+                totals[d] = tot;
+                if (ok && n) complete.push(d);
+            });
+            const counters = ids.map(id => {
+                const vals = Object.values(per[id]);
+                return { id, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0, days: vals.length,
+                         stopped: vfGroup(id) === "C" };
+            }).sort((a, b) => b.avg - a.avg);
+            return { ids, totals, complete, counters };
+        }
+
+        const arrFmt = n => Math.round(n || 0).toLocaleString("fr-CA");
+        const arrFmtDay = d => {
+            const s = new Date(d + "T12:00:00").toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        };
+        function arrWeatherHtml(d) {
+            const w = typeof weatherData !== "undefined" ? weatherData[d] : null;
+            if (!w) return "<span class=\\"arr-weather\\">—</span>";
+            const parts = [(w.icon || "") + " " + Math.round(w.tmax) + "° / " + Math.round(w.tmin) + "°"];
+            if (w.snow >= 0.5) parts.push("❄️ " + w.snow.toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " cm");
+            else if (w.precip >= 0.5) parts.push("💧 " + w.precip.toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " mm");
+            return "<span class=\\"arr-weather\\">" + parts.join(" · ") + "</span>";
+        }
+
+        function arrRenderCards(arr, s, days, avg) {
+            const fmtPct = p => (p >= 0 ? "+" : "−") + Math.abs(Math.round(p)) + " %";
+            const total = Object.values(s.totals).reduce((a, b) => a + b, 0);
+            const nFut = s.ids.filter(id => counterLocations[id] && counterLocations[id].type === "fut").length;
+            const nSol = s.ids.length - nFut;
+            const isWeekend = d => [0, 6].includes(new Date(d + "T12:00:00").getDay());
+            const mean = list => list.length ? list.reduce((a, d) => a + s.totals[d], 0) / list.length : 0;
+            const wk = mean(days.filter(d => !isWeekend(d))), we = mean(days.filter(isWeekend));
+            const best = days.reduce((b, d) => (!b || s.totals[d] > s.totals[b]) ? d : b, null);
+            const top = s.counters[0];
+            const cards = [
+                { icon: "🚲", title: "Passages", date: "12 derniers mois, tous compteurs", total: arrFmt(total), sub: "passages",
+                  meta: "<span>📍 <strong>" + s.ids.length + "</strong> compteur" + (s.ids.length > 1 ? "s" : "") +
+                        " (" + nFut + " photo/vidéo, " + nSol + " au sol)</span>" },
+                { icon: "📆", title: "Moyenne par jour", date: "Jours où tous les compteurs en service ont transmis", total: arrFmt(avg), sub: "passages / jour",
+                  meta: days.length ? "<span>Semaine : <strong>" + arrFmt(wk) + "</strong> · Fin de semaine : <strong>" + arrFmt(we) + "</strong></span>" : "" },
+                { icon: "🏆", title: "Journée record", date: best ? arrFmtDay(best) : "—", total: best ? arrFmt(s.totals[best]) : "—", sub: "passages",
+                  meta: best ? "<span>" + arrWeatherHtml(best) + "</span><span>" + fmtPct((s.totals[best] - avg) / avg * 100) + " vs la moyenne</span>" : "" },
+                { icon: "📍", title: "Compteur le plus achalandé", date: top ? counterLocations[top.id].label : "—", total: top ? arrFmt(top.avg) : "—", sub: "passages / jour en moyenne",
+                  meta: top ? "<span class=\\"global-top-row\\" onclick=\\"goToCounter('" + top.id + "')\\">Voir le compteur →</span>" : "" },
+            ];
+            document.getElementById("arr-cards").innerHTML = cards.map(c =>
+                "<div class=\\"global-card\\">" +
+                    "<div class=\\"global-card-title\\">" + c.icon + " " + c.title + "</div>" +
+                    "<div class=\\"global-card-date\\">" + c.date + "</div>" +
+                    "<div class=\\"global-card-total\\">" + c.total + "</div>" +
+                    "<div class=\\"global-card-sub\\">" + c.sub + "</div>" +
+                    (c.meta ? "<div class=\\"global-card-meta\\">" + c.meta + "</div>" : "") +
+                "</div>"
+            ).join("");
+        }
+
+        function arrRenderMap(s) {
+            if (typeof L === "undefined") return;
+            if (!arrMap) {
+                arrMap = L.map("arr-map", { scrollWheelZoom: false }).setView([45.53, -73.59], 11);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    attribution: "© <a href=\\"https://www.openstreetmap.org/copyright\\">OpenStreetMap</a>", maxZoom: 19,
+                }).addTo(arrMap);
+            }
+            if (arrLayer) arrLayer.remove();
+            arrLayer = L.featureGroup().addTo(arrMap);
+            s.ids.forEach(id => {
+                const loc = counterLocations[id];
+                if (!loc) return;
+                L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappyCounters.has(id), loc.type, vfGroup(id)))
+                    .bindTooltip((loc.type === "boucle" ? "⬡ " : "📍 ") + loc.label, { direction: "top", offset: [0, -6] })
+                    .on("click", () => goToCounter(id))
+                    .addTo(arrLayer);
+            });
+            arrMap.invalidateSize();
+            if (arrLayer.getLayers().length) arrMap.fitBounds(arrLayer.getBounds(), { padding: [30, 30], maxZoom: 15 });
+        }
+
+        function arrRenderCounters(s) {
+            const max = s.counters.length ? s.counters[0].avg : 1;
+            document.getElementById("arr-counters").innerHTML = s.counters.map(c => {
+                const loc = counterLocations[c.id] || {};
+                const type = loc.type || "fut";
+                return "<div class=\\"arr-row arr-counter-row\\" onclick=\\"goToCounter('" + c.id + "')\\">" +
+                    "<span class=\\"arr-name\\" title=\\"" + (loc.label || c.id).replace(/"/g, "&quot;") + "\\">" +
+                        "<span class=\\"arr-type\\" style=\\"" + ARR_TYPE_STYLE[type] + "\\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" + (loc.label || c.id) + "</span>" +
+                    "<div class=\\"arr-bar-wrap\\"><div class=\\"arr-bar\\" style=\\"width:" + (c.avg / max * 100).toFixed(1) + "%\\"></div></div>" +
+                    "<span class=\\"arr-vol\\">" + (c.stopped ? "⛔ inactif" : arrFmt(c.avg) + " / j") + "</span></div>";
+            }).join("");
+        }
+
+        function arrRenderMonthly(s, days) {
+            if (charts["__arr_monthly__"]) { charts["__arr_monthly__"].destroy(); delete charts["__arr_monthly__"]; }
+            const byMonth = {};
+            days.forEach(d => {
+                const m = d.slice(0, 7);
+                byMonth[m] = byMonth[m] || { sum: 0, n: 0 };
+                byMonth[m].sum += s.totals[d]; byMonth[m].n++;
+            });
+            const months = Object.keys(byMonth).sort();
+            const ctx = document.getElementById("arr-monthly-chart");
+            if (!ctx || !months.length) return;
+            charts["__arr_monthly__"] = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: months.map(m => new Date(m + "-15T12:00:00").toLocaleDateString("fr-CA", { month: "short", year: "2-digit" })),
+                    datasets: [{ data: months.map(m => byMonth[m].sum / byMonth[m].n), backgroundColor: "rgba(29,184,96,0.75)", borderRadius: 4 }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+                    plugins: { legend: { display: false }, tooltip: { callbacks: {
+                        label: item => " " + arrFmt(item.raw) + " passages / jour (" + byMonth[months[item.dataIndex]].n + " j)",
+                    } } },
+                    scales: {
+                        x: { grid: { display: false }, border: { display: false }, ticks: { color: "#777", font: { size: 11 } } },
+                        y: { grid: { color: "rgba(0,0,0,0.04)" }, border: { display: false }, beginAtZero: true, ticks: { color: "#777" } },
+                    },
+                },
+            });
+        }
+
+        function arrRenderWeather(s, days, avg) {
+            const cats = [
+                { icon: "☀️", label: "Jours secs (≥ 10 °C)", test: w => w.precip < 1 && w.snow < 0.5 && w.tmax >= 10 },
+                { icon: "🌧️", label: "Pluie (≥ 5 mm)", test: w => w.precip >= 5 && w.snow < 0.5 },
+                { icon: "🌨️", label: "Neige (≥ 1 cm)", test: w => w.snow >= 1 },
+                { icon: "🥶", label: "Froid (max < −10 °C)", test: w => w.tmax < -10 },
+            ];
+            document.getElementById("arr-weather-grid").innerHTML = cats.map(c => {
+                const list = days.filter(d => typeof weatherData !== "undefined" && weatherData[d] && c.test(weatherData[d]));
+                const m = list.length ? list.reduce((a, d) => a + s.totals[d], 0) / list.length : null;
+                const diff = m != null && avg ? Math.round((m - avg) / avg * 100) : null;
+                return "<div><div class=\\"net-val\\" style=\\"font-size:26px\\">" + c.icon + " " + (m != null ? arrFmt(m) : "—") + "</div>" +
+                    "<div class=\\"net-label\\">" + c.label + "</div>" +
+                    "<div class=\\"arr-weather\\" style=\\"margin-top:4px\\">" + list.length + " j" +
+                    (diff != null ? " · " + (diff >= 0 ? "+" : "−") + Math.abs(diff) + " % vs moyenne" : "") + "</div></div>";
+            }).join("");
+        }
+
+        function arrDaysTable(s, list, avg) {
+            if (!list.length) return "<p class=\\"arr-note\\">Pas assez de données.</p>";
+            return "<table class=\\"data-table\\"><thead><tr><th>Date</th><th>Passages</th><th>vs moy.</th><th>Météo</th></tr></thead><tbody>" +
+                list.map(d => {
+                    const p = avg ? (s.totals[d] - avg) / avg * 100 : 0;
+                    return "<tr><td><strong>" + arrFmtDay(d) + "</strong></td><td><strong>" + arrFmt(s.totals[d]) + "</strong></td>" +
+                        "<td>" + (p >= 0 ? "+" : "−") + Math.abs(Math.round(p)) + " %</td><td>" + arrWeatherHtml(d) + "</td></tr>";
+                }).join("") + "</tbody></table>";
+        }
+
+        function renderArrondissement(arr) {
+            const s = arrStats(arr);
+            // Jours comparables si possible ; sinon tous les jours avec des passages
+            const strict = s.complete.length >= 14;
+            const days = strict ? s.complete : Object.keys(s.totals).filter(d => s.totals[d] > 0);
+            const avg = days.length ? days.reduce((a, d) => a + s.totals[d], 0) / days.length : 0;
+            arrRenderCards(arr, s, days, avg);
+            arrRenderMap(s);
+            arrRenderCounters(s);
+            arrRenderMonthly(s, days);
+            arrRenderWeather(s, days, avg);
+            const sorted = days.slice().sort((a, b) => s.totals[b] - s.totals[a]);
+            document.getElementById("arr-top-days").innerHTML = arrDaysTable(s, sorted.slice(0, 10), avg);
+            document.getElementById("arr-low-days").innerHTML = arrDaysTable(s, sorted.slice(-10).reverse(), avg);
+            document.getElementById("arr-days-note").textContent = strict
+                ? "Classement sur " + days.length + " jours où tous les compteurs en service ont transmis des données complètes (jours d’anomalie exclus). Certains compteurs sont retirés l’hiver : les totaux d’hiver portent alors sur moins de compteurs."
+                : "Peu de jours où tous les compteurs ont transmis en même temps : le classement porte sur tous les jours avec des données, et un creux peut refléter une panne de compteur.";
+        }
+
+        function renderArrPage() {
+            if (!arrReady) {
+                arrReady = true;
+                const sel = document.getElementById("arrPageSelect");
+                const names = arrNames();
+                sel.innerHTML = names.map(a => "<option value=\\"" + a.replace(/"/g, "&quot;") + "\\">" + a + " (" +
+                    countersByArrondissement[a].filter(c => allDailyData[c.value]).length + ")</option>").join("");
+                // Par défaut : l'arrondissement avec le plus de compteurs
+                const def = names.reduce((b, a) => (!b || countersByArrondissement[a].length > countersByArrondissement[b].length) ? a : b, null);
+                if (def) sel.value = def;
+                sel.addEventListener("change", function() { renderArrondissement(this.value); });
+                if (sel.value) renderArrondissement(sel.value);
+            } else if (arrMap) {
+                arrMap.invalidateSize();
+            }
+        }
+
         // ── BIXI ─────────────────────────────────────────────────────────────
         const BIXI_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
         const BIXI_DURATION_LABELS = ["< 10 min", "10–20", "20–30", "30–45", "45–60", "60 min +"];
@@ -3978,7 +4245,7 @@ html_parts.append('''
                     "<td>" + BIXI_MONTHS[bestMonth] + "</td>" +
                 "</tr>";
             });
-            el.innerHTML = "<table class=\\"bixi-table\\"><thead><tr>" +
+            el.innerHTML = "<table class=\\"data-table\\"><thead><tr>" +
                 "<th>Année</th><th>Trajets</th><th>Croissance</th><th>Moy./jour</th><th>Durée moy.</th><th>Membres</th><th>Stations</th><th>Mois record</th>" +
                 "</tr></thead><tbody>" + rows.join("") + "</tbody></table>";
         }
@@ -4015,7 +4282,7 @@ html_parts.append('''
                     "<td>" + (best ? parseInt(best[0].slice(8), 10) + " " + BIXI_MONTHS[i].toLowerCase() + " (" + bixiFmt(best[1]) + ")" : "—") + "</td>" +
                 "</tr>");
             }
-            document.getElementById("bixi-monthly-table").innerHTML = "<table class=\\"bixi-table\\"><thead><tr>" +
+            document.getElementById("bixi-monthly-table").innerHTML = "<table class=\\"data-table\\"><thead><tr>" +
                 "<th>Mois</th><th>Trajets</th><th>vs " + prevY + "</th><th>Moy./jour</th><th>Jour record</th>" +
                 "</tr></thead><tbody>" + rows.join("") + "</tbody></table>" +
                 (lastDate ? "<p class=\\"bixi-note\\">* Mois en cours, comparé aux mêmes jours en " + prevY + ".</p>" : "");
@@ -4323,21 +4590,25 @@ html_parts.append('''
             const isHiver  = view === \'hiver\';
             const isMeth   = view === \'methodo\';
             const isBixi   = view === \'bixi\';
+            const isArr    = view === \'arr\';
             document.getElementById(\'main-header\').style.display    = isMain   ? \'\' : \'none\';
             document.getElementById(\'main-container\').style.display = isMain   ? \'\' : \'none\';
             document.getElementById(\'global-page\').style.display    = isGlobal ? \'\' : \'none\';
             document.getElementById(\'hiver-page\').style.display     = isHiver  ? \'\' : \'none\';
             document.getElementById(\'methodo-page\').style.display   = isMeth   ? \'\' : \'none\';
             document.getElementById(\'bixi-page\').style.display      = isBixi   ? \'\' : \'none\';
+            document.getElementById(\'arr-page\').style.display       = isArr    ? \'\' : \'none\';
             document.getElementById(\'nav-compteurs\').classList.toggle(\'active\', isMain);
             document.getElementById(\'nav-global\').classList.toggle(\'active\', isGlobal);
             document.getElementById(\'nav-hiver\').classList.toggle(\'active\', isHiver);
             document.getElementById(\'nav-bixi\').classList.toggle(\'active\', isBixi);
+            document.getElementById(\'nav-arr\').classList.toggle(\'active\', isArr);
             document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
             document.getElementById(\'nav-methodo-menu\').classList.toggle(\'active\', isMeth);
             if (isGlobal) renderGlobalPage();
             if (isHiver) renderHiverPage();
             if (isBixi) renderBixiPage();
+            if (isArr) renderArrPage();
             window.scrollTo({ top: 0, behavior: \'smooth\' });
         }
 
@@ -4366,18 +4637,18 @@ html_parts.append('''
             <div class="source-card-top">
               <span class="source-card-icon">🚦</span>
               <div>
-                <div class="source-card-title">Détecteurs SUM <span class="mbadge mbadge-fut">Détecteur SUM</span></div>
+                <div class="source-card-title">Capteurs photo/vidéo <span class="mbadge mbadge-fut">Capteur photo/vidéo</span></div>
                 <div class="source-card-sub">Vélos - comptage permanent — Ville de Montréal</div>
               </div>
             </div>
-            <div class="source-card-desc">Capteurs installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>. Publié sur le même portail que les Éco-Compteurs depuis 2026.</div>
+            <div class="source-card-desc">Capteurs installés sur des fûts le long des pistes cyclables. Données horaires bidirectionnelles, identifiants <code style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 4px">det-XXXXX-XX</code>. Publié sur le même portail que les capteurs au sol depuis 2026.</div>
             <a class="source-card-link" href="https://donnees.montreal.ca/dataset/cyclistes" target="_blank" rel="noopener">→ Portail données ouvertes Ville ↗</a>
           </div>
           <div class="source-card">
             <div class="source-card-top">
               <span class="source-card-icon">🔵</span>
               <div>
-                <div class="source-card-title">Éco-Compteurs <span class="mbadge mbadge-boucle">Éco-Compteur</span></div>
+                <div class="source-card-title">Capteurs au sol <span class="mbadge mbadge-boucle">Capteur au sol</span></div>
                 <div class="source-card-sub">Vélos - comptage sur les pistes cyclables — Ville de Montréal</div>
               </div>
             </div>
@@ -4448,7 +4719,7 @@ html_parts.append('''
         <h3>📅 Fenêtre temporelle</h3>
         <p>Seules les données des <strong>12 derniers mois glissants</strong> (365 jours) sont chargées et affichées. Cette limite s\'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
         <p>Le détail <strong>horaire</strong> (vue timeline, jour spécifique) couvre les <strong>90 derniers jours</strong> de chaque compteur ; au-delà, les vues 6 et 12 mois s\'appuient sur les totaux journaliers, et l\'heure de pointe est précalculée à partir des données horaires complètes.</p>
-        <p>Pour les Éco-Compteurs, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des Détecteurs SUM.</p>
+        <p>Pour les capteurs au sol, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des capteurs photo/vidéo.</p>
       </div>
 
       <!-- Combinaison de compteurs -->
@@ -4542,6 +4813,44 @@ html_parts.append('''
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
+    <!-- ══ Page Arrondissements ═══════════════════════════════════════════ -->
+    <div id="arr-page" style="display:none">
+      <div class="site-header">
+        <h1>🏘️ Le vélo par arrondissement</h1>
+        <p class="subtitle" style="display:block">Compteurs, achalandage et météo des 12 derniers mois</p>
+      </div>
+      <div class="select-wrapper" id="arr-picker">
+        <select id="arrPageSelect" aria-label="Arrondissement"></select>
+      </div>
+      <div id="arr-cards"></div>
+      <div class="global-section">
+        <div class="global-section-title">🗺️ Compteurs sur le territoire</div>
+        <div id="arr-map"></div>
+        <div id="arr-counters" style="margin-top:16px;"></div>
+        <p class="arr-note">Moyenne de passages par jour sur les jours où le compteur a transmis des données. Cliquez sur un compteur pour voir son détail.</p>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">📊 Passages moyens par jour, par mois</div>
+        <div class="arr-chart"><canvas id="arr-monthly-chart"></canvas></div>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">🌦️ Effet de la météo</div>
+        <div id="arr-weather-grid" class="net-grid net-grid-4"></div>
+      </div>
+      <div class="arr-days-grid">
+        <div class="global-section">
+          <div class="global-section-title">🏆 Jours les plus achalandés</div>
+          <div class="data-table-wrap" id="arr-top-days"></div>
+        </div>
+        <div class="global-section">
+          <div class="global-section-title">🐌 Jours les moins achalandés</div>
+          <div class="data-table-wrap" id="arr-low-days"></div>
+        </div>
+      </div>
+      <p class="arr-note" id="arr-days-note" style="text-align:center;"></p>
+    </div>
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
     <!-- ══ Page BIXI ══════════════════════════════════════════════════════ -->
     <div id="bixi-page" style="display:none">
       <div class="site-header" id="bixi-header">
@@ -4570,7 +4879,7 @@ html_parts.append('''
       </div>
       <div class="global-section">
         <div class="global-section-title">📋 Statistiques annuelles</div>
-        <div class="bixi-table-wrap" id="bixi-annual-table"></div>
+        <div class="data-table-wrap" id="bixi-annual-table"></div>
         <p class="bixi-note">Moy./jour : trajets divisés par le nombre de jours avec au moins un trajet. Durée moyenne : trajets de 1 min à 4 h. La part des membres n’est plus publiée par BIXI depuis 2022. * Année en cours.</p>
       </div>
       <div class="global-section">
@@ -4578,7 +4887,7 @@ html_parts.append('''
         <div class="select-wrapper" style="max-width:240px;margin-bottom:18px;">
           <select id="bixiYearSelect"></select>
         </div>
-        <div class="bixi-table-wrap" id="bixi-monthly-table"></div>
+        <div class="data-table-wrap" id="bixi-monthly-table"></div>
         <div class="bixi-chart-row">
           <div class="bixi-chart-col">
             <div>Heure de départ</div>
