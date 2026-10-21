@@ -1543,10 +1543,10 @@ html_parts = ['''<html lang="fr">
         }
         #profile-menu[hidden], #nav-more-menu[hidden] { display: none; }
         #profile-menu .nav-link, #nav-more-menu .nav-link { display: block; text-align: left; width: 100%; }
-        /* Menu « Plus » : mobile seulement (Arrondissements et BIXI y sont regroupés) */
+        /* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
         #nav-more-menu { z-index: 1; }
         @media (max-width: 767px) {
-            #nav-methodo, #nav-arr, #nav-bixi { display: none; }
+            #nav-methodo, #nav-global, #nav-arr, #nav-bixi { display: none; }
         }
         @media (min-width: 768px) {
             #profile-menu, #nav-more-wrap { display: none !important; }
@@ -1789,7 +1789,7 @@ html_parts = ['''<html lang="fr">
     <nav id="topbar">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
-            <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
+            <button class="nav-link" id="nav-global" onclick="showView(\'global\')">Vue Globale</button>
             <button class="nav-link" id="nav-arr" onclick="showView(\'arr\')">Arrondissements</button>
             <button class="nav-link" id="nav-hiver" onclick="showView(\'hiver\')"><span class="nav-label-full">Vélo d\'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-bixi" onclick="showView(\'bixi\')">BIXI</button>
@@ -1797,6 +1797,7 @@ html_parts = ['''<html lang="fr">
             <div id="nav-more-wrap">
                 <button class="nav-link" id="nav-more" aria-haspopup="true" aria-expanded="false" aria-controls="nav-more-menu">Plus ▾</button>
                 <div id="nav-more-menu" hidden>
+                    <button class="nav-link" id="nav-global-menu" onclick="closeNavMenus();showView(\'global\')">Vue Globale</button>
                     <button class="nav-link" id="nav-arr-menu" onclick="closeNavMenus();showView(\'arr\')">Arrondissements</button>
                     <button class="nav-link" id="nav-bixi-menu" onclick="closeNavMenus();showView(\'bixi\')">BIXI</button>
                 </div>
@@ -1815,7 +1816,7 @@ html_parts = ['''<html lang="fr">
     </nav>
     <script>
         // Sur mobile, la photo ouvre un menu (gabfortin.com / Méthodologie) au lieu du lien direct,
-        // et « Plus » regroupe Arrondissements et BIXI
+        // et « Plus » regroupe Vue Globale, Arrondissements et BIXI
         const profileLink = document.getElementById(\'topbar-profile\');
         const profileMenu = document.getElementById(\'profile-menu\');
         const moreBtn = document.getElementById(\'nav-more\');
@@ -4624,7 +4625,8 @@ html_parts.append('''
             document.getElementById(\'nav-arr\').classList.toggle(\'active\', isArr);
             document.getElementById(\'nav-arr-menu\').classList.toggle(\'active\', isArr);
             document.getElementById(\'nav-bixi-menu\').classList.toggle(\'active\', isBixi);
-            document.getElementById(\'nav-more\').classList.toggle(\'active\', isArr || isBixi);
+            document.getElementById(\'nav-global-menu\').classList.toggle(\'active\', isGlobal);
+            document.getElementById(\'nav-more\').classList.toggle(\'active\', isGlobal || isArr || isBixi);
             document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
             document.getElementById(\'nav-methodo-menu\').classList.toggle(\'active\', isMeth);
             if (isGlobal) renderGlobalPage();
