@@ -1526,8 +1526,8 @@ html_parts = ['''<html lang="fr">
             transition: box-shadow 0.25s;
         }
         /* Menu du profil : mobile seulement (Méthodologie y est déplacée) */
-        #topbar-profile-wrap { position: relative; }
-        #profile-menu {
+        #topbar-profile-wrap, #nav-more-wrap { position: relative; }
+        #profile-menu, #nav-more-menu {
             position: absolute;
             top: calc(100% + 8px);
             right: 0;
@@ -1541,13 +1541,15 @@ html_parts = ['''<html lang="fr">
             border-radius: 14px;
             box-shadow: var(--shadow), var(--inner);
         }
-        #profile-menu[hidden] { display: none; }
-        #profile-menu .nav-link { display: block; text-align: left; width: 100%; }
+        #profile-menu[hidden], #nav-more-menu[hidden] { display: none; }
+        #profile-menu .nav-link, #nav-more-menu .nav-link { display: block; text-align: left; width: 100%; }
+        /* Menu « Plus » : mobile seulement (Arrondissements et BIXI y sont regroupés) */
+        #nav-more-menu { z-index: 1; }
         @media (max-width: 767px) {
-            #nav-methodo { display: none; }
+            #nav-methodo, #nav-arr, #nav-bixi { display: none; }
         }
         @media (min-width: 768px) {
-            #profile-menu { display: none !important; }
+            #profile-menu, #nav-more-wrap { display: none !important; }
             #topbar { top: 14px; margin-top: 14px; padding: 0 8px 0 10px; }
             #topbar-profile-name { display: inline; }
             .nav-label-short { display: none; }
@@ -1683,7 +1685,6 @@ html_parts = ['''<html lang="fr">
         .arr-weather { color: var(--muted); font-size: 12px; }
         .arr-note { font-size: 11px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
         @media (max-width: 767px) {
-            #topbar-nav .nav-link { padding: 8px 8px; font-size: 12.5px; }
             .arr-counter-row { flex-wrap: wrap; row-gap: 4px; }
             .arr-counter-row .arr-name { width: 100%; white-space: normal; }
         }
@@ -1789,10 +1790,17 @@ html_parts = ['''<html lang="fr">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
             <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
-            <button class="nav-link" id="nav-arr" onclick="showView(\'arr\')"><span class="nav-label-full">Arrondissements</span><span class="nav-label-short">Arrond.</span></button>
+            <button class="nav-link" id="nav-arr" onclick="showView(\'arr\')">Arrondissements</button>
             <button class="nav-link" id="nav-hiver" onclick="showView(\'hiver\')"><span class="nav-label-full">Vélo d\'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-bixi" onclick="showView(\'bixi\')">BIXI</button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
+            <div id="nav-more-wrap">
+                <button class="nav-link" id="nav-more" aria-haspopup="true" aria-expanded="false" aria-controls="nav-more-menu">Plus ▾</button>
+                <div id="nav-more-menu" hidden>
+                    <button class="nav-link" id="nav-arr-menu" onclick="closeNavMenus();showView(\'arr\')">Arrondissements</button>
+                    <button class="nav-link" id="nav-bixi-menu" onclick="closeNavMenus();showView(\'bixi\')">BIXI</button>
+                </div>
+            </div>
         </div>
         <div id="topbar-profile-wrap">
             <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com" aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu">
@@ -1801,30 +1809,41 @@ html_parts = ['''<html lang="fr">
             </a>
             <div id="profile-menu" hidden>
                 <a class="nav-link" href="https://gabfortin.com">gabfortin.com</a>
-                <button class="nav-link" id="nav-methodo-menu" onclick="closeProfileMenu();showView(\'methodo\')">Méthodologie</button>
+                <button class="nav-link" id="nav-methodo-menu" onclick="closeNavMenus();showView(\'methodo\')">Méthodologie</button>
             </div>
         </div>
     </nav>
     <script>
-        // Sur mobile, la photo ouvre un menu (gabfortin.com / Méthodologie) au lieu du lien direct
+        // Sur mobile, la photo ouvre un menu (gabfortin.com / Méthodologie) au lieu du lien direct,
+        // et « Plus » regroupe Arrondissements et BIXI
         const profileLink = document.getElementById(\'topbar-profile\');
         const profileMenu = document.getElementById(\'profile-menu\');
+        const moreBtn = document.getElementById(\'nav-more\');
+        const moreMenu = document.getElementById(\'nav-more-menu\');
         const isMobileNav = () => window.matchMedia(\'(max-width: 767px)\').matches;
-        function closeProfileMenu() {
+        function toggleNavMenu(btn, menu) {
+            const open = menu.hidden;
+            closeNavMenus();
+            menu.hidden = !open;
+            btn.setAttribute(\'aria-expanded\', String(open));
+        }
+        function closeNavMenus() {
             profileMenu.hidden = true;
+            moreMenu.hidden = true;
             profileLink.setAttribute(\'aria-expanded\', \'false\');
+            moreBtn.setAttribute(\'aria-expanded\', \'false\');
         }
         profileLink.addEventListener(\'click\', e => {
             if (!isMobileNav()) return;
             e.preventDefault();
-            profileMenu.hidden = !profileMenu.hidden;
-            profileLink.setAttribute(\'aria-expanded\', String(!profileMenu.hidden));
+            toggleNavMenu(profileLink, profileMenu);
         });
+        moreBtn.addEventListener(\'click\', () => toggleNavMenu(moreBtn, moreMenu));
         document.addEventListener(\'click\', e => {
-            if (!e.target.closest(\'#topbar-profile-wrap\')) closeProfileMenu();
+            if (!e.target.closest(\'#topbar-profile-wrap, #nav-more-wrap\')) closeNavMenus();
         });
-        document.addEventListener(\'keydown\', e => { if (e.key === \'Escape\') closeProfileMenu(); });
-        window.addEventListener(\'resize\', () => { if (!isMobileNav()) closeProfileMenu(); });
+        document.addEventListener(\'keydown\', e => { if (e.key === \'Escape\') closeNavMenus(); });
+        window.addEventListener(\'resize\', () => { if (!isMobileNav()) closeNavMenus(); });
     </script>
     <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
@@ -4603,6 +4622,9 @@ html_parts.append('''
             document.getElementById(\'nav-hiver\').classList.toggle(\'active\', isHiver);
             document.getElementById(\'nav-bixi\').classList.toggle(\'active\', isBixi);
             document.getElementById(\'nav-arr\').classList.toggle(\'active\', isArr);
+            document.getElementById(\'nav-arr-menu\').classList.toggle(\'active\', isArr);
+            document.getElementById(\'nav-bixi-menu\').classList.toggle(\'active\', isBixi);
+            document.getElementById(\'nav-more\').classList.toggle(\'active\', isArr || isBixi);
             document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
             document.getElementById(\'nav-methodo-menu\').classList.toggle(\'active\', isMeth);
             if (isGlobal) renderGlobalPage();
