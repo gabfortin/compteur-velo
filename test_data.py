@@ -40,7 +40,11 @@ def parse_periode(s):
     s = re.sub(r'[+-]\d{2}$', '', s).strip()
     return datetime.fromisoformat(s)
 
-cutoff = datetime.now() - timedelta(days=365)
+# Même début de fenêtre que genMap.py (publié dans data/site.json) : recalculer
+# « maintenant − 365 jours » ici décalerait la limite de quelques minutes et
+# ferait différer la première journée dès qu'une heure pile passe entre les deux.
+with open(SITE_DATA_FILE, encoding='utf-8') as f:
+    cutoff = datetime.fromisoformat(json.load(f)['windowStart'])
 HOURLY_DAYS = 90   # doit correspondre à genMap.py
 
 # csv_data[instance][direction] = [(label, volume), ...]
@@ -105,7 +109,7 @@ with open(SITE_DATA_FILE, encoding='utf-8') as f:
     site = json.load(f)
 
 REQUIRED_KEYS = [
-    'version', 'generatedAt', 'counters', 'HOURLY_DAYS', 'allChartData', 'allDailyData',
+    'version', 'generatedAt', 'windowStart', 'counters', 'HOURLY_DAYS', 'allChartData', 'allDailyData',
     'hourProfile', 'countersByArrondissement', 'counterLocations', 'gappyCounters',
     'anomalyDays', 'vfDataQuality', 'weatherData', 'bixiNearby', 'bixiExceedsDays',
     'bixiYearly', 'historicalYearlyTotals', 'historicalYearlyCounters',

@@ -20,6 +20,9 @@ except FileNotFoundError:
 
 # Fenêtre glissante de données publiées (data/site.json)
 WINDOW_DAYS = 365
+# Début de la fenêtre, calculé une seule fois : publié dans data/site.json pour
+# que test_data.py applique exactement la même limite.
+WINDOW_START = datetime.now().replace(microsecond=0) - timedelta(days=WINDOW_DAYS)
 # Au-delà de HOURLY_DAYS (comptés depuis la dernière donnée de chaque compteur),
 # seuls les totaux journaliers sont publiés — allège les données de ~50 %.
 HOURLY_DAYS = 90
@@ -42,8 +45,7 @@ def is_within_window(date_str):
     try:
         clean = re.sub(r'[+-]\d{2}$', '', date_str.strip('"').strip())
         row_date = datetime.fromisoformat(clean)
-        cutoff_date = datetime.now() - timedelta(days=WINDOW_DAYS)
-        return row_date >= cutoff_date
+        return row_date >= WINDOW_START
     except:
         return False
 
@@ -186,7 +188,7 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
             meta_cache[cid]['rue_1'] = localisation_noms[cid]
 
     # Construire la structure compatible avec data{} (fenêtre WINDOW_DAYS, même filtre)
-    cutoff = datetime.now() - timedelta(days=WINDOW_DAYS)
+    cutoff = WINDOW_START
     result = {}
 
     # Date max globale dans le fichier (toutes sources confondues) pour classifier les groupes
@@ -676,6 +678,7 @@ print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} com
 site_data = {
     'version':     _APP_VERSION,
     'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%d à %H:%M'),
+    'windowStart': WINDOW_START.isoformat(sep=' '),
 }
 
 # Grouper par arrondissement (prendre le premier row disponible toutes directions confondues)
