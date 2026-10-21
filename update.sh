@@ -32,13 +32,7 @@ if [ "$CSV_CHANGED" = false ] && [ "$BIXI_CHANGED" = false ] && [ "$COMPTEURS_CH
     exit 0
 fi
 
-# ── Générer le HTML ────────────────────────────────────────────────────────────
-echo "$LOG Historique BIXI..."
-python3 bixi_stats.py
-echo "$LOG Génération du HTML..."
-python3 genMap.py
-
-# ── Incrémenter la version (patch) ────────────────────────────────────────────
+# ── Incrémenter la version (patch) — avant la génération, affichée par la page ─
 if [ -f version.txt ]; then
     CURRENT_VERSION=$(cat version.txt | tr -d '[:space:]')
     IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$CURRENT_VERSION"
@@ -48,20 +42,27 @@ if [ -f version.txt ]; then
     echo "$LOG Version incrémentée : $CURRENT_VERSION → $NEW_VERSION"
 fi
 
+# ── Générer les données (data/site.json ; la page elle-même est statique) ─────
+echo "$LOG Historique BIXI..."
+python3 bixi_stats.py
+echo "$LOG Génération des données..."
+python3 genMap.py
+
 # ── Valider les données ────────────────────────────────────────────────────────
 echo "$LOG Validation des données..."
+python3 -m unittest test_site_format
 python3 test_data.py
 
 # ── Publier sur GitHub ─────────────────────────────────────────────────────────
 echo "$LOG Vérification des changements..."
-git add index.html
+git add data/site.json
 # Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
 [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
 [ -f bixi_cache.json ] && git add bixi_cache.json
 [ -f version.txt ] && git add version.txt
 
 if git diff --staged --quiet; then
-    echo "$LOG Aucun changement dans index.html — rien à publier."
+    echo "$LOG Aucun changement dans data/site.json — rien à publier."
 else
     git commit -m "Mise à jour automatique — $(date '+%Y-%m-%d')"
     # Retry push (jusqu'à 3 tentatives) pour absorber les erreurs serveur GitHub transitoires

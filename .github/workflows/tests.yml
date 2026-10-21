@@ -1,0 +1,38 @@
+name: Tests de la page
+
+# Vérifie la page statique (index.html, assets/) avec les données publiées
+# (data/site.json) à chaque modification du code, avant la fusion.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'assets/**'
+      - 'data/**'
+      - '*.py'
+      - '.github/workflows/tests.yml'
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer le navigateur de test
+        run: |
+          pip install --no-cache-dir playwright
+          python3 -m playwright install --with-deps chromium
+
+      - name: Tests unitaires
+        run: python3 -m unittest test_site_format
+
+      - name: Test de la page dans le navigateur
+        run: python3 test_site.py

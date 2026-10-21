@@ -1,6 +1,6 @@
 """
-Tests de validation : vérifie que les données dans index.html correspondent
-exactement aux données du fichier cyclistes.csv.
+Tests de validation : vérifie que les données publiées (data/site.json)
+correspondent exactement aux données du fichier cyclistes.csv.
 """
 import csv
 import json
@@ -9,6 +9,8 @@ import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
+
+from site_format import SITE_DATA_FILE, decode_hour_runs, encode_hour_runs
 
 PASS = "\033[92m PASS\033[0m"
 FAIL = "\033[91m FAIL\033[0m"
@@ -95,127 +97,150 @@ if os.path.exists('compteurs.csv'):
             vf_instances.add(f"vf-{row['id_compteur']}")
     print(f"  Instances vf- (compteurs.csv) : {len(vf_instances)}")
 
-# ─── 2. Parser index.html ────────────────────────────────────────────────────
+# ─── 2. Charger data/site.json ───────────────────────────────────────────────
 
-print("\n=== Chargement de index.html ===")
+print(f"\n=== Chargement de {SITE_DATA_FILE} ===")
 
-with open('index.html', encoding='utf-8') as f:
-    html = f.read()
+with open(SITE_DATA_FILE, encoding='utf-8') as f:
+    site = json.load(f)
 
-# Nouvelle structure : allChartData['inst'] = { labels: [...], datasets: [...] }
-pattern = r"allChartData\['([^']+)'\]\s*=\s*\{\s*labels:\s*(\[.*?\]),\s*datasets:\s*(\[.*?\])\s*\};"
-matches = re.findall(pattern, html, re.DOTALL)
+REQUIRED_KEYS = [
+    'version', 'generatedAt', 'counters', 'HOURLY_DAYS', 'allChartData', 'allDailyData',
+    'hourProfile', 'countersByArrondissement', 'counterLocations', 'gappyCounters',
+    'anomalyDays', 'vfDataQuality', 'weatherData', 'bixiNearby', 'bixiExceedsDays',
+    'bixiYearly', 'historicalYearlyTotals', 'historicalYearlyCounters',
+    'counterHistoricalData', 'globalStats',
+]
+missing_keys = [k for k in REQUIRED_KEYS if k not in site]
+check("Toutes les clés attendues par la page sont présentes", not missing_keys,
+      f"Clés manquantes : {missing_keys}")
+check("HOURLY_DAYS identique à genMap.py", site.get('HOURLY_DAYS') == HOURLY_DAYS,
+      f"site.json={site.get('HOURLY_DAYS')}, attendu={HOURLY_DAYS}")
 
-html_data = {}
-for inst, labels_json, datasets_json in matches:
-    labels = json.loads(labels_json)
-    datasets = json.loads(datasets_json)
+site_data = {}
+for inst, chart in site['allChartData'].items():
+    runs = chart['hours']
+    labels = decode_hour_runs(runs)
+    datasets = chart['datasets']
+    # Les plages doivent être maximales (encodage canonique, comme genMap.py)
+    if encode_hour_runs(labels) != runs:
+        fail(f"[{inst}] Plages horaires canoniques", "Plages fusionnables ou mal formées")
+    if any(len(ds['data']) != len(labels) for ds in datasets):
+        fail(f"[{inst}] Longueur des séries horaires", "Séries et étiquettes de longueurs différentes")
     # Volumes combinés (somme de toutes les directions à chaque position)
     combined = [
         sum(ds['data'][i] or 0 for ds in datasets)
         for i in range(len(labels))
     ]
-    html_data[inst] = {
+    site_data[inst] = {
         'labels':   labels,
         'combined': combined,
         'datasets': datasets,
     }
 
-print(f"  Instances trouvées : {len(html_data)}")
+print(f"  Instances trouvées : {len(site_data)}")
 
-daily_pattern = r"allDailyData\['([^']+)'\]\s*=\s*\{\s*labels:\s*(\[.*?\]),\s*data:\s*(\[\[.*?\]\])\s*\};"
-html_daily = {}
-for inst, labels_json, data_json in re.findall(daily_pattern, html, re.DOTALL):
-    labels = json.loads(labels_json)
-    series = json.loads(data_json)
-    html_daily[inst] = {
+site_daily = {}
+for inst, daily in site['allDailyData'].items():
+    labels = daily['labels']
+    series = daily['data']
+    site_daily[inst] = {
         'labels':   labels,
         'combined': [sum(s[i] or 0 for s in series) for i in range(len(labels))],
     }
-print(f"  Instances journalières : {len(html_daily)}")
+print(f"  Instances journalières : {len(site_daily)}")
 
 # ─── 3. Tests ────────────────────────────────────────────────────────────────
 
 print("\n=== Tests de couverture ===")
 
 csv_instances  = set(csv_data.keys())
-html_instances = set(html_data.keys())
-# Les instances HTML peuvent inclure des vf- (compteurs.csv) en plus de cyclistes.csv
+site_instances = set(site_data.keys())
+# Les instances publiées peuvent inclure des vf- (compteurs.csv) en plus de cyclistes.csv
 known_instances = csv_instances | vf_instances
 
-check("Toutes les instances cyclistes.csv sont dans le HTML",
-      csv_instances.issubset(html_instances),
-      f"Manquantes dans HTML : {csv_instances - html_instances}")
+check("Toutes les instances cyclistes.csv sont dans les données",
+      csv_instances.issubset(site_instances),
+      f"Manquantes dans les données : {csv_instances - site_instances}")
 
-check("Aucune instance inconnue dans le HTML",
-      html_instances.issubset(known_instances),
-      f"Instances inconnues : {html_instances - known_instances}")
+check("Aucune instance inconnue dans les données",
+      site_instances.issubset(known_instances),
+      f"Instances inconnues : {site_instances - known_instances}")
 
 print("\n=== Tests de données par instance ===")
 
 label_re = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 
-for inst in sorted(csv_instances & html_instances):
+for inst in sorted(csv_instances & site_instances):
     csv_labels, csv_volumes, csv_days, csv_day_volumes = combined_for_instance(inst)
 
-    daily = html_daily.get(inst)
+    daily = site_daily.get(inst)
     check(f"[{inst}] Données journalières présentes", daily is not None)
     if daily:
         check(f"[{inst}] Jours identiques ({len(csv_days)} attendus)",
               daily['labels'] == csv_days,
-              f"HTML={len(daily['labels'])}, CSV={len(csv_days)}")
+              f"site.json={len(daily['labels'])}, CSV={len(csv_days)}")
         check(f"[{inst}] Totaux journaliers identiques",
               daily['combined'] == csv_day_volumes,
-              f"Premier écart : {next((f'{d} html={a} csv={b}' for d,a,b in zip(csv_days, daily['combined'], csv_day_volumes) if a!=b), 'N/A')}")
-    html_labels  = html_data[inst]['labels']
-    html_volumes = html_data[inst]['combined']
+              f"Premier écart : {next((f'{d} site={a} csv={b}' for d,a,b in zip(csv_days, daily['combined'], csv_day_volumes) if a!=b), 'N/A')}")
+    site_labels  = site_data[inst]['labels']
+    site_volumes = site_data[inst]['combined']
 
     check(f"[{inst}] Nombre de points ({len(csv_labels)} attendus)",
-          len(html_labels) == len(csv_labels),
-          f"HTML={len(html_labels)}, CSV={len(csv_labels)}")
+          len(site_labels) == len(csv_labels),
+          f"site.json={len(site_labels)}, CSV={len(csv_labels)}")
 
-    if len(html_labels) != len(csv_labels):
+    if len(site_labels) != len(csv_labels):
         continue
 
     check(f"[{inst}] Labels identiques et triés",
-          html_labels == csv_labels,
-          f"Premier écart : {next((i for i,(a,b) in enumerate(zip(html_labels,csv_labels)) if a!=b), 'N/A')}")
+          site_labels == csv_labels,
+          f"Premier écart : {next((i for i,(a,b) in enumerate(zip(site_labels,csv_labels)) if a!=b), 'N/A')}")
 
     check(f"[{inst}] Volumes combinés identiques",
-          html_volumes == csv_volumes,
-          f"Premier écart : {next((f'i={i} html={a} csv={b}' for i,(a,b) in enumerate(zip(html_volumes,csv_volumes)) if a!=b), 'N/A')}")
+          site_volumes == csv_volumes,
+          f"Premier écart : {next((f'i={i} site={a} csv={b}' for i,(a,b) in enumerate(zip(site_volumes,csv_volumes)) if a!=b), 'N/A')}")
 
-    bad_labels = [l for l in html_labels if not label_re.match(l)]
+    bad_labels = [l for l in site_labels if not label_re.match(l)]
     check(f"[{inst}] Format des labels (YYYY-MM-DD HH:MM)",
           len(bad_labels) == 0,
           f"Labels malformés : {bad_labels[:3]}")
 
-    old = [l for l in html_labels if datetime.fromisoformat(l) < cutoff]
+    old = [l for l in site_labels if datetime.fromisoformat(l) < cutoff]
     check(f"[{inst}] Aucune donnée hors période 12 mois",
           len(old) == 0,
           f"{len(old)} entrées trop anciennes, ex: {old[:2]}")
 
     check(f"[{inst}] Somme des volumes cohérente",
-          sum(html_volumes) == sum(csv_volumes),
-          f"HTML={sum(html_volumes)}, CSV={sum(csv_volumes)}")
+          sum(site_volumes) == sum(csv_volumes),
+          f"site.json={sum(site_volumes)}, CSV={sum(csv_volumes)}")
 
     # Vérifier que le nombre de datasets correspond au nombre de directions
     n_dirs_csv  = len(csv_data[inst])
-    n_dirs_html = len(html_data[inst]['datasets'])
+    n_dirs_site = len(site_data[inst]['datasets'])
     check(f"[{inst}] Nombre de directions ({n_dirs_csv} attendues)",
-          n_dirs_html == n_dirs_csv,
-          f"HTML={n_dirs_html}, CSV={n_dirs_csv}")
+          n_dirs_site == n_dirs_csv,
+          f"site.json={n_dirs_site}, CSV={n_dirs_csv}")
+
+print("\n=== Tests des blocs de graphiques ===")
+
+block_ids = [c[0] for c in site['counters']]
+check("Un bloc de graphique par compteur ayant des données",
+      set(site_instances).issubset(block_ids),
+      f"Sans bloc : {set(site_instances) - set(block_ids)}")
+check("Aucun bloc de graphique en double", len(block_ids) == len(set(block_ids)),
+      f"Doublons : {sorted({b for b in block_ids if block_ids.count(b) > 1})}")
 
 print("\n=== Tests des labels du dropdown ===")
 
-option_re = re.compile(r'<option value="([^"]+)">([^<]+)</option>')
-html_options = {m[0]: m[1] for m in option_re.findall(html) if m[0]}
+# Le menu est construit par assets/boot.js à partir de countersByArrondissement
+site_options = {c['value']: c['label'] for entries in site['countersByArrondissement'].values() for c in entries}
 
 for inst, meta in csv_meta.items():
-    if inst not in html_options:
+    if inst not in site_options:
         fail(f"[{inst}] Option présente dans dropdown", "Manquante")
         continue
-    label = html_options[inst]
+    label = site_options[inst]
     check(f"[{inst}] Label dropdown contient rue_1",
           meta['rue_1'] in label, f"'{meta['rue_1']}' absent de '{label}'")
     check(f"[{inst}] Label dropdown contient rue_2",
@@ -227,13 +252,12 @@ for inst, meta in csv_meta.items():
 
 print("\n=== Tests des optgroups ===")
 
-optgroup_re = re.compile(r'<optgroup label="([^"]+)">')
-html_groups = set(optgroup_re.findall(html))
+site_groups = set(site['countersByArrondissement'])
 csv_groups  = set(m['arrondissement'] for m in csv_meta.values())
 
 check("Tous les arrondissements cyclistes.csv sont des optgroups",
-      csv_groups.issubset(html_groups),
-      f"Manquants dans HTML : {csv_groups - html_groups}")
+      csv_groups.issubset(site_groups),
+      f"Manquants dans les données : {csv_groups - site_groups}")
 # Les arrondissements supplémentaires viennent des boucles magnétiques (compteurs.csv) — c'est normal
 
 # ─── Résumé ──────────────────────────────────────────────────────────────────
@@ -245,4 +269,4 @@ if failures:
         print(f"  • {f}")
     sys.exit(1)
 else:
-    print(f"\033[92mTous les tests sont passés. ({len(html_data)} instances validées)\033[0m")
+    print(f"\033[92mTous les tests sont passés. ({len(site_data)} instances validées)\033[0m")

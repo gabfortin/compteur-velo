@@ -6,4 +6,5 @@
 .claude
 .vscode
 ./logs*
-logs__pycache__
+logs
+__pycache__/

@@ -22,13 +22,23 @@ compteur-velo/
 │   ├── comptage_velo_2019.csv … comptage_velo_2025.csv
 │   └── localisation_des_compteurs_velo.csv
 ├── velo_meta_cache.json     # Cache Nominatim (arrondissement + rue des boucles magnétiques)
-├── genMap.py                # Script de génération du site HTML
-├── index.html               # Site généré (ne pas modifier manuellement)
+├── genMap.py                # Script de génération des données (data/site.json)
+├── site_format.py           # Format de data/site.json (encodage des heures) — partagé avec les tests
+├── index.html               # Page statique (HTML) — modifiable directement
+├── assets/
+│   ├── style.css            # Styles de la page
+│   ├── boot.js              # Charge data/site.json, construit les menus et les blocs, puis lance app.js
+│   └── app.js               # Logique de la page (graphiques, carte, onglets)
+├── data/
+│   └── site.json            # Données générées chaque jour par genMap.py (ne pas modifier manuellement)
 ├── favico.png               # Icône de l'application
 ├── og-image.png             # Image d’aperçu lors du partage (Open Graph, 1200×630)
-├── test_data.py             # Suite de tests de validation des données
+├── test_data.py             # Validation des données (data/site.json ↔ CSV)
+├── test_site_format.py      # Tests unitaires de site_format.py
+├── test_site.py             # Test de la page dans un navigateur (Playwright)
 ├── .github/workflows/
-│   └── update.yml           # Automatisation principale — cron GitHub Actions quotidien
+│   ├── update.yml           # Automatisation principale — cron GitHub Actions quotidien
+│   └── tests.yml            # Tests de la page à chaque modification du code
 ├── fetch_data.sh            # Téléchargement des 3 CSV — partagé entre update.yml et update.sh
 ├── update.sh                # Pipeline d'automatisation alternatif (auto-hébergement Docker)
 ├── Dockerfile               # Image Docker pour l'automatisation alternative (cron quotidien)
@@ -46,19 +56,38 @@ compteur-velo/
 
 ```
 cyclistes.csv   ─┐
-compteurs.csv   ─┤──  genMap.py  →  index.html  →  GitHub Pages
-bixi.csv        ─┤
-hist_cache.json ─┘
+compteurs.csv   ─┤──  genMap.py  →  data/site.json  ─┐
+bixi.csv        ─┤                                    ├──  GitHub Pages
+hist_cache.json ─┘    index.html + assets/ (statiques) ─┘
 ```
 
-`genMap.py` lit les CSV des années courante et précédente (fenêtre glissante de 12 mois) et le cache historique, filtre et transforme les données, puis génère un fichier HTML autonome (CSS + données + JavaScript inline). Il n'y a aucune dépendance serveur : `index.html` s'ouvre directement dans un navigateur.
+`genMap.py` lit les CSV des années courante et précédente (fenêtre glissante de 12 mois) et le cache historique, filtre et transforme les données, puis écrit **uniquement** `data/site.json`. La page elle-même (`index.html`, `assets/style.css`, `assets/app.js`) est statique : on peut modifier le style ou le code et pousser directement, sans relancer la génération.
 
-Pour régénérer le site manuellement après une mise à jour du CSV :
+Au chargement, `assets/boot.js` récupère `data/site.json` (revalidé à chaque visite pour toujours afficher les données du jour), construit les menus de compteurs et les blocs de graphiques, puis charge `assets/app.js`.
+
+Pour régénérer les données manuellement après une mise à jour du CSV :
 
 ```bash
 python3 genMap.py
 python3 test_data.py   # Valide les données après génération
 ```
+
+Pour voir la page en local, il faut un petit serveur (le navigateur bloque le chargement de `data/site.json` depuis un fichier ouvert directement) :
+
+```bash
+python3 -m http.server 8000   # puis ouvrir http://localhost:8000
+```
+
+### Tests
+
+```bash
+python3 -m unittest test_site_format   # Encodage des heures (aucune donnée requise)
+python3 test_data.py                   # data/site.json ↔ cyclistes.csv / compteurs.csv
+pip install playwright && python3 -m playwright install chromium
+python3 test_site.py                   # La page s'affiche sans erreur avec data/site.json
+```
+
+Le workflow quotidien exécute les trois avant de publier ; `tests.yml` exécute les tests unitaires et le test de la page à chaque modification du code.
 
 ---
 
@@ -293,7 +322,7 @@ BIXI_RADIUS_M = 150
 
 Pour chaque trajet, si la station de **départ ou d'arrivée** se trouve dans le rayon d'un compteur, ce compteur est incrémenté pour la date du trajet. Un même trajet ne compte qu'une seule fois par compteur, même si les deux stations sont dans son rayon.
 
-Résultat : deux structures injectées dans le JS :
+Résultat : deux structures publiées dans `data/site.json` :
 
 ```javascript
 // Nombre de trajets BIXI par compteur par jour
@@ -310,15 +339,15 @@ const bixiExceedsDays = {
 };
 ```
 
-### Étape 5 — Génération du HTML
+### Étape 5 — Écriture de `data/site.json`
 
-Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `index.html`.
+Toutes les données utilisées par la page sont réunies dans le dictionnaire `site_data`, puis écrites dans `data/site.json` (JSON compact, UTF-8).
 
-**Structure HTML produite :**
+**Structure de la page statique (`index.html`) :**
 
 ```
 <html>
-  <head>                 ← CSS inline + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + Google Analytics
+  <head>                 ← assets/style.css + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + GoatCounter
   <body>
     <nav #topbar>        ← Barre de navigation : liens Pistes / Compteurs + lien profil gabfortin.com
     .site-header         ← Logo, titre, sous-titre (liens vers données ouvertes Ville + BIXI)
@@ -337,21 +366,26 @@ Le HTML est construit par concaténation dans `html_parts`, puis écrit dans `in
       #chart-map-layout  ← Grid 2 colonnes sur desktop, empilé sur mobile
         #chart-area
           #noDataMsg     ← Message "Aucune donnée disponible" (affiché si période vide)
-          [N × .table-container]  ← Un div par compteur (masqué par défaut)
+          [N × .table-container]  ← Un div par compteur (masqué par défaut), ajouté par boot.js
                                      Le titre <h2> contient un badge cliquable indiquant le type de capteur
         #map             ← Carte Leaflet avec légende de types
-    <script>             ← Données + logique JS inline
+    <script boot.js>     ← Charge data/site.json puis assets/app.js
     .watermark           ← Crédit auteur + avertissement qualité des données + timestamp de génération
 ```
 
-**Données injectées dans le JS :**
+**Contenu de `data/site.json` :**
 
-Pour alléger le HTML (~7 Mo au lieu de ~18 Mo pour 12 mois), le détail horaire n'est conservé que pour les `HOURLY_DAYS` (90) derniers jours de chaque compteur, comptés depuis sa dernière donnée. Au-delà, seuls les totaux journaliers (`allDailyData`) sont intégrés, et le profil par heure (`hourProfile`) est précalculé pour les périodes de 6 et 12 mois afin que l'heure de pointe reste exacte.
+Pour alléger les données, le détail horaire n'est conservé que pour les `HOURLY_DAYS` (90) derniers jours de chaque compteur, comptés depuis sa dernière donnée. Au-delà, seuls les totaux journaliers (`allDailyData`) sont publiés, et le profil par heure (`hourProfile`) est précalculé pour les périodes de 6 et 12 mois afin que l'heure de pointe reste exacte.
+
+Les étiquettes horaires sont stockées en plages d'heures consécutives (`hours: [[première étiquette, nombre d'heures], ...]`, voir `site_format.py`) puis redéployées en `labels` par `assets/app.js` : le fichier passe ainsi d'environ 7 Mo à 2 Mo.
+
+Les exemples ci-dessous montrent chaque clé telle que `assets/app.js` l'expose (variables globales de même nom) :
 
 ```javascript
 const HOURLY_DAYS = 90;
 
 // Données horaires par instance et direction (HOURLY_DAYS derniers jours)
+// Dans site.json : { hours: [["2025-11-04 14:00", 2160]], datasets: [...] }
 allChartData['det-00709-01'] = {
     labels: ["2025-11-04 14:00", ...],
     datasets: [
@@ -401,9 +435,9 @@ const weatherData = { "2026-05-21": { tmax: 15.1, tmin: 7.2, precip: 0, snow: 0,
 
 ---
 
-## Logique JavaScript — `index.html`
+## Logique JavaScript — `assets/app.js`
 
-Tout le JavaScript est inline dans le HTML généré.
+La logique de la page est dans `assets/app.js` (statique). Il est chargé par `assets/boot.js` une fois `data/site.json` récupéré, et lit les données dans `window.SITE_DATA`.
 
 ### Variables globales
 
@@ -423,11 +457,11 @@ Tout le JavaScript est inline dans le HTML généré.
 | `viewMode`                  | `'timeline'` (courbe horaire) ou `'daily'` (barres journalières)                    |
 | `showBixi`                  | `false` — overlay BIXI désactivé par défaut                                         |
 | `specificDate`              | Date sélectionnée en mode "Jour spécifique" (format `YYYY-MM-DD`)                   |
-| `gappyCounters`             | `Set` des instances avec lacunes significatives — injecté par `genMap.py`            |
-| `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` — injecté par `genMap.py`    |
-| `bixiNearby`                | Trajets BIXI par compteur par jour — injecté par `genMap.py`                        |
-| `bixiExceedsDays`           | Jours où BIXI > compteur — injecté par `genMap.py`                                  |
-| `weatherData`               | Météo quotidienne `{date: {tmax, tmin, precip, snow, icon}}` — injecté par `genMap.py` |
+| `gappyCounters`             | `Set` des instances avec lacunes significatives — depuis `data/site.json`            |
+| `anomalyDays`               | Objet `{instance: {date: {total, expected, z_score}}}` — depuis `data/site.json`    |
+| `bixiNearby`                | Trajets BIXI par compteur par jour — depuis `data/site.json`                        |
+| `bixiExceedsDays`           | Jours où BIXI > compteur — depuis `data/site.json`                                  |
+| `weatherData`               | Météo quotidienne `{date: {tmax, tmin, precip, snow, icon}}` — depuis `data/site.json` |
 | `map`                       | Instance Leaflet (initialisée dans un `setTimeout`)                                  |
 
 ### Fonctions principales
@@ -447,7 +481,7 @@ Selon `displayMode` :
 Lit les totaux journaliers de `allDailyData` pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
 
 #### Écran de chargement
-Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement des données inline. Il est retiré à la fin du script principal, après l'initialisation de la carte, avec un repli sur l'événement `load` pour ne jamais bloquer la page en cas d'erreur JS.
+Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement de `data/site.json`. Il est retiré à la fin de `assets/app.js`, après l'initialisation de la carte, avec un repli (erreur JS ou 20 s) pour ne jamais bloquer la page. Si les données ne peuvent pas être chargées, `boot.js` y affiche un message d'erreur.
 
 #### `createChart(id)`
 Crée le graphique Chart.js pour le compteur donné. Si `showBixi` est actif et que `bixiNearby[id]` contient des données pour la période affichée, un dataset BIXI est ajouté :
