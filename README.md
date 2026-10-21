@@ -137,7 +137,7 @@ git push
 
 ## Sources de données
 
-### `cyclistes.csv` — Détecteurs SUM (comptage permanent)
+### `cyclistes.csv` — Capteurs photo/vidéo (anciennement « Détecteurs SUM ») (comptage permanent)
 
 Fichier CSV construit à partir du [portail de données ouvertes de la Ville de Montréal](https://donnees.montreal.ca/fr/dataset/cyclistes), où les données sont publiées par année sous les titres **« Velos - Comptage AAAA - Ville »** (`cyclistes_AAAA.csv`). `fetch_data.sh` télécharge les fichiers de l'année courante et de l'année précédente et les fusionne dans `cyclistes.csv`. L'ancien fichier unique `cyclistes.csv` du portail n'est plus mis à jour depuis août 2026 ; il ne sert qu'en repli. Contient les passages horaires des détecteurs installés sur des fûts le long des pistes cyclables.
 
@@ -266,6 +266,10 @@ Champs récupérés par jour : `temperature_2m_max`, `temperature_2m_min`, `prec
 Le résultat est embarqué dans le HTML sous la forme `const weatherData = {...}`, puis utilisé :
 1. pour exclure les jours sévères de la détection d'anomalies (`is_bad_weather()`)
 2. pour enrichir le tooltip des graphiques journaliers côté JS
+
+### Onglet Arrondissements
+
+Vue calculée entièrement côté navigateur à partir de `allDailyData`, `counterLocations`, `anomalyDays` et `weatherData` : statistiques de l'arrondissement choisi, carte et liste de ses compteurs, passages moyens par jour par mois, effet de la météo, et jours les plus et les moins achalandés avec leur météo. Pour que les totaux soient comparables, les classements ne retiennent que les jours où chaque compteur « en service » (ayant transmis dans les 7 jours avant ou après) a transmis des données, sans anomalie, en excluant la première et la dernière journée de chaque compteur (souvent partielles).
 
 ### Onglet BIXI — croissance de l'utilisation
 
