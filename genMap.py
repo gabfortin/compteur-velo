@@ -682,7 +682,9 @@ html_parts = ['''<html lang="fr">
     <link rel="apple-touch-icon" href="favico.png">
     <meta name="description" content="Passages de cyclistes à Montréal, compteur par compteur : graphiques horaires et journaliers, carte et historique depuis 2009, à partir des données ouvertes de la Ville. Mis à jour chaque jour.">
     <meta name="author" content="Gabriel Fortin">
-    <meta name="theme-color" content="#1DB860">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#1DB860" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b1310" media="(prefers-color-scheme: dark)">
     <link rel="canonical" href="https://compteurvelo.com/">
     <!-- Aperçu lors du partage (Open Graph / Twitter) -->
     <meta property="og:type" content="website">
@@ -1770,8 +1772,127 @@ html_parts = ['''<html lang="fr">
             :root { --glass: rgba(255,255,255,0.88); --glass-soft: rgba(255,255,255,0.7); }
             #topbar { background: rgba(255,255,255,0.94); }
         }
+        /* ── Thème sombre : suit le réglage de l'appareil ── */
+        .arr-type-fut    { background: rgba(29,184,96,0.12); color: #15803d; }
+        .arr-type-boucle { background: rgba(139,92,246,0.12); color: #6d28d9; }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --accent-strong: #3ddc84;
+                --accent-soft: rgba(29,184,96,0.18);
+                --accent-ring: rgba(29,184,96,0.30);
+                --text: #e4eee8;
+                --text-2: #b4c4bb;
+                --muted: #8b9d94;
+                --faint: #6c7e75;
+                --glass: rgba(24,33,29,0.62);
+                --glass-strong: rgba(34,45,40,0.82);
+                --glass-soft: rgba(28,38,34,0.48);
+                --glass-border: rgba(255,255,255,0.08);
+                --hairline: rgba(255,255,255,0.08);
+                --shadow: 0 1px 1px rgba(0,0,0,0.2), 0 10px 36px -8px rgba(0,0,0,0.5);
+                --shadow-lg: 0 2px 2px rgba(0,0,0,0.2), 0 24px 60px -16px rgba(0,0,0,0.6);
+                --inner: inset 0 1px 0 rgba(255,255,255,0.05);
+            }
+            html { background: #0b1310; }
+            body::before {
+                background:
+                    radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.16), transparent 62%),
+                    radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.12), transparent 62%),
+                    radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.10), transparent 62%),
+                    radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.06), transparent 62%),
+                    linear-gradient(160deg, #0b1411 0%, #0c1416 50%, #10131b 100%);
+            }
+            body::after { background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); }
+            h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #3ddc84 100%); }
+            .site-header img { box-shadow: 0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1) !important; }
+            select:hover { background: rgba(44,57,51,0.9); }
+            #topbar { background: rgba(18,26,23,0.72); }
+            .nav-link:hover, #topbar-profile:hover { background: rgba(255,255,255,0.07); }
+            .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
+            #profile-menu, #nav-more-menu { background: rgba(24,33,29,0.97); }
+            #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }
+            .global-top-row:hover, .arr-counter-row:hover { background: rgba(255,255,255,0.06); }
+            .arr-bar-wrap { background: rgba(255,255,255,0.08); }
+            #noDataMsg { border-color: rgba(255,255,255,0.12); }
+            .period-buttons .period-btn.active { background: rgba(255,255,255,0.12); border-color: transparent; }
+            .period-buttons .period-btn:hover { background: rgba(255,255,255,0.07); }
+            @media (min-width: 768px) {
+                .period-buttons { background: rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.06); }
+            }
+            /* Carte : tuiles assombries, contrôles vitrés sombres */
+            .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6); }
+            .leaflet-container { background: #1a2420; }
+            .leaflet-bar a { background: rgba(34,45,40,0.9) !important; border-color: rgba(255,255,255,0.08) !important; }
+            .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgba(34,45,40,0.95) !important; color: var(--text); }
+            .leaflet-control-attribution { background: rgba(18,26,23,0.75) !important; color: var(--muted); }
+            .leaflet-control-attribution a { color: var(--text-2); }
+            #cyclosm-btn, #map-legend { background: rgba(24,33,29,0.85); }
+            /* Avertissements et pastilles : teintes plus claires sur fond sombre */
+            #dataWarning, #anomalyWarning, #vfQualityWarning.vf-warn-lag { background: rgba(245,158,11,0.12); color: #fcd34d; }
+            #vfQualityWarning.vf-warn-stopped { background: rgba(239,68,68,0.12); color: #fca5a5; }
+            .anomaly-info-btn { color: #fcd34d; }
+            .bixi-btn { color: #f87171; }
+            .combine-clear-btn { color: #f87171; }
+            .bixi-exceeds-badge, .mbadge-bixi { color: #fca5a5; }
+            .counter-type-fut, .mbadge-fut { color: #7dd3fc; }
+            .counter-type-boucle, .mbadge-boucle, .arr-type-boucle { color: #c4b5fd; }
+            .arr-type-fut { color: #6ee7a0; }
+            .mbadge-meteo { color: #fcd34d; }
+            .algo-box { background: rgba(34,197,94,0.10); color: #86efac; }
+            .algo-box strong { color: #4ade80; }
+            .algo-warn { background: rgba(245,158,11,0.10); color: #fcd34d; }
+            #methodo-page code, .source-card-desc code { background: rgba(255,255,255,0.08) !important; color: var(--text-2); }
+            .bixi-up { color: #4ade80; }
+            .bixi-down { color: #f87171; }
+            /* Thèmes des pages Hiver et BIXI */
+            #hiver-page {
+                --accent-strong: #38bdf8;
+                --glass: rgba(18,32,40,0.62);
+                --glass-strong: rgba(26,44,54,0.82);
+                --glass-soft: rgba(22,38,46,0.48);
+                --glass-border: rgba(255,255,255,0.08);
+            }
+            #hiver-page::before {
+                background:
+                    radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.14), transparent 62%),
+                    radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.12), transparent 62%),
+                    radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.08), transparent 62%),
+                    linear-gradient(160deg, #0a1419 0%, #0b151c 50%, #0d1320 100%);
+            }
+            #hiver-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #38bdf8 100%); }
+            #nav-hiver.active { color: #38bdf8; }
+            #bixi-page { --accent-strong: #f87171; }
+            #bixi-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #f87171 100%); }
+            #nav-bixi.active { color: #f87171; }
+            #loading-screen {
+                background:
+                    radial-gradient(40vmax 40vmax at 20% 15%, rgba(29,184,96,0.16), transparent 60%),
+                    radial-gradient(36vmax 36vmax at 85% 85%, rgba(41,171,226,0.12), transparent 60%),
+                    #0b1310;
+            }
+        }
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            @media (prefers-color-scheme: dark) {
+                :root { --glass: rgba(24,33,29,0.94); --glass-soft: rgba(28,38,34,0.85); }
+                #topbar { background: rgba(18,26,23,0.96); }
+            }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
+        (function() {
+            const mq = window.matchMedia("(prefers-color-scheme: dark)");
+            function applyChartTheme() {
+                if (typeof Chart === "undefined") return;
+                Chart.defaults.color = mq.matches ? "#9fb0a7" : "#666";
+                Chart.defaults.borderColor = mq.matches ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
+                if (typeof charts !== "undefined") Object.values(charts).forEach(c => c && c.update && c.update("none"));
+            }
+            applyChartTheme();
+            mq.addEventListener("change", applyChartTheme);
+        })();
+    </script>
 </head>
 <body>
     <div id="loading-screen" role="status" aria-live="polite">
@@ -3765,7 +3886,6 @@ html_parts.append('''
 
         // ── Vue Arrondissement ───────────────────────────────────────────────
         const ARR_TYPE_LABEL = { fut: "Capteur photo/vidéo", boucle: "Capteur au sol" };
-        const ARR_TYPE_STYLE = { fut: "background:rgba(29,184,96,0.12);color:#15803d", boucle: "background:rgba(139,92,246,0.12);color:#6d28d9" };
         let arrMap = null, arrLayer = null, arrReady = false;
 
         function arrNames() {
@@ -3902,7 +4022,7 @@ html_parts.append('''
                 const type = loc.type || "fut";
                 return "<div class=\\"arr-row arr-counter-row\\" onclick=\\"goToCounter('" + c.id + "')\\">" +
                     "<span class=\\"arr-name\\" title=\\"" + (loc.label || c.id).replace(/"/g, "&quot;") + "\\">" +
-                        "<span class=\\"arr-type\\" style=\\"" + ARR_TYPE_STYLE[type] + "\\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" + (loc.label || c.id) + "</span>" +
+                        "<span class=\\"arr-type arr-type-" + type + "\\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" + (loc.label || c.id) + "</span>" +
                     "<div class=\\"arr-bar-wrap\\"><div class=\\"arr-bar\\" style=\\"width:" + (c.avg / max * 100).toFixed(1) + "%\\"></div></div>" +
                     "<span class=\\"arr-vol\\">" + (c.stopped ? "⛔ inactif" : arrFmt(c.avg) + " / j") + "</span></div>";
             }).join("");
