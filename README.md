@@ -271,7 +271,9 @@ Le résultat est embarqué dans le HTML sous la forme `const weatherData = {...}
 
 `bixi_stats.py` télécharge les ZIP annuels publiés sur [bixi.com/en/open-data](https://bixi.com/en/open-data/) (formats 2014–2021 et 2022+) et en tire, pour chaque année : trajets par jour, répartition horaire, durée moyenne et répartition des durées, part des membres (jusqu'en 2021), nombre de stations actives et stations de départ les plus populaires. Le résultat est stocké dans `bixi_cache.json` (commité) ; seules les années absentes du cache sont téléchargées, donc l'exécution quotidienne (étape « Historique BIXI » du workflow) ne fait normalement rien, sauf en début d'année.
 
-`genMap.py` ajoute l'année en cours (calculée depuis `bixi.csv`, marquée `partial`) et injecte le tout dans `const bixiYearly`. L'onglet affiche les trajets par année, le cumul depuis le 1er janvier, les trajets par mois, un tableau annuel et un explorateur par année (tableau mensuel, heures, jours de semaine, durées, stations).
+Chaque année est résumée pour tout le réseau et pour « Montréal seulement » (clé `mtl`) : les trajets partis d'une station située dans l'un des 19 arrondissements de la Ville. Les stations sont situées par point-dans-polygone avec les [limites administratives](https://donnees.montreal.ca/dataset/limites-administratives-agglomeration) des données ouvertes ; si ce fichier est inaccessible, la colonne `STARTSTATIONARRONDISSEMENT` (2022+) sert de repli. Une année du cache sans clé `mtl` est recalculée.
+
+`genMap.py` ajoute l'année en cours (calculée depuis `bixi.csv`, marquée `partial`) et injecte le tout dans `const bixiYearly`. L'onglet propose un filtre « Tout le réseau / Montréal seulement » et affiche les trajets par année, le cumul depuis le 1er janvier, les trajets par mois, un tableau annuel et un explorateur par année (tableau mensuel, heures, jours de semaine, durées, stations).
 
 ### Étape 4 — Traitement BIXI
 

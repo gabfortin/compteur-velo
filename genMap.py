@@ -1,7 +1,7 @@
 import csv
 import glob
 import re
-from collections import defaultdict, Counter
+from collections import defaultdict
 import os
 from tqdm import tqdm
 import json
@@ -1682,6 +1682,11 @@ html_parts = ['''<html lang="fr">
                     background-clip: text;
         }
         #nav-bixi.active { color: #B91C1C; }
+        #bixi-scope { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+        #bixi-scope .hist-btn.active {
+            background: linear-gradient(180deg, #EF4444, #B91C1C);
+            box-shadow: 0 6px 18px -6px rgba(185,28,28,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
+        }
         #bixi-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
         #bixi-page .global-section { margin-bottom: 20px; }
         .bixi-chart { position: relative; height: 260px; }
@@ -2091,7 +2096,8 @@ def _haversine_m(lat1, lon1, lat2, lon2):
 
 BIXI_RADIUS_M = 150
 bixi_near_counter = defaultdict(lambda: defaultdict(int))
-bixi_live = bixi_stats.BixiYearAggregator()
+bixi_live = bixi_stats.BixiYearAggregator(
+    bixi_stats.load_montreal_polygons() if os.path.exists('bixi.csv') else None)
 
 if os.path.exists('bixi.csv'):
     with open('bixi.csv', encoding='utf-8') as f:
@@ -2143,18 +2149,10 @@ html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
 
 # Statistiques BIXI par année : années passées depuis bixi_cache.json
 # (bixi_stats.py), année du fichier bixi.csv calculée ici.
-bixi_years = bixi_stats.load_cache()
-_bixi_live = bixi_live.summary()
-if _bixi_live:
-    _live_year = max(Counter(d[:4] for d in _bixi_live['daily']).items(), key=lambda kv: kv[1])[0]
-    _bixi_live['daily'] = {d: n for d, n in _bixi_live['daily'].items() if d.startswith(_live_year)}
-    _bixi_live['trips'] = sum(_bixi_live['daily'].values())
-    if _live_year not in bixi_years:
-        _bixi_live['partial'] = int(_live_year) == datetime.now().year
-        bixi_years[_live_year] = _bixi_live
-for _y in bixi_years.values():
-    _y.pop('source', None)
-html_parts.append(f"const bixiYearly = {json.dumps(dict(sorted(bixi_years.items())), ensure_ascii=False, separators=(',', ':'))};\n")
+_live_year = bixi_live.live_year()
+bixi_years = bixi_stats.merge_live(bixi_stats.load_cache(), bixi_live.summary(_live_year),
+                                   _live_year, datetime.now().year)
+html_parts.append(f"const bixiYearly = {json.dumps(bixi_years, ensure_ascii=False, separators=(',', ':'))};\n")
 # Données historiques
 html_parts.append(f"const historicalYearlyTotals = {json.dumps(hist_yearly, ensure_ascii=False)};\n")
 html_parts.append(f"const historicalYearlyCounters = {json.dumps(hist_yearly_counters, ensure_ascii=False)};\n")
@@ -3726,27 +3724,36 @@ html_parts.append('''
         const bixiShort = v => v >= 1e6 ? (v / 1e6).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " M" : v >= 1e3 ? Math.round(v / 1e3) + " k" : v;
         const bixiFmtDate = d => new Date(d + "T00:00:00").toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
 
-        function bixiYears() {
-            return typeof bixiYearly === "undefined" ? [] : Object.keys(bixiYearly).sort();
+        // Périmètre affiché : tout le réseau, ou trajets partis d'une station de la Ville de Montréal
+        let bixiScope = "all";
+        let bixiData = {};
+        function bixiComputeData() {
+            bixiData = {};
+            if (typeof bixiYearly === "undefined") return;
+            Object.entries(bixiYearly).forEach(([y, s]) => {
+                const d = bixiScope === "mtl" ? s.mtl : s;
+                if (d && d.trips) bixiData[y] = { ...d, partial: s.partial };
+            });
         }
-        function bixiCompleteYears() { return bixiYears().filter(y => !bixiYearly[y].partial); }
+        function bixiYears() { return Object.keys(bixiData).sort(); }
+        function bixiCompleteYears() { return bixiYears().filter(y => !bixiData[y].partial); }
         function bixiCurrentYear() {
-            const ys = bixiYears().filter(y => bixiYearly[y].partial);
+            const ys = bixiYears().filter(y => bixiData[y].partial);
             return ys.length ? ys[ys.length - 1] : null;
         }
         function bixiLastDate(y) {
-            const ds = Object.keys(bixiYearly[y].daily).sort();
+            const ds = Object.keys(bixiData[y].daily).sort();
             return ds[ds.length - 1];
         }
         function bixiMonthly(y) {
             const m = new Array(12).fill(0);
-            Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { m[parseInt(d.slice(5, 7), 10) - 1] += n; });
+            Object.entries(bixiData[y].daily).forEach(([d, n]) => { m[parseInt(d.slice(5, 7), 10) - 1] += n; });
             return m;
         }
         // Trajets de l'année y jusqu'au jour mmdd inclus (pour comparer à date égale)
         function bixiSumUntil(y, mmdd) {
             let s = 0;
-            Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { if (d.slice(5) <= mmdd) s += n; });
+            Object.entries(bixiData[y].daily).forEach(([d, n]) => { if (d.slice(5) <= mmdd) s += n; });
             return s;
         }
         function bixiPct(a, b) { return b ? (a - b) / b * 100 : null; }
@@ -3775,18 +3782,18 @@ html_parts.append('''
             const cards = [];
             if (complete.length) {
                 const y = complete[complete.length - 1];
-                const prev = bixiYearly[String(+y - 1)];
+                const prev = bixiData[String(+y - 1)];
                 cards.push({
                     icon: "📅", title: "Année " + y, date: "Du 1er janvier au 31 décembre",
-                    total: bixiFmt(bixiYearly[y].trips), sub: "trajets",
-                    meta: prev ? "<span>" + bixiPctHtml(bixiPct(bixiYearly[y].trips, prev.trips)) + " vs " + (+y - 1) + "</span>" : "",
+                    total: bixiFmt(bixiData[y].trips), sub: "trajets",
+                    meta: prev ? "<span>" + bixiPctHtml(bixiPct(bixiData[y].trips, prev.trips)) + " vs " + (+y - 1) + "</span>" : "",
                 });
             }
             if (cur) {
                 const last = bixiLastDate(cur);
                 const prevY = String(+cur - 1);
-                const ytd = bixiYearly[cur].trips;
-                const prevYtd = bixiYearly[prevY] ? bixiSumUntil(prevY, last.slice(5)) : 0;
+                const ytd = bixiData[cur].trips;
+                const prevYtd = bixiData[prevY] ? bixiSumUntil(prevY, last.slice(5)) : 0;
                 cards.push({
                     icon: "🚀", title: cur + " à ce jour", date: "Jusqu’au " + bixiFmtDate(last),
                     total: bixiFmt(ytd), sub: "trajets",
@@ -3794,13 +3801,13 @@ html_parts.append('''
                 });
             }
             let best = null;
-            ys.forEach(y => Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { if (!best || n > best.n) best = { d, n }; }));
+            ys.forEach(y => Object.entries(bixiData[y].daily).forEach(([d, n]) => { if (!best || n > best.n) best = { d, n }; }));
             if (best) {
                 cards.push({ icon: "🏆", title: "Record en une journée", date: bixiFmtDate(best.d), total: bixiFmt(best.n), sub: "trajets", meta: "" });
             }
             if (complete.length >= 2) {
                 const first = complete[0], last = complete[complete.length - 1];
-                const a = bixiYearly[first].trips, b = bixiYearly[last].trips;
+                const a = bixiData[first].trips, b = bixiData[last].trips;
                 cards.push({
                     icon: "📈", title: "Croissance depuis " + first, date: first + " → " + last,
                     total: "×" + (b / a).toLocaleString("fr-CA", { maximumFractionDigits: 1 }), sub: "trajets annuels",
@@ -3822,15 +3829,15 @@ html_parts.append('''
             const ctx = document.getElementById("bixi-yearly-chart");
             const ys = bixiYears();
             if (!ctx || !ys.length) return;
-            const trips = ys.map(y => bixiYearly[y].trips);
+            const trips = ys.map(y => bixiData[y].trips);
             charts["__bixi_yearly__"] = new Chart(ctx, {
                 type: "bar",
                 data: {
-                    labels: ys.map(y => bixiYearly[y].partial ? y + "*" : y),
+                    labels: ys.map(y => bixiData[y].partial ? y + "*" : y),
                     datasets: [{
                         label: "Trajets",
                         data: trips,
-                        backgroundColor: ys.map(y => bixiYearly[y].partial ? "rgba(225,37,27,0.35)" : "rgba(225,37,27,0.80)"),
+                        backgroundColor: ys.map(y => bixiData[y].partial ? "rgba(225,37,27,0.35)" : "rgba(225,37,27,0.80)"),
                         borderColor: "#B91C1C",
                         borderWidth: 1,
                         borderRadius: 4,
@@ -3844,7 +3851,7 @@ html_parts.append('''
                             label: item => {
                                 const y = ys[item.dataIndex];
                                 const lines = [" " + bixiFmt(item.raw) + " trajets"];
-                                if (bixiYearly[y].partial) lines.push(" En cours (jusqu’au " + bixiFmtDate(bixiLastDate(y)) + ")");
+                                if (bixiData[y].partial) lines.push(" En cours (jusqu’au " + bixiFmtDate(bixiLastDate(y)) + ")");
                                 else if (item.dataIndex > 0 && ys[item.dataIndex - 1] === String(+y - 1)) {
                                     const p = bixiPct(item.raw, trips[item.dataIndex - 1]);
                                     lines.push(" " + (p >= 0 ? "+" : "−") + Math.abs(p).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " % vs " + (+y - 1));
@@ -3872,11 +3879,11 @@ html_parts.append('''
             }
             const datasets = ys.map(y => {
                 const byDay = {};
-                Object.entries(bixiYearly[y].daily).forEach(([d, n]) => {
+                Object.entries(bixiData[y].daily).forEach(([d, n]) => {
                     const k = d.slice(5) === "02-29" ? "02-28" : d.slice(5);
                     byDay[k] = (byDay[k] || 0) + n;
                 });
-                const last = bixiYearly[y].partial ? bixiLastDate(y).slice(5) : "12-31";
+                const last = bixiData[y].partial ? bixiLastDate(y).slice(5) : "12-31";
                 let cum = 0;
                 const data = labels.map(k => { cum += byDay[k] || 0; return k <= last ? cum : null; });
                 const color = bixiYearColor(y, ys);
@@ -3918,7 +3925,7 @@ html_parts.append('''
             if (!ctx || !ys.length) return;
             const datasets = ys.map(y => {
                 const m = bixiMonthly(y);
-                const lastMonth = bixiYearly[y].partial ? parseInt(bixiLastDate(y).slice(5, 7), 10) : 12;
+                const lastMonth = bixiData[y].partial ? parseInt(bixiLastDate(y).slice(5, 7), 10) : 12;
                 const color = bixiYearColor(y, ys);
                 const rank = ys.length - 1 - ys.indexOf(y);
                 return {
@@ -3951,8 +3958,8 @@ html_parts.append('''
             const ys = bixiYears().slice().reverse();
             if (!ys.length) { el.innerHTML = ""; return; }
             const rows = ys.map(y => {
-                const s = bixiYearly[y];
-                const prev = bixiYearly[String(+y - 1)];
+                const s = bixiData[y];
+                const prev = bixiData[String(+y - 1)];
                 const days = Object.keys(s.daily).length;
                 const m = bixiMonthly(y);
                 const bestMonth = m.indexOf(Math.max(...m));
@@ -3977,10 +3984,10 @@ html_parts.append('''
         }
 
         function renderBixiYear(y) {
-            const s = bixiYearly[y];
+            const s = bixiData[y];
             if (!s) return;
             const prevY = String(+y - 1);
-            const prev = bixiYearly[prevY];
+            const prev = bixiData[prevY];
             const m = bixiMonthly(y);
             const pm = prev ? bixiMonthly(prevY) : null;
             const lastDate = s.partial ? bixiLastDate(y) : null;
@@ -4059,8 +4066,10 @@ html_parts.append('''
             ).join("") || "<p class=\\"bixi-note\\">Aucune donnée de station.</p>";
         }
 
-        function renderBixiPage() {
-            if (charts["__bixi_yearly__"]) return;
+        let bixiReady = false;
+        function renderBixiAll() {
+            Object.keys(charts).filter(k => k.startsWith("__bixi_")).forEach(k => { charts[k].destroy(); delete charts[k]; });
+            bixiComputeData();
             const ys = bixiYears();
             renderBixiCards();
             if (!ys.length) return;
@@ -4069,9 +4078,23 @@ html_parts.append('''
             renderBixiMonthlyChart();
             renderBixiAnnualTable();
             const sel = document.getElementById("bixiYearSelect");
-            sel.innerHTML = ys.slice().reverse().map(y => "<option value=\\"" + y + "\\">" + y + (bixiYearly[y].partial ? " (en cours)" : "") + "</option>").join("");
-            sel.addEventListener("change", function() { renderBixiYear(this.value); });
+            const keep = sel.value;
+            sel.innerHTML = ys.slice().reverse().map(y => "<option value=\\"" + y + "\\">" + y + (bixiData[y].partial ? " (en cours)" : "") + "</option>").join("");
+            if (keep && bixiData[keep]) sel.value = keep;
             renderBixiYear(sel.value);
+        }
+
+        function renderBixiPage() {
+            if (bixiReady) return;
+            bixiReady = true;
+            document.getElementById("bixiYearSelect").addEventListener("change", function() { renderBixiYear(this.value); });
+            document.querySelectorAll("#bixi-scope button").forEach(btn => btn.addEventListener("click", function() {
+                if (bixiScope === this.dataset.scope) return;
+                bixiScope = this.dataset.scope;
+                document.querySelectorAll("#bixi-scope button").forEach(b => b.classList.toggle("active", b === this));
+                renderBixiAll();
+            }));
+            renderBixiAll();
         }
 
         // ── Fonctions historique compteur ────────────────────────────────────
@@ -4525,6 +4548,11 @@ html_parts.append('''
         <h1>🚲 BIXI à Montréal</h1>
         <p class="subtitle" style="display:block">La croissance du vélopartage, année après année</p>
       </div>
+      <div id="bixi-scope" role="group" aria-label="Périmètre">
+        <button class="hist-btn active" data-scope="all">Tout le réseau</button>
+        <button class="hist-btn" data-scope="mtl">Montréal seulement</button>
+      </div>
+      <p class="bixi-note" style="text-align:center;margin:0 0 18px;">« Montréal seulement » : trajets partis d’une station située dans l’un des 19 arrondissements de la Ville (sans Laval, Longueuil, Westmount, Mont-Royal, etc.).</p>
       <div id="bixi-cards"></div>
       <div class="global-section">
         <div class="global-section-title">📈 Trajets par année</div>
