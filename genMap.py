@@ -672,6 +672,7 @@ print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} com
 html_parts = ['''<html lang="fr">
 <head>
     <meta charset="utf-8">
+    <script>window.goatcounter = {path: function(p) { return location.host + p }}</script>
     <script data-goatcounter="https://gabfortin.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
