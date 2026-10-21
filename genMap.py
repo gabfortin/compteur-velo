@@ -1,7 +1,7 @@
 import csv
 import glob
 import re
-from collections import defaultdict
+from collections import defaultdict, Counter
 import os
 from tqdm import tqdm
 import json
@@ -9,6 +9,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 import math
 from statistics import mean, stdev, median
+import bixi_stats
 
 try:
     with open('version.txt') as _vf:
@@ -1667,6 +1668,46 @@ html_parts = ['''<html lang="fr">
             .hiver-chart-row { flex-direction: row; }
             .net-grid-4 { grid-template-columns: repeat(4, 1fr); }
         }
+        /* ── BIXI — thème rouge ── */
+        #bixi-page {
+            max-width: 1200px; margin: 0 auto; padding: 0 12px 40px;
+            --accent: #E1251B;
+            --accent-strong: #B91C1C;
+            --accent-soft: rgba(225,37,27,0.10);
+            --accent-ring: rgba(225,37,27,0.22);
+        }
+        #bixi-page h1 {
+            background: linear-gradient(120deg, #0f1f17 30%, #B91C1C 100%);
+            -webkit-background-clip: text;
+                    background-clip: text;
+        }
+        #nav-bixi.active { color: #B91C1C; }
+        #bixi-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+        #bixi-page .global-section { margin-bottom: 20px; }
+        .bixi-chart { position: relative; height: 260px; }
+        .bixi-chart-sm { position: relative; height: 200px; }
+        .bixi-note { font-size: 11px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+        .bixi-up   { color: #15803d; font-weight: 600; }
+        .bixi-down { color: #b91c1c; font-weight: 600; }
+        .bixi-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .bixi-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+        .bixi-table th {
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--hairline);
+        }
+        .bixi-table td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
+        .bixi-table th:first-child, .bixi-table td:first-child { text-align: left; }
+        .bixi-table tr:last-child td { border-bottom: none; }
+        .bixi-table td strong { color: var(--text); }
+        .bixi-chart-row { display: flex; flex-direction: column; gap: 20px; margin-top: 22px; }
+        .bixi-chart-col { flex: 1; min-width: 0; }
+        .bixi-chart-col > div:first-child { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: center; }
+        @media (min-width: 768px) {
+            #bixi-page { padding: 0 20px 40px; }
+            #bixi-cards { grid-template-columns: repeat(4, 1fr); }
+            .bixi-chart { height: 300px; }
+            .bixi-chart-row { flex-direction: row; }
+        }
         /* Écran de chargement — visible pendant le téléchargement des données inline */
         #loading-screen {
             position: fixed; inset: 0; z-index: 10000;
@@ -1717,6 +1758,7 @@ html_parts = ['''<html lang="fr">
             <button class="nav-link active" id="nav-compteurs" onclick="showView(\'main\')">Compteurs</button>
             <button class="nav-link" id="nav-global" onclick="showView(\'global\')"><span class="nav-label-full">Vue Globale</span><span class="nav-label-short">Global</span></button>
             <button class="nav-link" id="nav-hiver" onclick="showView(\'hiver\')"><span class="nav-label-full">Vélo d\'hiver</span><span class="nav-label-short">Hiver</span></button>
+            <button class="nav-link" id="nav-bixi" onclick="showView(\'bixi\')">BIXI</button>
             <button class="nav-link" id="nav-methodo" onclick="showView(\'methodo\')">Méthodologie</button>
         </div>
         <div id="topbar-profile-wrap">
@@ -2049,10 +2091,12 @@ def _haversine_m(lat1, lon1, lat2, lon2):
 
 BIXI_RADIUS_M = 150
 bixi_near_counter = defaultdict(lambda: defaultdict(int))
+bixi_live = bixi_stats.BixiYearAggregator()
 
 if os.path.exists('bixi.csv'):
     with open('bixi.csv', encoding='utf-8') as f:
         for row in tqdm(csv.DictReader(f), desc="Données Bixi"):
+            bixi_live.add_row(row)
             try:
                 slat = float(row['STARTSTATIONLATITUDE'])
                 slng = float(row['STARTSTATIONLONGITUDE'])
@@ -2096,6 +2140,21 @@ for inst, bixi_days in bixi_near_counter.items():
         bixi_exceeds_days[inst] = exceeds
 
 html_parts.append(f"const bixiExceedsDays = {json.dumps(bixi_exceeds_days)};\n")
+
+# Statistiques BIXI par année : années passées depuis bixi_cache.json
+# (bixi_stats.py), année du fichier bixi.csv calculée ici.
+bixi_years = bixi_stats.load_cache()
+_bixi_live = bixi_live.summary()
+if _bixi_live:
+    _live_year = max(Counter(d[:4] for d in _bixi_live['daily']).items(), key=lambda kv: kv[1])[0]
+    _bixi_live['daily'] = {d: n for d, n in _bixi_live['daily'].items() if d.startswith(_live_year)}
+    _bixi_live['trips'] = sum(_bixi_live['daily'].values())
+    if _live_year not in bixi_years:
+        _bixi_live['partial'] = int(_live_year) == datetime.now().year
+        bixi_years[_live_year] = _bixi_live
+for _y in bixi_years.values():
+    _y.pop('source', None)
+html_parts.append(f"const bixiYearly = {json.dumps(dict(sorted(bixi_years.items())), ensure_ascii=False, separators=(',', ':'))};\n")
 # Données historiques
 html_parts.append(f"const historicalYearlyTotals = {json.dumps(hist_yearly, ensure_ascii=False)};\n")
 html_parts.append(f"const historicalYearlyCounters = {json.dumps(hist_yearly_counters, ensure_ascii=False)};\n")
@@ -3658,6 +3717,363 @@ html_parts.append('''
             renderHiverDowCharts(getSelectedHiverCounter());
         }
 
+        // ── BIXI ─────────────────────────────────────────────────────────────
+        const BIXI_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+        const BIXI_DURATION_LABELS = ["< 10 min", "10–20", "20–30", "30–45", "45–60", "60 min +"];
+        const BIXI_TOOLTIP = { backgroundColor: "rgba(40,10,10,0.90)", titleColor: "#FCA5A5", bodyColor: "#fff", padding: 10, cornerRadius: 8 };
+        const BIXI_AXIS = { grid: { color: "rgba(0,0,0,0.04)" }, border: { display: false }, ticks: { color: "#777", font: { size: 11 } } };
+        const bixiFmt = n => Math.round(n || 0).toLocaleString("fr-CA");
+        const bixiShort = v => v >= 1e6 ? (v / 1e6).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " M" : v >= 1e3 ? Math.round(v / 1e3) + " k" : v;
+        const bixiFmtDate = d => new Date(d + "T00:00:00").toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
+
+        function bixiYears() {
+            return typeof bixiYearly === "undefined" ? [] : Object.keys(bixiYearly).sort();
+        }
+        function bixiCompleteYears() { return bixiYears().filter(y => !bixiYearly[y].partial); }
+        function bixiCurrentYear() {
+            const ys = bixiYears().filter(y => bixiYearly[y].partial);
+            return ys.length ? ys[ys.length - 1] : null;
+        }
+        function bixiLastDate(y) {
+            const ds = Object.keys(bixiYearly[y].daily).sort();
+            return ds[ds.length - 1];
+        }
+        function bixiMonthly(y) {
+            const m = new Array(12).fill(0);
+            Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { m[parseInt(d.slice(5, 7), 10) - 1] += n; });
+            return m;
+        }
+        // Trajets de l'année y jusqu'au jour mmdd inclus (pour comparer à date égale)
+        function bixiSumUntil(y, mmdd) {
+            let s = 0;
+            Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { if (d.slice(5) <= mmdd) s += n; });
+            return s;
+        }
+        function bixiPct(a, b) { return b ? (a - b) / b * 100 : null; }
+        function bixiPctHtml(p) {
+            if (p == null || !isFinite(p)) return "<span>—</span>";
+            const up = p >= 0;
+            return "<span class=\\"" + (up ? "bixi-up" : "bixi-down") + "\\">" + (up ? "▲ +" : "▼ −") +
+                Math.abs(p).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " %</span>";
+        }
+        // Couleur d'une année : l'année en cours en rouge, puis des teintes de plus en plus pâles
+        function bixiYearColor(y, years) {
+            const rank = years.length - 1 - years.indexOf(y);
+            const palette = ["#E1251B", "#29ABE2", "#1DB860", "#F59E0B", "#8B5CF6", "#EC4899"];
+            return rank < palette.length ? palette[rank] : "rgba(120,120,120,0.45)";
+        }
+
+        function renderBixiCards() {
+            const el = document.getElementById("bixi-cards");
+            const ys = bixiYears();
+            if (!ys.length) {
+                el.innerHTML = "<div class=\\"global-card\\">Données BIXI indisponibles pour le moment.</div>";
+                return;
+            }
+            const complete = bixiCompleteYears();
+            const cur = bixiCurrentYear();
+            const cards = [];
+            if (complete.length) {
+                const y = complete[complete.length - 1];
+                const prev = bixiYearly[String(+y - 1)];
+                cards.push({
+                    icon: "📅", title: "Année " + y, date: "Du 1er janvier au 31 décembre",
+                    total: bixiFmt(bixiYearly[y].trips), sub: "trajets",
+                    meta: prev ? "<span>" + bixiPctHtml(bixiPct(bixiYearly[y].trips, prev.trips)) + " vs " + (+y - 1) + "</span>" : "",
+                });
+            }
+            if (cur) {
+                const last = bixiLastDate(cur);
+                const prevY = String(+cur - 1);
+                const ytd = bixiYearly[cur].trips;
+                const prevYtd = bixiYearly[prevY] ? bixiSumUntil(prevY, last.slice(5)) : 0;
+                cards.push({
+                    icon: "🚀", title: cur + " à ce jour", date: "Jusqu’au " + bixiFmtDate(last),
+                    total: bixiFmt(ytd), sub: "trajets",
+                    meta: prevYtd ? "<span>" + bixiPctHtml(bixiPct(ytd, prevYtd)) + " vs même période en " + prevY + "</span>" : "",
+                });
+            }
+            let best = null;
+            ys.forEach(y => Object.entries(bixiYearly[y].daily).forEach(([d, n]) => { if (!best || n > best.n) best = { d, n }; }));
+            if (best) {
+                cards.push({ icon: "🏆", title: "Record en une journée", date: bixiFmtDate(best.d), total: bixiFmt(best.n), sub: "trajets", meta: "" });
+            }
+            if (complete.length >= 2) {
+                const first = complete[0], last = complete[complete.length - 1];
+                const a = bixiYearly[first].trips, b = bixiYearly[last].trips;
+                cards.push({
+                    icon: "📈", title: "Croissance depuis " + first, date: first + " → " + last,
+                    total: "×" + (b / a).toLocaleString("fr-CA", { maximumFractionDigits: 1 }), sub: "trajets annuels",
+                    meta: "<span>" + bixiFmt(a) + " → <strong>" + bixiFmt(b) + "</strong></span>",
+                });
+            }
+            el.innerHTML = cards.map(c =>
+                "<div class=\\"global-card\\">" +
+                    "<div class=\\"global-card-title\\">" + c.icon + " " + c.title + "</div>" +
+                    "<div class=\\"global-card-date\\">" + c.date + "</div>" +
+                    "<div class=\\"global-card-total\\">" + c.total + "</div>" +
+                    "<div class=\\"global-card-sub\\">" + c.sub + "</div>" +
+                    (c.meta ? "<div class=\\"global-card-meta\\">" + c.meta + "</div>" : "") +
+                "</div>"
+            ).join("");
+        }
+
+        function renderBixiYearlyChart() {
+            const ctx = document.getElementById("bixi-yearly-chart");
+            const ys = bixiYears();
+            if (!ctx || !ys.length) return;
+            const trips = ys.map(y => bixiYearly[y].trips);
+            charts["__bixi_yearly__"] = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: ys.map(y => bixiYearly[y].partial ? y + "*" : y),
+                    datasets: [{
+                        label: "Trajets",
+                        data: trips,
+                        backgroundColor: ys.map(y => bixiYearly[y].partial ? "rgba(225,37,27,0.35)" : "rgba(225,37,27,0.80)"),
+                        borderColor: "#B91C1C",
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { ...BIXI_TOOLTIP, callbacks: {
+                            label: item => {
+                                const y = ys[item.dataIndex];
+                                const lines = [" " + bixiFmt(item.raw) + " trajets"];
+                                if (bixiYearly[y].partial) lines.push(" En cours (jusqu’au " + bixiFmtDate(bixiLastDate(y)) + ")");
+                                else if (item.dataIndex > 0 && ys[item.dataIndex - 1] === String(+y - 1)) {
+                                    const p = bixiPct(item.raw, trips[item.dataIndex - 1]);
+                                    lines.push(" " + (p >= 0 ? "+" : "−") + Math.abs(p).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " % vs " + (+y - 1));
+                                }
+                                return lines;
+                            },
+                        } },
+                    },
+                    scales: {
+                        x: BIXI_AXIS,
+                        y: { ...BIXI_AXIS, beginAtZero: true, ticks: { ...BIXI_AXIS.ticks, callback: bixiShort } },
+                    },
+                },
+            });
+        }
+
+        function renderBixiCumulChart() {
+            const ctx = document.getElementById("bixi-cumul-chart");
+            const ys = bixiYears();
+            if (!ctx || !ys.length) return;
+            // Axe : 365 jours (le 29 février est regroupé avec le 28)
+            const labels = [];
+            for (let d = new Date(Date.UTC(2023, 0, 1)); d.getUTCFullYear() === 2023; d.setUTCDate(d.getUTCDate() + 1)) {
+                labels.push(d.toISOString().slice(5, 10));
+            }
+            const datasets = ys.map(y => {
+                const byDay = {};
+                Object.entries(bixiYearly[y].daily).forEach(([d, n]) => {
+                    const k = d.slice(5) === "02-29" ? "02-28" : d.slice(5);
+                    byDay[k] = (byDay[k] || 0) + n;
+                });
+                const last = bixiYearly[y].partial ? bixiLastDate(y).slice(5) : "12-31";
+                let cum = 0;
+                const data = labels.map(k => { cum += byDay[k] || 0; return k <= last ? cum : null; });
+                const color = bixiYearColor(y, ys);
+                const rank = ys.length - 1 - ys.indexOf(y);
+                return {
+                    label: y, data, borderColor: color, backgroundColor: color,
+                    borderWidth: rank === 0 ? 3 : 1.5, pointRadius: 0, pointHoverRadius: 3, tension: 0.2,
+                    hidden: rank >= 6,
+                };
+            });
+            charts["__bixi_cumul__"] = new Chart(ctx, {
+                type: "line",
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { ...BIXI_TOOLTIP, callbacks: {
+                            title: items => {
+                                const [m, d] = items[0].label.split("-");
+                                return parseInt(d, 10) + " " + BIXI_MONTHS[parseInt(m, 10) - 1].toLowerCase();
+                            },
+                            label: item => " " + item.dataset.label + " : " + bixiFmt(item.raw),
+                        } },
+                    },
+                    scales: {
+                        x: { ...BIXI_AXIS, grid: { display: false }, ticks: { ...BIXI_AXIS.ticks, autoSkip: false, maxRotation: 0,
+                            callback: (v, i) => labels[i].endsWith("-01") ? BIXI_MONTHS[parseInt(labels[i].slice(0, 2), 10) - 1] : null } },
+                        y: { ...BIXI_AXIS, beginAtZero: true, ticks: { ...BIXI_AXIS.ticks, callback: bixiShort } },
+                    },
+                },
+            });
+        }
+
+        function renderBixiMonthlyChart() {
+            const ctx = document.getElementById("bixi-monthly-chart");
+            const ys = bixiYears();
+            if (!ctx || !ys.length) return;
+            const datasets = ys.map(y => {
+                const m = bixiMonthly(y);
+                const lastMonth = bixiYearly[y].partial ? parseInt(bixiLastDate(y).slice(5, 7), 10) : 12;
+                const color = bixiYearColor(y, ys);
+                const rank = ys.length - 1 - ys.indexOf(y);
+                return {
+                    label: y, data: m.map((v, i) => i < lastMonth ? v : null),
+                    borderColor: color, backgroundColor: color,
+                    borderWidth: rank === 0 ? 3 : 1.5, pointRadius: 2, tension: 0.25,
+                    hidden: rank >= 6,
+                };
+            });
+            charts["__bixi_monthly__"] = new Chart(ctx, {
+                type: "line",
+                data: { labels: BIXI_MONTHS, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { ...BIXI_TOOLTIP, callbacks: { label: item => " " + item.dataset.label + " : " + bixiFmt(item.raw) } },
+                    },
+                    scales: {
+                        x: BIXI_AXIS,
+                        y: { ...BIXI_AXIS, beginAtZero: true, ticks: { ...BIXI_AXIS.ticks, callback: bixiShort } },
+                    },
+                },
+            });
+        }
+
+        function renderBixiAnnualTable() {
+            const el = document.getElementById("bixi-annual-table");
+            const ys = bixiYears().slice().reverse();
+            if (!ys.length) { el.innerHTML = ""; return; }
+            const rows = ys.map(y => {
+                const s = bixiYearly[y];
+                const prev = bixiYearly[String(+y - 1)];
+                const days = Object.keys(s.daily).length;
+                const m = bixiMonthly(y);
+                const bestMonth = m.indexOf(Math.max(...m));
+                // Année en cours : croissance à date égale
+                const growth = !prev ? null : s.partial
+                    ? bixiPct(s.trips, bixiSumUntil(String(+y - 1), bixiLastDate(y).slice(5)))
+                    : bixiPct(s.trips, prev.trips);
+                return "<tr>" +
+                    "<td><strong>" + y + (s.partial ? "*" : "") + "</strong></td>" +
+                    "<td><strong>" + bixiFmt(s.trips) + "</strong></td>" +
+                    "<td>" + bixiPctHtml(growth) + "</td>" +
+                    "<td>" + bixiFmt(days ? s.trips / days : 0) + "</td>" +
+                    "<td>" + (s.avg_duration_min != null ? s.avg_duration_min.toLocaleString("fr-CA") + " min" : "—") + "</td>" +
+                    "<td>" + (s.member_share != null ? Math.round(s.member_share * 100) + " %" : "—") + "</td>" +
+                    "<td>" + bixiFmt(s.stations) + "</td>" +
+                    "<td>" + BIXI_MONTHS[bestMonth] + "</td>" +
+                "</tr>";
+            });
+            el.innerHTML = "<table class=\\"bixi-table\\"><thead><tr>" +
+                "<th>Année</th><th>Trajets</th><th>Croissance</th><th>Moy./jour</th><th>Durée moy.</th><th>Membres</th><th>Stations</th><th>Mois record</th>" +
+                "</tr></thead><tbody>" + rows.join("") + "</tbody></table>";
+        }
+
+        function renderBixiYear(y) {
+            const s = bixiYearly[y];
+            if (!s) return;
+            const prevY = String(+y - 1);
+            const prev = bixiYearly[prevY];
+            const m = bixiMonthly(y);
+            const pm = prev ? bixiMonthly(prevY) : null;
+            const lastDate = s.partial ? bixiLastDate(y) : null;
+
+            // Tableau mensuel
+            const rows = [];
+            for (let i = 0; i < 12; i++) {
+                const mm = String(i + 1).padStart(2, "0");
+                const days = Object.entries(s.daily).filter(([d]) => d.slice(5, 7) === mm);
+                if (!m[i] && !(pm && pm[i])) continue;
+                if (lastDate && i + 1 > parseInt(lastDate.slice(5, 7), 10)) continue;
+                const inProgress = lastDate && lastDate.slice(5, 7) === mm;
+                // Mois en cours : comparer au même nombre de jours l'an dernier
+                let ref = pm ? pm[i] : null;
+                if (inProgress && prev) {
+                    ref = 0;
+                    Object.entries(prev.daily).forEach(([d, n]) => { if (d.slice(5, 7) === mm && d.slice(5) <= lastDate.slice(5)) ref += n; });
+                }
+                const best = days.reduce((b, [d, n]) => (!b || n > b[1]) ? [d, n] : b, null);
+                rows.push("<tr>" +
+                    "<td><strong>" + BIXI_MONTHS[i] + (inProgress ? "*" : "") + "</strong></td>" +
+                    "<td><strong>" + (m[i] ? bixiFmt(m[i]) : "—") + "</strong></td>" +
+                    "<td>" + (m[i] && ref ? bixiPctHtml(bixiPct(m[i], ref)) : "—") + "</td>" +
+                    "<td>" + (days.length ? bixiFmt(m[i] / days.length) : "—") + "</td>" +
+                    "<td>" + (best ? parseInt(best[0].slice(8), 10) + " " + BIXI_MONTHS[i].toLowerCase() + " (" + bixiFmt(best[1]) + ")" : "—") + "</td>" +
+                "</tr>");
+            }
+            document.getElementById("bixi-monthly-table").innerHTML = "<table class=\\"bixi-table\\"><thead><tr>" +
+                "<th>Mois</th><th>Trajets</th><th>vs " + prevY + "</th><th>Moy./jour</th><th>Jour record</th>" +
+                "</tr></thead><tbody>" + rows.join("") + "</tbody></table>" +
+                (lastDate ? "<p class=\\"bixi-note\\">* Mois en cours, comparé aux mêmes jours en " + prevY + ".</p>" : "");
+
+            // Graphiques
+            ["__bixi_hour__", "__bixi_dow__", "__bixi_duration__"].forEach(k => {
+                if (charts[k]) { charts[k].destroy(); delete charts[k]; }
+            });
+            const smallOpts = (fmtTip) => ({
+                responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+                plugins: { legend: { display: false }, tooltip: { ...BIXI_TOOLTIP, callbacks: { label: fmtTip } } },
+                scales: {
+                    x: { ...BIXI_AXIS, grid: { display: false } },
+                    y: { ...BIXI_AXIS, beginAtZero: true, ticks: { ...BIXI_AXIS.ticks, callback: bixiShort } },
+                },
+            });
+            const bar = { backgroundColor: "rgba(225,37,27,0.75)", borderRadius: 3 };
+            charts["__bixi_hour__"] = new Chart(document.getElementById("bixi-hour-chart"), {
+                type: "bar",
+                data: { labels: [...Array(24).keys()].map(h => h + "h"), datasets: [{ ...bar, data: s.hourly }] },
+                options: smallOpts(item => " " + bixiFmt(item.raw) + " trajets"),
+            });
+            const dowSum = new Array(7).fill(0), dowN = new Array(7).fill(0);
+            Object.entries(s.daily).forEach(([d, n]) => {
+                const i = (new Date(d + "T12:00:00").getDay() + 6) % 7;
+                dowSum[i] += n; dowN[i] += 1;
+            });
+            charts["__bixi_dow__"] = new Chart(document.getElementById("bixi-dow-chart"), {
+                type: "bar",
+                data: { labels: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"], datasets: [{ ...bar, data: dowSum.map((v, i) => dowN[i] ? v / dowN[i] : 0) }] },
+                options: smallOpts(item => " " + bixiFmt(item.raw) + " trajets / jour"),
+            });
+            const durTotal = (s.duration_hist || []).reduce((a, b) => a + b, 0);
+            charts["__bixi_duration__"] = new Chart(document.getElementById("bixi-duration-chart"), {
+                type: "bar",
+                data: { labels: BIXI_DURATION_LABELS, datasets: [{ ...bar, data: (s.duration_hist || []).map(v => durTotal ? v / durTotal * 100 : 0) }] },
+                options: { ...smallOpts(item => " " + item.raw.toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " % des trajets"),
+                    scales: { x: { ...BIXI_AXIS, grid: { display: false } }, y: { ...BIXI_AXIS, beginAtZero: true, ticks: { ...BIXI_AXIS.ticks, callback: v => v + " %" } } } },
+            });
+
+            // Stations les plus populaires
+            const top = s.top_stations || [];
+            const max = top.length ? top[0][1] : 1;
+            document.getElementById("bixi-top-stations").innerHTML = top.map(([name, n]) =>
+                "<div class=\\"arr-row\\"><span class=\\"arr-name\\" title=\\"" + name.replace(/"/g, "&quot;") + "\\">" + name + "</span>" +
+                "<div class=\\"arr-bar-wrap\\"><div class=\\"arr-bar\\" style=\\"width:" + (n / max * 100).toFixed(1) + "%;background:linear-gradient(to right,#FCA5A5,#E1251B)\\"></div></div>" +
+                "<span class=\\"arr-vol\\">" + bixiFmt(n) + "</span></div>"
+            ).join("") || "<p class=\\"bixi-note\\">Aucune donnée de station.</p>";
+        }
+
+        function renderBixiPage() {
+            if (charts["__bixi_yearly__"]) return;
+            const ys = bixiYears();
+            renderBixiCards();
+            if (!ys.length) return;
+            renderBixiYearlyChart();
+            renderBixiCumulChart();
+            renderBixiMonthlyChart();
+            renderBixiAnnualTable();
+            const sel = document.getElementById("bixiYearSelect");
+            sel.innerHTML = ys.slice().reverse().map(y => "<option value=\\"" + y + "\\">" + y + (bixiYearly[y].partial ? " (en cours)" : "") + "</option>").join("");
+            sel.addEventListener("change", function() { renderBixiYear(this.value); });
+            renderBixiYear(sel.value);
+        }
+
         // ── Fonctions historique compteur ────────────────────────────────────
         const _FR_MONTHS = [\'Jan\',\'Fév\',\'Mar\',\'Avr\',\'Mai\',\'Juin\',\'Juil\',\'Août\',\'Sep\',\'Oct\',\'Nov\',\'Déc\'];
         const _PALETTE   = [\'#1DB860\',\'#29ABE2\',\'#F59E0B\',\'#EF4444\',\'#8B5CF6\',\'#EC4899\',\'#14B8A6\',\'#F97316\'];
@@ -3883,18 +4299,22 @@ html_parts.append('''
             const isGlobal = view === \'global\';
             const isHiver  = view === \'hiver\';
             const isMeth   = view === \'methodo\';
+            const isBixi   = view === \'bixi\';
             document.getElementById(\'main-header\').style.display    = isMain   ? \'\' : \'none\';
             document.getElementById(\'main-container\').style.display = isMain   ? \'\' : \'none\';
             document.getElementById(\'global-page\').style.display    = isGlobal ? \'\' : \'none\';
             document.getElementById(\'hiver-page\').style.display     = isHiver  ? \'\' : \'none\';
             document.getElementById(\'methodo-page\').style.display   = isMeth   ? \'\' : \'none\';
+            document.getElementById(\'bixi-page\').style.display      = isBixi   ? \'\' : \'none\';
             document.getElementById(\'nav-compteurs\').classList.toggle(\'active\', isMain);
             document.getElementById(\'nav-global\').classList.toggle(\'active\', isGlobal);
             document.getElementById(\'nav-hiver\').classList.toggle(\'active\', isHiver);
+            document.getElementById(\'nav-bixi\').classList.toggle(\'active\', isBixi);
             document.getElementById(\'nav-methodo\').classList.toggle(\'active\', isMeth);
             document.getElementById(\'nav-methodo-menu\').classList.toggle(\'active\', isMeth);
             if (isGlobal) renderGlobalPage();
             if (isHiver) renderHiverPage();
+            if (isBixi) renderBixiPage();
             window.scrollTo({ top: 0, behavior: \'smooth\' });
         }
 
@@ -3949,7 +4369,7 @@ html_parts.append('''
                 <div class="source-card-sub">bixi.csv — BIXI open data</div>
               </div>
             </div>
-            <div class="source-card-desc">Données de trajets BIXI de l\'année courante. Utilisées pour valider les volumes des capteurs fixes situés près de stations BIXI — un dépassement visible est signalé.</div>
+            <div class="source-card-desc">Données de trajets BIXI depuis 2014. Elles alimentent l\'onglet BIXI (croissance annuelle et mensuelle) et servent à valider les volumes des capteurs fixes situés près de stations BIXI — un dépassement visible est signalé.</div>
             <a class="source-card-link" href="https://bixi.com/en/open-data/" target="_blank" rel="noopener">→ Données ouvertes BIXI ↗</a>
           </div>
           <div class="source-card">
@@ -4096,6 +4516,60 @@ html_parts.append('''
         </div>
       </div>
       <div class="global-section" id="hiver-records"></div>
+    </div>
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ══ Page BIXI ══════════════════════════════════════════════════════ -->
+    <div id="bixi-page" style="display:none">
+      <div class="site-header" id="bixi-header">
+        <h1>🚲 BIXI à Montréal</h1>
+        <p class="subtitle" style="display:block">La croissance du vélopartage, année après année</p>
+      </div>
+      <div id="bixi-cards"></div>
+      <div class="global-section">
+        <div class="global-section-title">📈 Trajets par année</div>
+        <div class="bixi-chart"><canvas id="bixi-yearly-chart"></canvas></div>
+        <p class="bixi-note">L’année en cours (plus pâle) est partielle : comparez-la avec le cumul ci-dessous.</p>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">🏁 Cumul depuis le 1er janvier</div>
+        <div class="bixi-chart"><canvas id="bixi-cumul-chart"></canvas></div>
+        <p class="bixi-note">Trajets cumulés jour après jour. Cliquez sur une année dans la légende pour l’afficher ou la masquer.</p>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">🗓️ Trajets par mois</div>
+        <div class="bixi-chart"><canvas id="bixi-monthly-chart"></canvas></div>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">📋 Statistiques annuelles</div>
+        <div class="bixi-table-wrap" id="bixi-annual-table"></div>
+        <p class="bixi-note">Moy./jour : trajets divisés par le nombre de jours avec au moins un trajet. Durée moyenne : trajets de 1 min à 4 h. La part des membres n’est plus publiée par BIXI depuis 2022. * Année en cours.</p>
+      </div>
+      <div class="global-section">
+        <div class="global-section-title">🔍 Explorer une année</div>
+        <div class="select-wrapper" style="max-width:240px;margin-bottom:18px;">
+          <select id="bixiYearSelect"></select>
+        </div>
+        <div class="bixi-table-wrap" id="bixi-monthly-table"></div>
+        <div class="bixi-chart-row">
+          <div class="bixi-chart-col">
+            <div>Heure de départ</div>
+            <div class="bixi-chart-sm"><canvas id="bixi-hour-chart"></canvas></div>
+          </div>
+          <div class="bixi-chart-col">
+            <div>Trajets moyens par jour de semaine</div>
+            <div class="bixi-chart-sm"><canvas id="bixi-dow-chart"></canvas></div>
+          </div>
+          <div class="bixi-chart-col">
+            <div>Durée des trajets</div>
+            <div class="bixi-chart-sm"><canvas id="bixi-duration-chart"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top:22px;">
+          <div class="global-section-title" style="font-size:12px;">📍 Stations de départ les plus populaires</div>
+          <div id="bixi-top-stations"></div>
+        </div>
+      </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 

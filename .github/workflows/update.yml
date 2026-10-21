@@ -35,6 +35,9 @@ jobs:
           chmod +x fetch_data.sh
           ./fetch_data.sh
 
+      - name: Historique BIXI (années passées manquantes dans bixi_cache.json)
+        run: python3 bixi_stats.py
+
       - name: Générer le HTML
         run: python3 genMap.py
 
@@ -57,10 +60,11 @@ jobs:
 
           git add index.html
           [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
+          [ -f bixi_cache.json ] && git add bixi_cache.json
           [ -f version.txt ] && git add version.txt
 
           if git diff --staged --quiet; then
-            echo "Aucun changement dans index.html — rien à publier."
+            echo "Aucun changement — rien à publier."
             exit 0
           fi
 

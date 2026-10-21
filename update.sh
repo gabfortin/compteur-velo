@@ -33,6 +33,8 @@ if [ "$CSV_CHANGED" = false ] && [ "$BIXI_CHANGED" = false ] && [ "$COMPTEURS_CH
 fi
 
 # ── Générer le HTML ────────────────────────────────────────────────────────────
+echo "$LOG Historique BIXI..."
+python3 bixi_stats.py
 echo "$LOG Génération du HTML..."
 python3 genMap.py
 
@@ -55,6 +57,7 @@ echo "$LOG Vérification des changements..."
 git add index.html
 # Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
 [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
+[ -f bixi_cache.json ] && git add bixi_cache.json
 [ -f version.txt ] && git add version.txt
 
 if git diff --staged --quiet; then

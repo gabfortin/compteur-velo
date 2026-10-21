@@ -13,6 +13,8 @@ compteur-velo/
 ├── cyclistes.csv            # Détecteurs sur fût — portail données ouvertes Montréal — ignoré par git
 ├── compteurs.csv            # Boucles magnétiques — portail données ouvertes Montréal — ignoré par git
 ├── bixi.csv                 # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
+├── bixi_stats.py            # Agrégats BIXI par année (onglet BIXI) — construit bixi_cache.json
+├── bixi_cache.json          # Statistiques BIXI des années passées (2014 → année précédente) — commité
 ├── hist_cache.json          # Données historiques pré-calculées (2009–année précédente) — commité
 ├── historique/              # CSV historiques bruts (2009–2025) — ignoré par git, non nécessaire en prod
 │   ├── comptage_velo_2009.csv
@@ -264,6 +266,12 @@ Champs récupérés par jour : `temperature_2m_max`, `temperature_2m_min`, `prec
 Le résultat est embarqué dans le HTML sous la forme `const weatherData = {...}`, puis utilisé :
 1. pour exclure les jours sévères de la détection d'anomalies (`is_bad_weather()`)
 2. pour enrichir le tooltip des graphiques journaliers côté JS
+
+### Onglet BIXI — croissance de l'utilisation
+
+`bixi_stats.py` télécharge les ZIP annuels publiés sur [bixi.com/en/open-data](https://bixi.com/en/open-data/) (formats 2014–2021 et 2022+) et en tire, pour chaque année : trajets par jour, répartition horaire, durée moyenne et répartition des durées, part des membres (jusqu'en 2021), nombre de stations actives et stations de départ les plus populaires. Le résultat est stocké dans `bixi_cache.json` (commité) ; seules les années absentes du cache sont téléchargées, donc l'exécution quotidienne (étape « Historique BIXI » du workflow) ne fait normalement rien, sauf en début d'année.
+
+`genMap.py` ajoute l'année en cours (calculée depuis `bixi.csv`, marquée `partial`) et injecte le tout dans `const bixiYearly`. L'onglet affiche les trajets par année, le cumul depuis le 1er janvier, les trajets par mois, un tableau annuel et un explorateur par année (tableau mensuel, heures, jours de semaine, durées, stations).
 
 ### Étape 4 — Traitement BIXI
 
