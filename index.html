@@ -854,7 +854,29 @@
             box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 2px 8px rgba(15,40,28,0.15);
             transition: box-shadow 0.25s;
         }
+        /* Menu du profil : mobile seulement (Méthodologie y est déplacée) */
+        #topbar-profile-wrap { position: relative; }
+        #profile-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 180px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: rgba(255,255,255,0.96);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            box-shadow: var(--shadow), var(--inner);
+        }
+        #profile-menu[hidden] { display: none; }
+        #profile-menu .nav-link { display: block; text-align: left; width: 100%; }
+        @media (max-width: 767px) {
+            #nav-methodo { display: none; }
+        }
         @media (min-width: 768px) {
+            #profile-menu { display: none !important; }
             #topbar { top: 14px; margin-top: 14px; padding: 0 8px 0 10px; }
             #topbar-profile-name { display: inline; }
             .nav-label-short { display: none; }
@@ -1027,11 +1049,38 @@
             <button class="nav-link" id="nav-hiver" onclick="showView('hiver')"><span class="nav-label-full">Vélo d'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-methodo" onclick="showView('methodo')">Méthodologie</button>
         </div>
-        <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
-            <span id="topbar-profile-name">gabfortin.com</span>
-            <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
-        </a>
+        <div id="topbar-profile-wrap">
+            <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com" aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu">
+                <span id="topbar-profile-name">gabfortin.com</span>
+                <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
+            </a>
+            <div id="profile-menu" hidden>
+                <a class="nav-link" href="https://gabfortin.com">gabfortin.com</a>
+                <button class="nav-link" id="nav-methodo-menu" onclick="closeProfileMenu();showView('methodo')">Méthodologie</button>
+            </div>
+        </div>
     </nav>
+    <script>
+        // Sur mobile, la photo ouvre un menu (gabfortin.com / Méthodologie) au lieu du lien direct
+        const profileLink = document.getElementById('topbar-profile');
+        const profileMenu = document.getElementById('profile-menu');
+        const isMobileNav = () => window.matchMedia('(max-width: 767px)').matches;
+        function closeProfileMenu() {
+            profileMenu.hidden = true;
+            profileLink.setAttribute('aria-expanded', 'false');
+        }
+        profileLink.addEventListener('click', e => {
+            if (!isMobileNav()) return;
+            e.preventDefault();
+            profileMenu.hidden = !profileMenu.hidden;
+            profileLink.setAttribute('aria-expanded', String(!profileMenu.hidden));
+        });
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#topbar-profile-wrap')) closeProfileMenu();
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeProfileMenu(); });
+        window.addEventListener('resize', () => { if (!isMobileNav()) closeProfileMenu(); });
+    </script>
     <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
         <h1>Compteurs Vélo Montréal</h1>
@@ -3269,6 +3318,7 @@ const globalStats = {"yesterday": {"total": 69833, "coverage": 82, "active": 101
             document.getElementById('nav-global').classList.toggle('active', isGlobal);
             document.getElementById('nav-hiver').classList.toggle('active', isHiver);
             document.getElementById('nav-methodo').classList.toggle('active', isMeth);
+            document.getElementById('nav-methodo-menu').classList.toggle('active', isMeth);
             if (isGlobal) renderGlobalPage();
             if (isHiver) renderHiverPage();
             window.scrollTo({ top: 0, behavior: 'smooth' });
