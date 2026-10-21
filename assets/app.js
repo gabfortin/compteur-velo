@@ -1521,6 +1521,116 @@ function renderHiverPage() {
     renderHiverFacts();
     renderHiverTrendChart();
     renderHiverDowCharts(getSelectedHiverCounter());
+    renderHiverBixiSection();
+}
+
+// ── BIXI l'hiver (introduit en 2023) ────────────────────────────────────
+function computeBixiWinterSeasons() {
+    const seasons = {};
+    if (typeof bixiYearly === 'undefined') return seasons;
+    Object.values(bixiYearly).forEach(s => {
+        if (!s || !s.daily) return;
+        Object.entries(s.daily).forEach(([date, n]) => {
+            if (!isWinterDate(date)) return;
+            const season = winterSeasonLabel(date);
+            seasons[season] = (seasons[season] || 0) + n;
+        });
+    });
+    return seasons;
+}
+
+function renderHiverBixiCards(seasons) {
+    const el = document.getElementById('hiver-bixi-cards');
+    if (!el) return;
+    const fmt = n => Math.round(n || 0).toLocaleString('fr-CA');
+    const keys = Object.keys(seasons).sort();
+    if (!keys.length) {
+        el.innerHTML = "<div class='global-card'>Données BIXI hivernales indisponibles.</div>";
+        return;
+    }
+    const winterMonthsWithData = new Set();
+    Object.values(bixiYearly).forEach(s => {
+        if (!s || !s.daily) return;
+        Object.keys(s.daily).forEach(date => { if (isWinterDate(date)) winterMonthsWithData.add(date.slice(0, 7)); });
+    });
+    const totalWinterTrips = keys.reduce((sum, k) => sum + seasons[k], 0);
+    const avgPerMonth = winterMonthsWithData.size ? totalWinterTrips / winterMonthsWithData.size : null;
+    const first = keys[0], last = keys[keys.length - 1];
+
+    const cards = [
+        {
+            icon: '🚲', title: 'BIXI — hiver ' + last, date: 'Novembre à mars',
+            total: fmt(seasons[last]), sub: 'trajets', meta: '',
+        },
+        {
+            icon: '📊', title: 'Moyenne des mois hivernaux', date: 'Nov. à mars, toutes saisons confondues',
+            total: avgPerMonth != null ? fmt(avgPerMonth) : '—', sub: 'trajets par mois', meta: '',
+        },
+    ];
+    if (keys.length >= 2) {
+        const a = seasons[first], b = seasons[last];
+        cards.push({
+            icon: '📈', title: 'Progression depuis ' + first, date: first + ' → ' + last,
+            total: '×' + (b / a).toLocaleString('fr-CA', { maximumFractionDigits: 1 }), sub: 'trajets d’hiver',
+            meta: "<span>" + fmt(a) + " → <strong>" + fmt(b) + "</strong></span>",
+        });
+    }
+    el.innerHTML = cards.map(c =>
+        "<div class='global-card'>" +
+            "<div class='global-card-title'>" + c.icon + ' ' + c.title + "</div>" +
+            "<div class='global-card-date'>" + c.date + "</div>" +
+            "<div class='global-card-total'>" + c.total + "</div>" +
+            "<div class='global-card-sub'>" + c.sub + "</div>" +
+            (c.meta ? "<div class='global-card-meta'>" + c.meta + "</div>" : '') +
+        "</div>"
+    ).join('');
+}
+
+function renderHiverBixiChart(seasons) {
+    if (charts['__hiver_bixi__']) return;
+    const ctx = document.getElementById('hiver-bixi-chart');
+    const keys = Object.keys(seasons).sort();
+    if (!ctx || !keys.length) return;
+    const fmt = n => Math.round(n || 0).toLocaleString('fr-CA');
+    charts['__hiver_bixi__'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: keys,
+            datasets: [{
+                label: 'Trajets BIXI (nov–mar)',
+                data: keys.map(k => seasons[k]),
+                backgroundColor: 'rgba(225,37,27,0.75)',
+                borderColor: '#B91C1C',
+                borderWidth: 1,
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            responsive: true,
+            animation: { duration: 500 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(40,10,10,0.90)', titleColor: '#FCA5A5', bodyColor: '#fff',
+                    padding: 10, cornerRadius: 8,
+                    callbacks: { label: item => ' ' + fmt(item.raw) + ' trajets' },
+                },
+            },
+            scales: {
+                x: { grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { color: '#777', font: { size: 11 } } },
+                y: {
+                    grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, beginAtZero: true,
+                    ticks: { color: '#777', callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : v },
+                },
+            },
+        },
+    });
+}
+
+function renderHiverBixiSection() {
+    const seasons = computeBixiWinterSeasons();
+    renderHiverBixiCards(seasons);
+    renderHiverBixiChart(seasons);
 }
 
 // ── Vue Arrondissement ───────────────────────────────────────────────
