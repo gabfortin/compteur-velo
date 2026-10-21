@@ -1186,7 +1186,7 @@ function renderGlobalPage() {
 }
 
 // ── Vélo d'hiver ──────────────────────────────────────────────────────
-const WINTER_MONTHS_SET = new Set([11, 12, 1, 2, 3]);
+const WINTER_MONTHS_SET = new Set([12, 1, 2, 3]);
 const DOW_LABELS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 const HIVER_CAT_COLORS = { doux: '#38BDF8', pluie: '#2563EB', froid: '#8B5CF6', neige: '#06B6D4' };
 let _hiverGlobalDaily = null;
@@ -1286,7 +1286,7 @@ function computeHistoricalWinterTrend() {
             const yr = parseInt(yrStr, 10);
             Object.entries(months).forEach(([moStr, vol]) => {
                 const mo = parseInt(moStr, 10);
-                if (![11, 12, 1, 2, 3].includes(mo)) return;
+                if (![12, 1, 2, 3].includes(mo)) return;
                 const season = mo >= 11
                     ? yr + '–' + String((yr + 1) % 100).padStart(2, '0')
                     : (yr - 1) + '–' + String(yr % 100).padStart(2, '0');
@@ -1329,7 +1329,7 @@ function renderHiverFacts() {
 
     const cards = [
         {
-            icon: '❄️', title: "Hiver dernier", date: "Nov. à mars, tous compteurs",
+            icon: '❄️', title: "Hiver dernier", date: "Déc. à mars, tous compteurs",
             total: fmt(stats.winterTotal), sub: 'passages',
             meta: "<span>📆 Sur <strong>" + fmt(stats.winterDays) + "</strong> jours de données</span>",
         },
@@ -1373,7 +1373,7 @@ function renderHiverTrendChart() {
         data: {
             labels: seasons,
             datasets: [{
-                label: 'Passages (nov–mar)',
+                label: 'Passages (déc–mar)',
                 data: seasons.map(s => totals[s]),
                 backgroundColor: seasons.map(s => s === curSeason ? 'rgba(14,165,216,0.45)' : 'rgba(14,165,216,0.75)'),
                 borderColor: seasons.map(s => s === curSeason ? '#0A7FAE' : '#0EA5D8'),
@@ -1559,11 +1559,11 @@ function renderHiverBixiCards(seasons) {
 
     const cards = [
         {
-            icon: '🚲', title: 'BIXI — hiver ' + last, date: 'Novembre à mars',
+            icon: '🚲', title: 'BIXI — hiver ' + last, date: 'Décembre à mars',
             total: fmt(seasons[last]), sub: 'trajets', meta: '',
         },
         {
-            icon: '📊', title: 'Moyenne des mois hivernaux', date: 'Nov. à mars, toutes saisons confondues',
+            icon: '📊', title: 'Moyenne des mois hivernaux', date: 'Déc. à mars, toutes saisons confondues',
             total: avgPerMonth != null ? fmt(avgPerMonth) : '—', sub: 'trajets par mois', meta: '',
         },
     ];
@@ -1597,7 +1597,7 @@ function renderHiverBixiChart(seasons) {
         data: {
             labels: keys,
             datasets: [{
-                label: 'Trajets BIXI (nov–mar)',
+                label: 'Trajets BIXI (déc–mar)',
                 data: keys.map(k => seasons[k]),
                 backgroundColor: 'rgba(225,37,27,0.75)',
                 borderColor: '#B91C1C',
