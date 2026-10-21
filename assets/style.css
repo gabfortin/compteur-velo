@@ -814,6 +814,23 @@ button.nav-link.active { background: #fff; }
     box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 2px 8px rgba(15,40,28,0.15);
     transition: box-shadow 0.25s;
 }
+/* Icône Instagram : mobile seulement, et seulement si la largeur le permet */
+#topbar-profile-wrap { display: flex; align-items: center; gap: 2px; }
+#topbar-instagram {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: var(--faint);
+    flex-shrink: 0;
+    transition: color 0.25s, background 0.25s;
+}
+#topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
+@media (min-width: 400px) and (max-width: 767px) {
+    #topbar-instagram { display: flex; }
+}
 /* Menu du profil : mobile seulement (Méthodologie y est déplacée) */
 #topbar-profile-wrap, #nav-more-wrap { position: relative; }
 #profile-menu, #nav-more-menu {
@@ -1094,7 +1111,7 @@ button.nav-link.active { background: #fff; }
     .site-header img { box-shadow: 0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1) !important; }
     select:hover { background: rgba(44,57,51,0.9); }
     #topbar { background: rgba(18,26,23,0.72); }
-    .nav-link:hover, #topbar-profile:hover { background: rgba(255,255,255,0.07); }
+    .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover { background: rgba(255,255,255,0.07); }
     .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
     #profile-menu, #nav-more-menu { background: rgba(24,33,29,0.97); }
     #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }
