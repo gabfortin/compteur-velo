@@ -35,7 +35,7 @@ compteur-velo/
 ├── .env                     # Variables d'environnement locales (ignoré par git)
 ├── .env.example             # Modèle de configuration
 ├── .gitignore               # Exclut cyclistes.csv, bixi.csv, compteurs.csv, historique/ et .env
-└── CNAME                    # Domaine personnalisé GitHub Pages (compteur.gabfortin.com)
+└── CNAME                    # Domaine personnalisé GitHub Pages (compteurvelo.com)
 ```
 
 ---
@@ -792,7 +792,9 @@ docker compose exec velo-updater /app/update.sh
 
 ## Déploiement — GitHub Pages
 
-Le site est hébergé sur **GitHub Pages** (branche `main`). Le fichier `CNAME` définit le domaine personnalisé (`compteur.gabfortin.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
+Le site est hébergé sur **GitHub Pages** (branche `main`). Le fichier `CNAME` définit le domaine personnalisé (`compteurvelo.com`). Seuls `index.html` et `favico.png` sont servis — tout est statique, sans backend.
+
+L'ancien domaine `velo.gabfortin.com` redirige (301) vers `https://compteurvelo.com` : GitHub Pages n'accepte qu'un seul domaine personnalisé par dépôt, la redirection est donc configurée côté DNS / registraire de `gabfortin.com`, pas dans ce dépôt.
 
 Chaque `push` sur `main` déclenche automatiquement le déploiement. En production, c'est le workflow GitHub Actions (`update.yml`) qui s'en charge. En développement local :
 
