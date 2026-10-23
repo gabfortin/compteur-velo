@@ -878,11 +878,11 @@ button.nav-link.active { background: #fff; }
     box-shadow: var(--shadow-lg), var(--inner);
 }
 .global-card-title {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 2px;
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 3px;
 }
 .global-card-date {
-    font-size: 12px; color: var(--faint); margin-bottom: 10px;
+    font-size: 13px; color: var(--faint); margin-bottom: 10px;
 }
 .global-card-total {
     font-size: 36px; font-weight: 800; letter-spacing: -0.035em; color: var(--accent-strong); line-height: 1.05;
@@ -904,7 +904,7 @@ button.nav-link.active { background: #fff; }
     transition: background 0.15s;
 }
 .global-top-row:hover { background: rgba(255,255,255,0.7); }
-.global-top-rank { font-size: 13px; flex-shrink: 0; }
+.global-top-rank { font-size: 12px; font-weight: 700; color: var(--faint); min-width: 1em; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .global-top-vol { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
 #global-bottom {
     display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px;
@@ -914,8 +914,8 @@ button.nav-link.active { background: #fff; }
     padding: 20px 22px; box-shadow: var(--shadow), var(--inner);
 }
 .global-section-title {
-    font-size: 13px; font-weight: 700; color: var(--text);
-    margin-bottom: 16px; display: flex; align-items: center; gap: 7px;
+    font-size: 17px; font-weight: 700; letter-spacing: -0.015em; color: var(--text);
+    margin-bottom: 16px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px;
 }
 .arr-row {
     display: flex; align-items: center; gap: 10px;
@@ -925,9 +925,10 @@ button.nav-link.active { background: #fff; }
 .arr-bar-wrap { flex: 1; height: 8px; background: rgba(15,40,28,0.06); border-radius: 999px; overflow: hidden; }
 .arr-bar { height: 100%; background: linear-gradient(to right, #7ee8a2, #1DB860); border-radius: 999px; }
 .arr-vol { font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 52px; text-align: right; }
+.arr-stopped { color: #b91c1c; font-weight: 600; }
 .net-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
 .net-val { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
-.net-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+.net-label { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 /* ── Vélo d'hiver — thème glace ── */
 #hiver-page {
     max-width: 1200px; margin: 0 auto; padding: 0 12px 40px; position: relative;
@@ -960,6 +961,7 @@ button.nav-link.active { background: #fff; }
 }
 #nav-hiver.active { color: #0A7FAE; }
 #hiver-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+#hiver-bixi-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .hiver-chart-row { display: flex; flex-direction: column; gap: 20px; }
 .hiver-chart-col { flex: 1; min-width: 0; }
 .hiver-chart-col > div:first-child { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: center; }
@@ -973,6 +975,7 @@ button.nav-link.active { background: #fff; }
     .arr-name { width: 200px; }
     #hiver-page { padding: 0 20px 40px; }
     #hiver-cards { grid-template-columns: repeat(4, 1fr); }
+    #hiver-bixi-cards { grid-template-columns: repeat(2, 1fr); }
     .hiver-chart-row { flex-direction: row; }
     .net-grid-4 { grid-template-columns: repeat(4, 1fr); }
 }
@@ -1137,7 +1140,7 @@ button.nav-link.active { background: #fff; }
     .anomaly-info-btn { color: #fcd34d; }
     .bixi-btn { color: #f87171; }
     .combine-clear-btn { color: #f87171; }
-    .bixi-exceeds-badge, .mbadge-bixi { color: #fca5a5; }
+    .bixi-exceeds-badge, .mbadge-bixi, .arr-stopped { color: #fca5a5; }
     .counter-type-fut, .mbadge-fut { color: #7dd3fc; }
     .counter-type-boucle, .mbadge-boucle, .arr-type-boucle { color: #c4b5fd; }
     .arr-type-fut { color: #6ee7a0; }

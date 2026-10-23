@@ -516,13 +516,14 @@ def load_historical_data(historique_dir='historique'):
                    for yr, months in yrs.items()}
             for inst, yrs in cache.get('counter_monthly', {}).items()
         }
+        live = set(cache.get('live_years', []))
         print(f"Historique : {len(yearly)} années, {len(monthly)} compteurs (depuis cache).")
-        return yearly, ctrs, monthly
+        return yearly, ctrs, monthly, live
 
     # ── 2. Parsing des CSV bruts ──────────────────────────────────────────────
     if not os.path.isdir(historique_dir):
         print(f"Historique : {historique_dir}/ introuvable et {HIST_CACHE_FILE} absent — ignoré.")
-        return {}, {}, {}
+        return {}, {}, {}, set()
 
     print(f"Historique : parsing de {historique_dir}/ (première exécution — génère {HIST_CACHE_FILE})...")
 
@@ -640,36 +641,51 @@ def load_historical_data(historique_dir='historique'):
     except Exception as e:
         print(f"Historique : impossible de sauvegarder le cache ({e})")
 
-    return result_yearly, result_ctrs, result_monthly
+    return result_yearly, result_ctrs, result_monthly, set()
 
 
-hist_yearly, hist_yearly_counters, hist_counter_monthly = load_historical_data()
+hist_yearly, hist_yearly_counters, hist_counter_monthly, hist_live_years = load_historical_data()
 
-# Ajouter les données de l'année courante (depuis les fichiers actifs)
-_cur_year = datetime.now().year
-_cur_year_instances = set()
+# ── Enregistrer les données récentes dans l'historique ───────────────────────
+# hist_cache.json contient les fichiers annuels du portail (jusqu'à l'année
+# précédente). Chaque jour, les mois entièrement compris dans la fenêtre y sont
+# enregistrés, pour qu'une année ne disparaisse pas des graphiques le 1er janvier :
+#  - années « récentes » (commencées après le début de la fenêtre, ex. 2026) :
+#    tous leurs mois sont réécrits et leurs totaux recalculés depuis les données ;
+#  - années plus anciennes (totaux officiels du portail) : seuls les mois absents
+#    sont ajoutés (ex. décembre 2025 des capteurs photo/vidéo, pour la saison
+#    d'hiver 2025–26), sans modifier le total annuel publié par le portail.
+_live_months = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))   # inst → année → mois → total
 for _inst, _directions in data.items():
     for _rows in _directions.values():
         for _row in _rows:
-            try:
-                _d  = _row['periode'][:10]
-                _yr = int(_d[:4])
-                _mo = int(_d[5:7])
-                _v  = int(_row.get('volume', 0))
-                if _yr == _cur_year:
-                    hist_yearly[_cur_year] = hist_yearly.get(_cur_year, 0) + _v
-                    _cur_year_instances.add(_inst)
-                    if _inst not in hist_counter_monthly:
-                        hist_counter_monthly[_inst] = {}
-                    if _yr not in hist_counter_monthly[_inst]:
-                        hist_counter_monthly[_inst][_yr] = {}
-                    _mo_dict = hist_counter_monthly[_inst][_yr]
-                    _mo_dict[_mo] = _mo_dict.get(_mo, 0) + _v
-            except (ValueError, KeyError, TypeError):
-                pass
-
-hist_yearly_counters[_cur_year] = len(_cur_year_instances)
-print(f"Historique : {len(hist_yearly)} années, {len(hist_counter_monthly)} compteurs.")
+            _yr, _mo = int(_row['periode'][:4]), int(_row['periode'][5:7])
+            _live_months[_inst][_yr][_mo] += int(_row['volume'])
+for _years in _live_months.values():
+    for _yr in _years:
+        if datetime(_yr, 1, 1) > WINDOW_START:
+            hist_live_years.add(_yr)
+for _inst, _years in _live_months.items():
+    for _yr, _months in _years.items():
+        for _mo, _v in _months.items():
+            if datetime(_yr, _mo, 1) <= WINDOW_START:
+                continue                    # mois partiellement hors de la fenêtre : inchangé
+            _cm = hist_counter_monthly.setdefault(_inst, {}).setdefault(_yr, {})
+            if _yr in hist_live_years or _mo not in _cm:
+                _cm[_mo] = _v
+for _yr in hist_live_years:
+    _ctrs = [m[_yr] for m in hist_counter_monthly.values() if m.get(_yr)]
+    hist_yearly[_yr] = sum(sum(m.values()) for m in _ctrs)
+    hist_yearly_counters[_yr] = len(_ctrs)
+with open(HIST_CACHE_FILE, 'w', encoding='utf-8') as _f:
+    json.dump({'yearly': dict(sorted(hist_yearly.items())),
+               'yearly_counters': dict(sorted(hist_yearly_counters.items())),
+               'counter_monthly': {i: {y: dict(sorted(ms.items())) for y, ms in sorted(ys.items())}
+                                   for i, ys in sorted(hist_counter_monthly.items())},
+               'live_years': sorted(hist_live_years)},
+              _f, ensure_ascii=False, separators=(',', ':'))
+print(f"Historique : {len(hist_yearly)} années ({', '.join(map(str, sorted(hist_live_years)))} "
+      f"depuis les données récentes), {len(hist_counter_monthly)} compteurs.")
 
 
 # ── Données de la page (data/site.json) ──────────────────────────────────────
@@ -811,7 +827,9 @@ if os.path.exists('bixi.csv'):
                 slng = float(row['STARTSTATIONLONGITUDE'])
                 elat = float(row['ENDSTATIONLATITUDE'])
                 elng = float(row['ENDSTATIONLONGITUDE'])
-                date = datetime.fromtimestamp(int(row['STARTTIMEMS']) / 1000, tz=timezone.utc).strftime('%Y-%m-%d')
+                # Jour de Montréal (et non UTC) : comparé aux totaux journaliers des compteurs
+                date = datetime.fromtimestamp(int(row['STARTTIMEMS']) / 1000, tz=timezone.utc) \
+                    .astimezone(bixi_stats.MTL_TZ).strftime('%Y-%m-%d')
                 nearby = set()
                 for inst, loc in counter_locations.items():
                     clat, clng = loc['lat'], loc['lng']
@@ -860,6 +878,9 @@ site_data['bixiYearly'] = bixi_years
 site_data['historicalYearlyTotals'] = hist_yearly
 site_data['historicalYearlyCounters'] = hist_yearly_counters
 site_data['counterHistoricalData'] = hist_counter_monthly
+# Années dont le total vient des données récentes (tous les compteurs) ; les années
+# antérieures viennent des fichiers du portail (capteurs au sol seulement)
+site_data['historicalLiveYears'] = sorted(hist_live_years)
 
 # ── Vue globale : stats agrégées (compteurs groupes A + B) ────────────────────
 _active_g = [i for i in data if all_quality.get(i, {}).get('group') in ('A', 'B')]

@@ -15,7 +15,7 @@ compteur-velo/
 ├── bixi.csv                 # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
 ├── bixi_stats.py            # Agrégats BIXI par année (onglet BIXI) — construit bixi_cache.json
 ├── bixi_cache.json          # Statistiques BIXI des années passées (2014 → année précédente) — commité
-├── hist_cache.json          # Données historiques pré-calculées (2009–année précédente) — commité
+├── hist_cache.json          # Données historiques (2009 → année en cours), enrichies chaque jour — commité
 ├── historique/              # CSV historiques bruts (2009–2025) — ignoré par git, non nécessaire en prod
 │   ├── comptage_velo_2009.csv
 │   ├── comptagevelo2010.csv … comptagevelo2018.csv
@@ -34,8 +34,10 @@ compteur-velo/
 ├── favico.png               # Icône de l'application
 ├── og-image.png             # Image d’aperçu lors du partage (Open Graph, 1200×630)
 ├── test_data.py             # Validation des données (data/site.json ↔ CSV)
+├── test_sources.py          # Audit : chaque valeur publiée recalculée depuis les sources
 ├── test_site_format.py      # Tests unitaires de site_format.py
 ├── test_site.py             # Test de la page dans un navigateur (Playwright)
+├── test_site_values.py      # Chaque chiffre affiché par la page recalculé (Playwright)
 ├── .github/workflows/
 │   ├── update.yml           # Automatisation principale — cron GitHub Actions quotidien
 │   └── tests.yml            # Tests de la page à chaque modification du code
@@ -83,11 +85,13 @@ python3 -m http.server 8000   # puis ouvrir http://localhost:8000
 ```bash
 python3 -m unittest test_site_format   # Encodage des heures (aucune donnée requise)
 python3 test_data.py                   # data/site.json ↔ cyclistes.csv / compteurs.csv
+python3 test_sources.py                # Audit complet contre les sources (voir « Tests et audit des données »)
 pip install playwright && python3 -m playwright install chromium
 python3 test_site.py                   # La page s'affiche sans erreur avec data/site.json
+python3 test_site_values.py            # Chaque chiffre affiché = valeur recalculée depuis data/site.json
 ```
 
-Le workflow quotidien exécute les trois avant de publier ; `tests.yml` exécute les tests unitaires et le test de la page à chaque modification du code.
+Le workflow quotidien exécute tous ces tests avant de publier : un seul échec bloque la publication. `tests.yml` exécute les tests unitaires et les deux tests de la page à chaque modification du code.
 
 ---
 
@@ -134,10 +138,23 @@ Fichier JSON pré-calculé (~60 Ko) commité sur GitHub. Contient :
 }
 ```
 
-`yearly` : total de passages toutes sources confondues pour chaque année historique (2009–2025).  
-`counter_monthly` : passages mensuels par compteur (clé = identifiant `vf-XXXXXXX`), pour les années disponibles dans les fichiers longs (2009, 2019–2025) et pour certains compteurs nommés dans les fichiers larges (2010–2018).
+`yearly` : total de passages pour chaque année.  
+`yearly_counters` : nombre de compteurs de chaque année.  
+`counter_monthly` : passages mensuels par compteur (`vf-…` capteurs au sol, `det-…` capteurs photo/vidéo).  
+`live_years` : années tenues à jour depuis les données récentes (voir ci-dessous).
 
-L'année courante (2026) n'est **pas** dans le cache — elle est calculée à chaque génération depuis `cyclistes.csv` et `compteurs.csv`.
+Les années 2009–2025 viennent des fichiers annuels du portail (capteurs au sol seulement) : `counter_monthly` y couvre les fichiers longs (2009, 2019–2025) et certains compteurs nommés des fichiers larges (2010–2018).
+
+### Mise à jour quotidienne du cache
+
+À chaque génération, `genMap.py` enregistre dans le cache les mois **entièrement compris** dans la fenêtre de 12 mois, puis le workflow commite `hist_cache.json` :
+
+- **Années récentes** (commencées après le début de la fenêtre, à partir de 2026 ; listées dans `live_years`) : tous leurs mois sont réécrits depuis les données récentes — tous les compteurs, capteurs photo/vidéo compris — et leur total annuel est recalculé. Une année reste ainsi dans l'historique après le 1er janvier, et ses mois se figent à mesure qu'ils sortent de la fenêtre.
+- **Années du portail** (2025 et avant) : leurs totaux ne changent jamais ; seuls les mois absents sont ajoutés (ex. décembre 2025 des capteurs photo/vidéo, pour que la saison d'hiver 2025–26 reste complète).
+
+`test_sources.py` vérifie chaque jour ces règles et compare le cache au dernier commit : aucun mois ni aucune année ne peut disparaître, et les données du portail ne peuvent pas changer.
+
+Le graphique « Évolution annuelle » sépare les deux types de capteurs : pour les années du portail, le total ne compte que les capteurs au sol.
 
 ### Logique de chargement dans `genMap.py`
 
@@ -147,20 +164,9 @@ L'année courante (2026) n'est **pas** dans le cache — elle est calculée à c
 3. Sinon → ignorer les données historiques (site fonctionne sans)
 ```
 
-Puis, dans tous les cas : ajouter les données de l'année courante depuis les fichiers live.
+Puis, dans tous les cas : enregistrer les mois récents dans le cache (voir « Mise à jour quotidienne du cache ») et le réécrire.
 
-### Mise à jour du cache
-
-Le cache couvre 2009–2025 et n'a pas besoin d'être mis à jour tant qu'aucun nouveau fichier historique n'est ajouté dans `historique/`. Lorsqu'un historique 2026 complet sera disponible (début 2027) :
-
-```bash
-# Sur une machine disposant du dossier historique/ mis à jour
-rm hist_cache.json
-python3 genMap.py           # reparse tout et régénère le cache
-git add hist_cache.json
-git commit -m "Update hist cache — add 2026 full year"
-git push
-```
+> **Ne pas régénérer le cache depuis `historique/`** (`rm hist_cache.json`) : les fichiers du portail ne contiennent que les capteurs au sol, et les années récentes enregistrées depuis les données quotidiennes (capteurs photo/vidéo compris) seraient perdues.
 
 ---
 
@@ -713,20 +719,38 @@ Lorsqu'un compteur sélectionné possède un voisin complémentaire à moins de 
 
 ---
 
-## Tests — `test_data.py`
+## Tests et audit des données
 
-Suite de validation qui compare directement les CSV et `index.html`. À relancer après chaque régénération du HTML.
+Principe : chaque valeur est **recalculée indépendamment** (code séparé de `genMap.py` et de `assets/app.js`) puis comparée à ce qui est publié. Quand la source fournit ses propres agrégats, ils servent de référence externe.
+
+### `test_data.py` — données horaires des capteurs photo/vidéo
+
+Compare `data/site.json` à `cyclistes.csv` : labels horaires (`HOURLY_DAYS` derniers jours), volumes, totaux journaliers (12 mois), nombre de directions, présence de chaque compteur dans les menus.
+
+### `test_sources.py` — audit contre les fichiers sources
 
 ```bash
-python3 test_data.py
+python3 test_sources.py                              # après fetch_data.sh et genMap.py (~1 min)
+python3 test_sources.py --profond                    # + historique et BIXI des années passées, retéléchargés
+BIXI_ANNEES=2024,2025 python3 test_sources.py --profond   # limite les ZIP BIXI téléchargés
 ```
 
-Le script charge `cyclistes.csv` et `compteurs.csv` (si présent) pour établir la liste des instances attendues, puis valide :
+1. **`cyclistes.csv`** : lignes lisibles, aucune heure publiée deux fois pour une même voie (plusieurs voies d'un même compteur sont additionnées), somme des heures = **total journalier publié par la Ville** pour chaque voie et chaque jour, quarts d'heure = heures, totaux mensuels et annuels de la Ville cohérents, aucun compteur déplacé de plus de 25 m.
+2. **`compteurs.csv`** : grille de 15 min, aucun quart d'heure en double, totaux journaliers et horaires de chaque capteur au sol recalculés depuis les quarts d'heure (règle des journées d'au moins 12 h).
+3. **Capteurs photo/vidéo** : totaux journaliers et mensuels publiés = **totaux de la Ville**.
+4. Profils horaires (6 et 12 mois), localisations, bornes de la fenêtre.
+5. Statut de chaque compteur (actif / en retard / inactif), compteurs lacunaires, cohérence de chaque anomalie signalée.
+6. Vue globale : totaux d'hier, des 7 derniers jours et du mois, compteurs avec données, top 2, heure de pointe, classement des arrondissements, statut du réseau.
+7. Historique : données publiées = `hist_cache.json` ; mois des années récentes = données recalculées ; aucun mois ni aucune année perdus, et totaux du portail inchangés depuis le dernier commit.
+8. Météo : valeurs plausibles, complètes, identiques à Open-Meteo (revérifiées en ligne).
+9. BIXI : cohérence de chaque année, année en cours **recomptée trajet par trajet** depuis `bixi.csv` (jour de Montréal), trajets à moins de 150 m de chaque compteur.
+10. `--profond` : totaux historiques retéléchargés depuis le portail de la Ville, années BIXI recomptées depuis les ZIP officiels.
 
-- Toutes les instances de `cyclistes.csv` sont présentes dans le HTML
-- Aucune instance inconnue dans le HTML (les `vf-` de `compteurs.csv` sont acceptées)
-- Pour chaque instance `det-` : labels horaires (`HOURLY_DAYS` derniers jours), volumes, totaux journaliers (12 mois) et nombre de directions correspondent exactement au CSV
-- Tous les arrondissements de `cyclistes.csv` ont un `<optgroup>` correspondant (des groupes supplémentaires pour les boucles magnétiques sont acceptés)
+Les **avertissements** (non bloquants) signalent des limites de méthode — par exemple une année dont le réseau de compteurs diffère de l'année précédente.
+
+### `test_site_values.py` — chiffres affichés par la page
+
+Ouvre la page dans Chromium (Playwright) et compare chaque chiffre affiché à sa valeur recalculée en Python depuis `data/site.json`, selon la définition affichée à l'utilisateur : statistiques de chaque compteur sur 7, 30, 90, 180 et 365 jours ; cartes, classement et graphique annuel de la Vue globale ; cartes, liste des compteurs, météo, jours record et moyennes mensuelles de **chaque arrondissement** ; cartes, saisons, BIXI l'hiver et explorateur de **chaque compteur** de l'onglet Vélo d'hiver ; cartes, tableau annuel et détail mensuel de **chaque année** BIXI (réseau et Montréal). Environ 4 700 vérifications.
 
 ---
 
@@ -744,8 +768,9 @@ La méthode principale d'automatisation est un **workflow GitHub Actions** plani
 5. ./fetch_data.sh        → télécharge cyclistes.csv, bixi.csv, compteurs.csv
 6. python3 genMap.py      → lit hist_cache.json + fichiers téléchargés → génère index.html
 7. Incrémente version.txt (patch)
-8. python3 test_data.py
-9. git add + commit + push (uniquement si index.html a changé)
+8. python3 test_data.py, python3 test_sources.py
+9. python3 test_site.py, python3 test_site_values.py
+10. git add + commit + push (uniquement si data/site.json a changé)
 ```
 
 `fetch_data.sh` est un script partagé entre ce workflow et `update.sh` (voir section Docker ci-dessous) — toute la logique de scraping/téléchargement (API CKAN, scraping BIXI, extraction du ZIP) vit dans ce seul fichier pour éviter la duplication.
@@ -799,7 +824,7 @@ Une alternative à GitHub Actions, utile pour auto-héberger l'automatisation su
 7. git commit + git push si index.html a changé
 ```
 
-> **Note** : `hist_cache.json` est lu mais jamais modifié par `update.sh`. Le dossier `historique/` n'est pas présent sur le serveur de production — `genMap.py` détecte l'absence du dossier et utilise uniquement le cache.
+> **Note** : `hist_cache.json` est enrichi à chaque génération et commité avec `data/site.json`. Le dossier `historique/` n'est pas présent sur le serveur de production — `genMap.py` détecte l'absence du dossier et utilise uniquement le cache.
 
 Les URLs de `cyclistes.csv` et `compteurs.csv` sont résolues via l'API CKAN du portail (`package_show` sur l'UUID du dataset [cyclistes](https://donnees.montreal.ca/fr/dataset/cyclistes)). Le script cherche `cyclistes_{année}.csv` (repli : `cyclistes.csv`) et `comptage_velo_{année}.csv`, ainsi que les fichiers de l'année précédente, puis fusionne chaque paire (fenêtre de 12 mois).
 

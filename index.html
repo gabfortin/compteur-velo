@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/style.css?v=2.1.3">
+    <link rel="stylesheet" href="assets/style.css?v=2.1.4">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
@@ -431,8 +431,9 @@
       </div>
       <div id="global-cards"></div>
       <div class="global-section" style="margin-bottom:20px;">
-        <div class="global-section-title" style="margin-bottom:12px;">📈 Évolution annuelle — passages totaux</div>
+        <div class="global-section-title" style="margin-bottom:12px;">Évolution annuelle — passages totaux</div>
         <canvas id="global-yearly-chart" style="height:260px;"></canvas>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Tous les compteurs confondus. Les capteurs photo/vidéo ne sont publiés par la Ville que depuis 2026 : une partie de la hausse de 2026 vient de leur ajout, et non d'une hausse équivalente de l'achalandage. Le nombre de compteurs de chaque année est indiqué dans l'info-bulle.</p>
       </div>
       <div id="global-bottom">
         <div class="global-section" id="global-arr"></div>
@@ -444,23 +445,23 @@
     <!-- ══ Page Vélo d'hiver ═══════════════════════════════════════════════ -->
     <div id="hiver-page" style="display:none">
       <div class="site-header" id="hiver-header">
-        <h1>❄️ Vélo d'hiver à Montréal</h1>
+        <h1>Vélo d'hiver à Montréal</h1>
         <p class="subtitle" style="display:block">Décembre à mars — le vélo ne s'arrête pas pour l'hiver</p>
       </div>
       <div id="hiver-cards"></div>
       <div class="global-section" style="margin-bottom:20px;">
-        <div class="global-section-title" style="margin-bottom:12px;">📊 Évolution du vélo d'hiver au fil des années</div>
+        <div class="global-section-title" style="margin-bottom:12px;">Évolution du vélo d'hiver au fil des années</div>
         <canvas id="hiver-trend-chart" style="height:260px;"></canvas>
-        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Total des passages de décembre à mars, tous compteurs confondus. Le nombre de compteurs actifs a augmenté au fil des années (voir l'info-bulle) — une partie de la hausse reflète l'ajout de nouveaux capteurs plutôt qu'une hausse équivalente de l'achalandage.</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Total des passages de décembre à mars, tous compteurs confondus. Le nombre de compteurs actifs a augmenté au fil des années (voir l'info-bulle) — une partie de la hausse reflète l'ajout de nouveaux capteurs plutôt qu'une hausse équivalente de l'achalandage. Les capteurs photo/vidéo ne sont publiés que depuis l'hiver 2025–26.</p>
       </div>
       <div class="global-section" style="margin-bottom:20px;">
-        <div class="global-section-title" style="margin-bottom:12px;">🚲 BIXI l'hiver</div>
+        <div class="global-section-title" style="margin-bottom:12px;">BIXI l'hiver</div>
         <div id="hiver-bixi-cards"></div>
         <canvas id="hiver-bixi-chart" style="height:220px;margin-top:12px;"></canvas>
         <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Les BIXI d'hiver ont été introduits en 2023 — les saisons précédentes n'ont pas de données de décembre à mars.</p>
       </div>
       <div class="global-section" style="margin-bottom:20px;">
-        <div class="global-section-title" style="margin-bottom:12px;">🔍 Explorer un compteur l'hiver</div>
+        <div class="global-section-title" style="margin-bottom:12px;">Explorer un compteur l'hiver</div>
         <div class="select-wrapper" style="max-width:480px;margin-bottom:18px;">
           <select id="hiverCounterSelect">
             <option value="__all__">Tous les compteurs — moyenne combinée</option>
@@ -477,7 +478,7 @@
           </div>
         </div>
         <div style="margin-top:22px;">
-          <div class="global-section-title" style="margin-bottom:10px;font-size:12px;">🌡️ Achalandage moyen par type de journée</div>
+          <div class="global-section-title" style="margin-bottom:10px;font-size:14px;">Achalandage moyen par type de journée</div>
           <div id="hiver-weather-breakdown" class="net-grid net-grid-4"></div>
         </div>
       </div>
@@ -488,7 +489,7 @@
     <!-- ══ Page Arrondissements ═══════════════════════════════════════════ -->
     <div id="arr-page" style="display:none">
       <div class="site-header">
-        <h1>🏘️ Le vélo par arrondissement</h1>
+        <h1>Le vélo par arrondissement</h1>
         <p class="subtitle" style="display:block">Compteurs, achalandage et météo des 12 derniers mois</p>
       </div>
       <div class="select-wrapper" id="arr-picker">
@@ -496,26 +497,26 @@
       </div>
       <div id="arr-cards"></div>
       <div class="global-section">
-        <div class="global-section-title">🗺️ Compteurs sur le territoire</div>
+        <div class="global-section-title">Compteurs sur le territoire</div>
         <div id="arr-map"></div>
         <div id="arr-counters" style="margin-top:16px;"></div>
         <p class="arr-note">Moyenne de passages par jour sur les jours où le compteur a transmis des données. Cliquez sur un compteur pour voir son détail.</p>
       </div>
       <div class="global-section">
-        <div class="global-section-title">📊 Passages moyens par jour, par mois</div>
+        <div class="global-section-title">Passages moyens par jour, par mois</div>
         <div class="arr-chart"><canvas id="arr-monthly-chart"></canvas></div>
       </div>
       <div class="global-section">
-        <div class="global-section-title">🌦️ Effet de la météo</div>
+        <div class="global-section-title">Effet de la météo</div>
         <div id="arr-weather-grid" class="net-grid net-grid-4"></div>
       </div>
       <div class="arr-days-grid">
         <div class="global-section">
-          <div class="global-section-title">🏆 Jours les plus achalandés</div>
+          <div class="global-section-title">Jours les plus achalandés</div>
           <div class="data-table-wrap" id="arr-top-days"></div>
         </div>
         <div class="global-section">
-          <div class="global-section-title">🐌 Jours les moins achalandés</div>
+          <div class="global-section-title">Jours les moins achalandés</div>
           <div class="data-table-wrap" id="arr-low-days"></div>
         </div>
       </div>
@@ -526,7 +527,7 @@
     <!-- ══ Page BIXI ══════════════════════════════════════════════════════ -->
     <div id="bixi-page" style="display:none">
       <div class="site-header" id="bixi-header">
-        <h1>🚲 BIXI à Montréal</h1>
+        <h1>BIXI à Montréal</h1>
         <p class="subtitle" style="display:block">La croissance du vélopartage, année après année</p>
       </div>
       <div id="bixi-scope" role="group" aria-label="Périmètre">
@@ -536,26 +537,26 @@
       <p class="bixi-note" style="text-align:center;margin:0 0 18px;">« Montréal seulement » : trajets partis d’une station située dans l’un des 19 arrondissements de la Ville (sans Laval, Longueuil, Westmount, Mont-Royal, etc.).</p>
       <div id="bixi-cards"></div>
       <div class="global-section">
-        <div class="global-section-title">📈 Trajets par année</div>
+        <div class="global-section-title">Trajets par année</div>
         <div class="bixi-chart"><canvas id="bixi-yearly-chart"></canvas></div>
         <p class="bixi-note">L’année en cours (plus pâle) est partielle : comparez-la avec le cumul ci-dessous.</p>
       </div>
       <div class="global-section">
-        <div class="global-section-title">🏁 Cumul depuis le 1er janvier</div>
+        <div class="global-section-title">Cumul depuis le 1er janvier</div>
         <div class="bixi-chart"><canvas id="bixi-cumul-chart"></canvas></div>
         <p class="bixi-note">Trajets cumulés jour après jour. Cliquez sur une année dans la légende pour l’afficher ou la masquer.</p>
       </div>
       <div class="global-section">
-        <div class="global-section-title">🗓️ Trajets par mois</div>
+        <div class="global-section-title">Trajets par mois</div>
         <div class="bixi-chart"><canvas id="bixi-monthly-chart"></canvas></div>
       </div>
       <div class="global-section">
-        <div class="global-section-title">📋 Statistiques annuelles</div>
+        <div class="global-section-title">Statistiques annuelles</div>
         <div class="data-table-wrap" id="bixi-annual-table"></div>
         <p class="bixi-note">Moy./jour : trajets divisés par le nombre de jours avec au moins un trajet. Durée moyenne : trajets de 1 min à 4 h. La part des membres n’est plus publiée par BIXI depuis 2022. * Année en cours.</p>
       </div>
       <div class="global-section">
-        <div class="global-section-title">🔍 Explorer une année</div>
+        <div class="global-section-title">Explorer une année</div>
         <div class="select-wrapper" style="max-width:240px;margin-bottom:18px;">
           <select id="bixiYearSelect"></select>
         </div>
@@ -575,7 +576,7 @@
           </div>
         </div>
         <div style="margin-top:22px;">
-          <div class="global-section-title" style="font-size:12px;">📍 Stations de départ les plus populaires</div>
+          <div class="global-section-title" style="font-size:14px;">Stations de départ les plus populaires</div>
           <div id="bixi-top-stations"></div>
         </div>
       </div>

@@ -52,6 +52,7 @@ python3 genMap.py
 echo "$LOG Validation des données..."
 python3 -m unittest test_site_format
 python3 test_data.py
+python3 test_sources.py
 
 # ── Publier sur GitHub ─────────────────────────────────────────────────────────
 echo "$LOG Vérification des changements..."
@@ -59,6 +60,7 @@ git add data/site.json
 # Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
 [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
 [ -f bixi_cache.json ] && git add bixi_cache.json
+git add hist_cache.json
 [ -f version.txt ] && git add version.txt
 
 if git diff --staged --quiet; then

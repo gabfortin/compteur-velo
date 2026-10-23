@@ -230,6 +230,14 @@ function buildDailyData(instance, days) {
     };
 }
 
+// Jours avec des données parmi les `days` derniers jours du compteur
+function daysWithData(instance, days) {
+    const instMax = getMaxDate(allChartData[instance].labels) || globalMaxDate;
+    if (!instMax) return [];
+    const cutoffStr = dateStr(new Date(instMax.getFullYear(), instMax.getMonth(), instMax.getDate() - (days - 1)));
+    return allDailyData[instance].labels.filter(l => l >= cutoffStr);
+}
+
 function buildCombinedFilteredData(inst1, inst2, days) {
     const d1 = buildFilteredData(inst1, days);
     const d2 = buildFilteredData(inst2, days);
@@ -318,7 +326,16 @@ function updateStats(instance) {
         datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
     );
     const total = combined.reduce((a, b) => a + b, 0);
-    const uniqueDays = new Set(labels.map(l => l.slice(0, 10))).size;
+    // Moyenne sur les jours où le compteur a transmis : la vue 7 jours complète les
+    // heures manquantes par des zéros pour le graphique, qui ne doivent pas compter.
+    let uniqueDays;
+    if (currentPeriod > 0) {
+        const days = new Set(daysWithData(instance, currentPeriod));
+        if (combinedInstance && allChartData[combinedInstance]) daysWithData(combinedInstance, currentPeriod).forEach(d => days.add(d));
+        uniqueDays = days.size;
+    } else {
+        uniqueDays = new Set(labels.map(l => l.slice(0, 10))).size;
+    }
     const avg = uniqueDays > 0 ? Math.round(total / uniqueDays) : 0;
     const hourTotals = {};
     if (currentPeriod > HOURLY_DAYS) {
@@ -1049,6 +1066,20 @@ function goToCounter(id) {
     setTimeout(() => setCounterFromMap(id), 0);
 }
 
+// Type de capteur : photo/vidéo (det-) ou au sol (vf-), mêmes couleurs que les badges
+const isPhotoVideo = inst => inst.startsWith('det-');
+const TYPE_COLORS = { boucle: ['rgba(139,92,246,0.72)', '#7C3AED'], fut: ['rgba(29,184,96,0.75)', '#1DB860'] };
+const TYPE_LEGEND = { display: true, position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, color: '#555', font: { size: 11 } } };
+// Série d'un graphique empilé ; `partial` éclaircit les barres de la période en cours
+function typeDataset(label, data, colors, partial) {
+    const light = c => c.replace(/[\d.]+\)$/, '0.4)');
+    return {
+        label, data,
+        backgroundColor: partial.map(p => p ? light(colors[0]) : colors[0]),
+        borderColor: colors[1], borderWidth: 1, borderRadius: 3,
+    };
+}
+
 function renderGlobalPage() {
     const s = globalStats;
     if (!s || !s.yesterday) return;
@@ -1057,9 +1088,9 @@ function renderGlobalPage() {
     const fmtPeak = h => h !== null && h !== undefined ? h + 'h–' + (h + 1) + 'h' : '—';
 
     const periods = [
-        { key: 'yesterday', label: 'Hier',              icon: '📅' },
-        { key: 'week',      label: '7 derniers jours',   icon: '📆' },
-        { key: 'month',     label: 'Ce mois',            icon: '🗓️' },
+        { key: 'yesterday', label: 'Hier' },
+        { key: 'week',      label: '7 derniers jours' },
+        { key: 'month',     label: 'Ce mois' },
     ];
 
     document.getElementById('global-cards').innerHTML = periods.map(p => {
@@ -1076,15 +1107,15 @@ function renderGlobalPage() {
             : '';
         return '<div class="global-card' + (clickable ? ' global-card-clickable' : '') + '"' +
             (clickable ? ' onclick="goToCounter(\'' + top1.id + '\')" title="Voir ' + (top1.label || '') + '"' : '') + '>' +
-            '<div class="global-card-title">' + p.icon + ' ' + p.label + '</div>' +
+            '<div class="global-card-title">' + p.label + '</div>' +
             '<div class="global-card-date">' + (d.subtitle || '') + '</div>' +
             '<div class="global-card-total">' + fmt(d.total) + '</div>' +
             '<div class="global-card-sub">passages</div>' +
             '<div class="global-card-meta">' +
-                '<span>⏰ Pointe : <strong>' + fmtPeak(d.peak_hour) + '</strong></span>' +
-                topRow(top1, '🥇') +
-                topRow(top2, '🥈') +
-                '<span>📍 ' + d.coverage + ' / ' + d.active + ' compteurs avec données</span>' +
+                '<span>Pointe : <strong>' + fmtPeak(d.peak_hour) + '</strong></span>' +
+                topRow(top1, '1') +
+                topRow(top2, '2') +
+                '<span>' + d.coverage + ' / ' + d.active + ' compteurs avec données</span>' +
             '</div>' +
             (clickable ? '<div class="global-card-cta">Voir le top compteur →</div>' : '') +
         '</div>';
@@ -1093,7 +1124,7 @@ function renderGlobalPage() {
     // ── Classement arrondissements ──
     const maxVol = s.arr_rank && s.arr_rank.length ? s.arr_rank[0].vol : 1;
     document.getElementById('global-arr').innerHTML =
-        '<div class="global-section-title">🏙️ Top arrondissements <span style="font-size:11px;font-weight:400;color:#9ca3af;">— 7 derniers jours</span></div>' +
+        '<div class="global-section-title">Top arrondissements <span style="font-size:13px;font-weight:400;color:#9ca3af;">— 7 derniers jours</span></div>' +
         (s.arr_rank || []).map(a =>
             '<div class="arr-row">' +
                 '<span class="arr-name">' + a.name + '</span>' +
@@ -1105,7 +1136,7 @@ function renderGlobalPage() {
     // ── Statut du réseau ──
     const n = s.net_status || {};
     document.getElementById('global-net').innerHTML =
-        '<div class="global-section-title">📡 Statut du réseau</div>' +
+        '<div class="global-section-title">Statut du réseau</div>' +
         '<div class="net-grid">' +
             '<div><div class="net-val" style="color:#1DB860">' + (n.A || 0) + '</div><div class="net-label">Actifs</div></div>' +
             '<div><div class="net-val" style="color:#F59E0B">' + (n.B || 0) + '</div><div class="net-label">En retard</div></div>' +
@@ -1116,7 +1147,17 @@ function renderGlobalPage() {
     // ── Graphique évolution annuelle ──
     if (typeof historicalYearlyTotals !== 'undefined' && !charts['__global_yearly__']) {
         const years  = Object.keys(historicalYearlyTotals).map(Number).sort();
-        const totals = years.map(y => historicalYearlyTotals[y]);
+        // Part des capteurs photo/vidéo dans les années tirées des données récentes ; les
+        // totaux des années antérieures (fichiers du portail) ne comptent que les capteurs au sol
+        const liveYears = new Set((SITE_DATA.historicalLiveYears || []).map(String));
+        const fut = {};
+        Object.entries(counterHistoricalData).forEach(([inst, ys]) => {
+            if (!isPhotoVideo(inst)) return;
+            Object.entries(ys).forEach(([y, months]) => {
+                if (!liveYears.has(y)) return;
+                fut[y] = (fut[y] || 0) + Object.values(months).reduce((a, b) => a + b, 0);
+            });
+        });
         const curY   = new Date().getFullYear();
         const ctx    = document.getElementById('global-yearly-chart');
         if (ctx) {
@@ -1124,49 +1165,47 @@ function renderGlobalPage() {
                 type: 'bar',
                 data: {
                     labels: years,
-                    datasets: [{
-                        label: 'Total passages',
-                        data: totals,
-                        backgroundColor: years.map(y => y === curY
-                            ? 'rgba(29,184,96,0.45)'
-                            : 'rgba(29,184,96,0.75)'),
-                        borderColor: years.map(y => y === curY ? '#17a355' : '#1DB860'),
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }],
+                    datasets: [
+                        typeDataset('Capteurs au sol', years.map(y => historicalYearlyTotals[y] - (fut[y] || 0)),
+                                    TYPE_COLORS.boucle, years.map(y => y === curY)),
+                        typeDataset('Capteurs photo/vidéo', years.map(y => fut[y] || 0),
+                                    TYPE_COLORS.fut, years.map(y => y === curY)),
+                    ],
                 },
                 options: {
                     responsive: true,
                     animation: { duration: 500 },
                     plugins: {
-                        legend: { display: false },
+                        legend: TYPE_LEGEND,
                         tooltip: {
                             backgroundColor: 'rgba(10,40,20,0.88)',
                             titleColor: '#7ee8a2',
                             bodyColor: '#fff',
                             padding: 10,
                             cornerRadius: 8,
+                            mode: 'index',
+                            filter: item => item.raw > 0,
                             callbacks: {
-                                label: item => {
-                                    const y = Number(item.label);
+                                title: items => items[0].label + (Number(items[0].label) === curY ? ' (en cours)' : ''),
+                                label: item => ' ' + item.dataset.label + ' : ' + Math.round(item.raw).toLocaleString('fr-CA'),
+                                footer: items => {
+                                    const y = Number(items[0].label);
                                     const n = (typeof historicalYearlyCounters !== 'undefined' && historicalYearlyCounters[y]) || null;
-                                    const suffix = y === curY ? ' (en cours)' : '';
-                                    const ctrLine = n ? '📍 ' + n + ' compteur' + (n > 1 ? 's' : '') : '';
-                                    return [
-                                        ' ' + Math.round(item.raw).toLocaleString('fr-CA') + ' passages' + suffix,
-                                        ctrLine,
-                                    ].filter(Boolean);
+                                    return ['Total : ' + historicalYearlyTotals[y].toLocaleString('fr-CA') + ' passages',
+                                            n ? n + ' compteur' + (n > 1 ? 's' : '') : ''].filter(Boolean);
                                 },
                             },
                         },
                     },
                     scales: {
                         x: {
+                            stacked: true,
                             grid: { color: 'rgba(0,0,0,0.04)' },
                             border: { display: false },
                             ticks: { color: '#777', font: { size: 11 } },
                         },
                         y: {
+                            stacked: true,
                             grid: { color: 'rgba(0,0,0,0.04)' },
                             border: { display: false },
                             beginAtZero: true,
@@ -1226,7 +1265,22 @@ function winterSeasonLabel(dateStr) {
         : (y - 1) + '–' + String(y % 100).padStart(2, '0');
 }
 
+// Saison retenue pour les statistiques d'hiver : la plus récente terminée (à défaut,
+// celle en cours). La fenêtre de 12 mois peut contenir deux hivers (ex. en décembre) :
+// on ne les additionne jamais.
+let _hiverSeason;
+function hiverSeason() {
+    if (_hiverSeason !== undefined) return _hiverSeason;
+    const today = dateStr(new Date());
+    const current = isWinterDate(today) ? winterSeasonLabel(today) : null;
+    const seasons = [...new Set(Object.keys(hiverGlobalDaily()).filter(isWinterDate).map(winterSeasonLabel))].sort();
+    const done = seasons.filter(s => s !== current);
+    _hiverSeason = done.length ? done[done.length - 1] : (seasons.length ? seasons[seasons.length - 1] : null);
+    return _hiverSeason;
+}
+
 function computeWinterStats(dailyMap) {
+    const season = hiverSeason();
     const dowSum = Array(7).fill(0), dowCount = Array(7).fill(0);
     const dowTempSum = Array(7).fill(0), dowTempCount = Array(7).fill(0);
     const cats = {
@@ -1238,8 +1292,11 @@ function computeWinterStats(dailyMap) {
     let coldestRidden = null, snowiestRidden = null, busiest = null;
     let winterTotal = 0, winterDays = 0, snowDaysTotal = 0, snowDaysRidden = 0;
 
+    let firstDate = null, lastDate = null;
     Object.entries(dailyMap).forEach(([date, v]) => {
-        if (!isWinterDate(date)) return;
+        if (!isWinterDate(date) || winterSeasonLabel(date) !== season) return;
+        if (!firstDate || date < firstDate) firstDate = date;
+        if (!lastDate || date > lastDate) lastDate = date;
         winterTotal += v;
         winterDays++;
         const dow = (new Date(date + 'T00:00:00').getDay() + 6) % 7;
@@ -1274,28 +1331,41 @@ function computeWinterStats(dailyMap) {
         avgPassages: dowSum.map((s, i) => dowCount[i] ? Math.round(s / dowCount[i]) : null),
         avgTemp: dowTempSum.map((s, i) => dowTempCount[i] ? +(s / dowTempCount[i]).toFixed(1) : null),
         cats, coldestRidden, snowiestRidden, busiest,
-        winterTotal, winterDays, snowDaysTotal, snowDaysRidden,
+        winterTotal, winterDays, snowDaysTotal, snowDaysRidden, season, firstDate, lastDate,
     };
 }
 
 function computeHistoricalWinterTrend() {
-    const totals = {}, counters = {};
-    if (typeof counterHistoricalData === 'undefined') return { totals, counters };
+    const totals = {}, byType = { boucle: {}, fut: {} }, counters = {};
+    if (typeof counterHistoricalData === 'undefined') return { totals, byType, counters };
+    const add = (season, inst, vol) => {
+        const t = isPhotoVideo(inst) ? 'fut' : 'boucle';
+        totals[season] = (totals[season] || 0) + vol;
+        byType[t][season] = (byType[t][season] || 0) + vol;
+        (counters[season] = counters[season] || new Set()).add(inst);
+    };
+    const shown = hiverSeason();
     Object.entries(counterHistoricalData).forEach(([inst, years]) => {
         Object.entries(years).forEach(([yrStr, months]) => {
             const yr = parseInt(yrStr, 10);
             Object.entries(months).forEach(([moStr, vol]) => {
                 const mo = parseInt(moStr, 10);
                 if (![12, 1, 2, 3].includes(mo)) return;
-                const season = mo >= 11
-                    ? yr + '–' + String((yr + 1) % 100).padStart(2, '0')
-                    : (yr - 1) + '–' + String(yr % 100).padStart(2, '0');
-                totals[season] = (totals[season] || 0) + vol;
-                (counters[season] = counters[season] || new Set()).add(inst);
+                const season = winterSeasonLabel(yr + '-' + String(mo).padStart(2, '0') + '-01');
+                if (season !== shown) add(season, inst, vol);
             });
         });
     });
-    return { totals, counters };
+    // La saison des cartes vient des données quotidiennes (tous les compteurs, décembre
+    // compris) : l'historique ne contient pas les capteurs photo/vidéo avant l'année en cours.
+    if (shown) {
+        Object.keys(counterLocations).forEach(inst => {
+            Object.entries(dailyTotalsFor(inst)).forEach(([date, v]) => {
+                if (isWinterDate(date) && winterSeasonLabel(date) === shown) add(shown, inst, v);
+            });
+        });
+    }
+    return { totals, byType, counters };
 }
 
 function populateHiverCounterSelect() {
@@ -1326,32 +1396,39 @@ function renderHiverFacts() {
     const fmt = n => (n || 0).toLocaleString('fr-CA');
     const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const pctSnowRidden = stats.snowDaysTotal ? Math.round(stats.snowDaysRidden / stats.snowDaysTotal * 100) : 0;
+    // Saison « AAAA–AA » : décembre AAAA à mars AAAA+1 ; on signale une couverture partielle
+    const y0 = stats.season ? parseInt(stats.season.slice(0, 4), 10) : null;
+    const fmtShort = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
+    const partial = stats.firstDate && (stats.firstDate > y0 + '-12-01' || stats.lastDate < (y0 + 1) + '-03-31');
+    const seasonText = y0 ? 'Déc. ' + y0 + ' à mars ' + (y0 + 1) +
+        (partial ? ' (données du ' + fmtShort(stats.firstDate) + ' au ' + fmtShort(stats.lastDate) + ')' : '') +
+        ', tous compteurs' : '—';
 
     const cards = [
         {
-            icon: '❄️', title: "Hiver dernier", date: "Déc. à mars, tous compteurs",
+            title: stats.season ? "Hiver " + stats.season : "Hiver dernier", date: seasonText,
             total: fmt(stats.winterTotal), sub: 'passages',
-            meta: "<span>📆 Sur <strong>" + fmt(stats.winterDays) + "</strong> jours de données</span>",
+            meta: "<span>Sur <strong>" + fmt(stats.winterDays) + "</strong> jours de données</span>",
         },
         {
-            icon: '🥶', title: "Jour le plus froid pédalé", date: stats.coldestRidden ? fmtDate(stats.coldestRidden.date) : '—',
+            title: "Jour le plus froid pédalé", date: stats.coldestRidden ? fmtDate(stats.coldestRidden.date) : '—',
             total: stats.coldestRidden ? stats.coldestRidden.tmin.toFixed(1) + '°C' : '—', sub: 'minimum ce jour',
-            meta: stats.coldestRidden ? "<span>🚲 <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages quand même</span>" : '',
+            meta: stats.coldestRidden ? "<span><strong>" + fmt(stats.coldestRidden.v) + "</strong> passages quand même</span>" : '',
         },
         {
-            icon: '🏆', title: "Record d'achalandage hivernal", date: stats.busiest ? fmtDate(stats.busiest.date) : '—',
+            title: "Record d'achalandage hivernal", date: stats.busiest ? fmtDate(stats.busiest.date) : '—',
             total: stats.busiest ? fmt(stats.busiest.v) : '—', sub: 'passages en 1 jour', meta: '',
         },
         {
-            icon: '🌨️', title: "Jours de neige, pédalés quand même", date: fmt(stats.snowDaysTotal) + ' jours de neige (≥1 cm)',
+            title: "Jours de neige, pédalés quand même", date: fmt(stats.snowDaysTotal) + ' jours de neige (≥1 cm)',
             total: pctSnowRidden + '%', sub: 'de ces jours avec des cyclistes',
-            meta: "<span>🚲 <strong>" + fmt(stats.snowDaysRidden) + "</strong> / " + fmt(stats.snowDaysTotal) + " jours</span>",
+            meta: "<span><strong>" + fmt(stats.snowDaysRidden) + "</strong> / " + fmt(stats.snowDaysTotal) + " jours</span>",
         },
     ];
 
     el.innerHTML = cards.map(c =>
         "<div class='global-card'>" +
-            "<div class='global-card-title'>" + c.icon + ' ' + c.title + "</div>" +
+            "<div class='global-card-title'>" + c.title + "</div>" +
             "<div class='global-card-date'>" + c.date + "</div>" +
             "<div class='global-card-total'>" + c.total + "</div>" +
             "<div class='global-card-sub'>" + c.sub + "</div>" +
@@ -1362,52 +1439,51 @@ function renderHiverFacts() {
 
 function renderHiverTrendChart() {
     if (charts['__hiver_trend__']) return;
-    const { totals, counters } = computeHistoricalWinterTrend();
+    const { totals, byType, counters } = computeHistoricalWinterTrend();
     const seasons = Object.keys(totals).sort();
     const ctx = document.getElementById('hiver-trend-chart');
     if (!ctx || !seasons.length) return;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = dateStr(new Date());
     const curSeason = isWinterDate(todayStr) ? winterSeasonLabel(todayStr) : null;
+    const partial = seasons.map(s => s === curSeason);
     charts['__hiver_trend__'] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: seasons,
-            datasets: [{
-                label: 'Passages (déc–mar)',
-                data: seasons.map(s => totals[s]),
-                backgroundColor: seasons.map(s => s === curSeason ? 'rgba(14,165,216,0.45)' : 'rgba(14,165,216,0.75)'),
-                borderColor: seasons.map(s => s === curSeason ? '#0A7FAE' : '#0EA5D8'),
-                borderWidth: 1,
-                borderRadius: 4,
-            }],
+            datasets: [
+                typeDataset('Capteurs au sol', seasons.map(s => byType.boucle[s] || 0), TYPE_COLORS.boucle, partial),
+                typeDataset('Capteurs photo/vidéo', seasons.map(s => byType.fut[s] || 0), TYPE_COLORS.fut, partial),
+            ],
         },
         options: {
             responsive: true,
             animation: { duration: 500 },
             plugins: {
-                legend: { display: false },
+                legend: TYPE_LEGEND,
                 tooltip: {
                     backgroundColor: 'rgba(7,33,51,0.90)',
                     titleColor: '#8FE0FB',
                     bodyColor: '#fff',
                     padding: 10,
                     cornerRadius: 8,
+                    mode: 'index',
+                    filter: item => item.raw > 0,
                     callbacks: {
-                        label: item => {
-                            const s = item.label;
+                        title: items => items[0].label + (items[0].label === curSeason ? ' (en cours)' : ''),
+                        label: item => ' ' + item.dataset.label + ' : ' + Math.round(item.raw).toLocaleString('fr-CA'),
+                        footer: items => {
+                            const s = items[0].label;
                             const n = counters[s] ? counters[s].size : 0;
-                            const suffix = s === curSeason ? ' (en cours)' : '';
-                            return [
-                                ' ' + Math.round(item.raw).toLocaleString('fr-CA') + ' passages' + suffix,
-                                n ? '📍 ' + n + ' compteur' + (n > 1 ? 's' : '') : '',
-                            ].filter(Boolean);
+                            return ['Total : ' + Math.round(totals[s]).toLocaleString('fr-CA') + ' passages',
+                                    n ? n + ' compteur' + (n > 1 ? 's' : '') : ''].filter(Boolean);
                         },
                     },
                 },
             },
             scales: {
-                x: { grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { color: '#777', font: { size: 11 } } },
+                x: { stacked: true, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { color: '#777', font: { size: 11 } } },
                 y: {
+                    stacked: true,
                     grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, beginAtZero: true,
                     ticks: { color: '#777', callback: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : v },
                     title: { display: true, text: 'Passages', color: '#999', font: { size: 11 } },
@@ -1422,7 +1498,7 @@ function renderHiverWeatherBreakdown(stats) {
     if (!el) return;
     const fmt = n => (n || 0).toLocaleString('fr-CA');
     const defs = [
-        { key: 'doux',  icon: '🙂', label: 'Jours doux (référence)' },
+        { key: 'doux',  icon: '🌤️', label: 'Jours doux (référence)' },
         { key: 'pluie', icon: '🌧️', label: 'Pluie / verglas (>5 mm)' },
         { key: 'froid', icon: '🥶', label: '≤ -10 °C (sans neige)' },
         { key: 'neige', icon: '❄️', label: 'Neige (≥1 cm)' },
@@ -1446,15 +1522,15 @@ function renderHiverRecords(stats, instance) {
     const label = instance === '__all__' ? 'tous les compteurs' : ((counterLocations[instance] && counterLocations[instance].label) || instance);
     const rows = [];
     if (stats.busiest) {
-        rows.push("<p>🏆 Journée la plus achalandée de l'hiver pour <strong>" + label + "</strong> : <strong>" + fmtDate(stats.busiest.date) + "</strong>, avec <strong>" + fmt(stats.busiest.v) + "</strong> passages.</p>");
+        rows.push("<p>Journée la plus achalandée de l'hiver pour <strong>" + label + "</strong> : <strong>" + fmtDate(stats.busiest.date) + "</strong>, avec <strong>" + fmt(stats.busiest.v) + "</strong> passages.</p>");
     }
     if (stats.coldestRidden) {
-        rows.push("<p>🥶 Malgré <strong>" + stats.coldestRidden.tmin.toFixed(1) + " °C</strong> le " + fmtDate(stats.coldestRidden.date) + ", <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages ont tout de même été comptés.</p>");
+        rows.push("<p>Malgré <strong>" + stats.coldestRidden.tmin.toFixed(1) + " °C</strong> le " + fmtDate(stats.coldestRidden.date) + ", <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages ont tout de même été comptés.</p>");
     }
     if (stats.snowiestRidden) {
-        rows.push("<p>❄️ Le " + fmtDate(stats.snowiestRidden.date) + ", sous " + stats.snowiestRidden.snow.toFixed(1) + " cm de neige, <strong>" + fmt(stats.snowiestRidden.v) + "</strong> cyclistes ont quand même été comptés.</p>");
+        rows.push("<p>Le " + fmtDate(stats.snowiestRidden.date) + ", sous " + stats.snowiestRidden.snow.toFixed(1) + " cm de neige, <strong>" + fmt(stats.snowiestRidden.v) + "</strong> cyclistes ont quand même été comptés.</p>");
     }
-    el.innerHTML = "<div class='global-section-title'>📌 Faits marquants — " + label + "</div>" +
+    el.innerHTML = "<div class='global-section-title'>Faits marquants — " + label + "</div>" +
         (rows.length ? rows.join('') : "<p style='color:var(--faint);font-size:13px;'>Pas assez de données hivernales pour ce compteur.</p>");
 }
 
@@ -1548,36 +1624,35 @@ function renderHiverBixiCards(seasons) {
         el.innerHTML = "<div class='global-card'>Données BIXI hivernales indisponibles.</div>";
         return;
     }
+    const last = keys[keys.length - 1];
+    // Saisons antérieures au service hivernal (quelques trajets isolés) : exclues
+    // de la moyenne, sinon ces mois quasi vides la tirent vers le bas.
+    const maxSeason = Math.max(...keys.map(k => seasons[k]));
+    const servedKeys = keys.filter(k => seasons[k] >= maxSeason * 0.01);
+    const served = new Set(servedKeys);
     const winterMonthsWithData = new Set();
     Object.values(bixiYearly).forEach(s => {
         if (!s || !s.daily) return;
-        Object.keys(s.daily).forEach(date => { if (isWinterDate(date)) winterMonthsWithData.add(date.slice(0, 7)); });
+        Object.keys(s.daily).forEach(date => {
+            if (isWinterDate(date) && served.has(winterSeasonLabel(date))) winterMonthsWithData.add(date.slice(0, 7));
+        });
     });
-    const totalWinterTrips = keys.reduce((sum, k) => sum + seasons[k], 0);
+    const totalWinterTrips = servedKeys.reduce((sum, k) => sum + seasons[k], 0);
     const avgPerMonth = winterMonthsWithData.size ? totalWinterTrips / winterMonthsWithData.size : null;
-    const first = keys[0], last = keys[keys.length - 1];
 
     const cards = [
         {
-            icon: '🚲', title: 'BIXI — hiver ' + last, date: 'Décembre à mars',
+            title: 'BIXI — hiver ' + last, date: 'Décembre à mars',
             total: fmt(seasons[last]), sub: 'trajets', meta: '',
         },
         {
-            icon: '📊', title: 'Moyenne des mois hivernaux', date: 'Déc. à mars, toutes saisons confondues',
+            title: 'Moyenne des mois hivernaux', date: 'Déc. à mars, toutes saisons confondues',
             total: avgPerMonth != null ? fmt(avgPerMonth) : '—', sub: 'trajets par mois', meta: '',
         },
     ];
-    if (keys.length >= 2) {
-        const a = seasons[first], b = seasons[last];
-        cards.push({
-            icon: '📈', title: 'Progression depuis ' + first, date: first + ' → ' + last,
-            total: '×' + (b / a).toLocaleString('fr-CA', { maximumFractionDigits: 1 }), sub: 'trajets d’hiver',
-            meta: "<span>" + fmt(a) + " → <strong>" + fmt(b) + "</strong></span>",
-        });
-    }
     el.innerHTML = cards.map(c =>
         "<div class='global-card'>" +
-            "<div class='global-card-title'>" + c.icon + ' ' + c.title + "</div>" +
+            "<div class='global-card-title'>" + c.title + "</div>" +
             "<div class='global-card-date'>" + c.date + "</div>" +
             "<div class='global-card-total'>" + c.total + "</div>" +
             "<div class='global-card-sub'>" + c.sub + "</div>" +
@@ -1721,19 +1796,19 @@ function arrRenderCards(arr, s, days, avg) {
     const best = days.reduce((b, d) => (!b || s.totals[d] > s.totals[b]) ? d : b, null);
     const top = s.counters[0];
     const cards = [
-        { icon: "🚲", title: "Passages", date: "12 derniers mois, tous compteurs", total: arrFmt(total), sub: "passages",
-          meta: "<span>📍 <strong>" + s.ids.length + "</strong> compteur" + (s.ids.length > 1 ? "s" : "") +
+        { title: "Passages", date: "12 derniers mois, tous compteurs", total: arrFmt(total), sub: "passages",
+          meta: "<span><strong>" + s.ids.length + "</strong> compteur" + (s.ids.length > 1 ? "s" : "") +
                 " (" + nFut + " photo/vidéo, " + nSol + " au sol)</span>" },
-        { icon: "📆", title: "Moyenne par jour", date: "Jours où tous les compteurs en service ont transmis", total: arrFmt(avg), sub: "passages / jour",
+        { title: "Moyenne par jour", date: "Jours où tous les compteurs en service ont transmis", total: arrFmt(avg), sub: "passages / jour",
           meta: days.length ? "<span>Semaine : <strong>" + arrFmt(wk) + "</strong> · Fin de semaine : <strong>" + arrFmt(we) + "</strong></span>" : "" },
-        { icon: "🏆", title: "Journée record", date: best ? arrFmtDay(best) : "—", total: best ? arrFmt(s.totals[best]) : "—", sub: "passages",
+        { title: "Journée record", date: best ? arrFmtDay(best) : "—", total: best ? arrFmt(s.totals[best]) : "—", sub: "passages",
           meta: best ? "<span>" + arrWeatherHtml(best) + "</span><span>" + fmtPct((s.totals[best] - avg) / avg * 100) + " vs la moyenne</span>" : "" },
-        { icon: "📍", title: "Compteur le plus achalandé", date: top ? counterLocations[top.id].label : "—", total: top ? arrFmt(top.avg) : "—", sub: "passages / jour en moyenne",
+        { title: "Compteur le plus achalandé", date: top ? counterLocations[top.id].label : "—", total: top ? arrFmt(top.avg) : "—", sub: "passages / jour en moyenne",
           meta: top ? "<span class=\"global-top-row\" onclick=\"goToCounter('" + top.id + "')\">Voir le compteur →</span>" : "" },
     ];
     document.getElementById("arr-cards").innerHTML = cards.map(c =>
         "<div class=\"global-card\">" +
-            "<div class=\"global-card-title\">" + c.icon + " " + c.title + "</div>" +
+            "<div class=\"global-card-title\">" + c.title + "</div>" +
             "<div class=\"global-card-date\">" + c.date + "</div>" +
             "<div class=\"global-card-total\">" + c.total + "</div>" +
             "<div class=\"global-card-sub\">" + c.sub + "</div>" +
@@ -1756,7 +1831,7 @@ function arrRenderMap(s) {
         const loc = counterLocations[id];
         if (!loc) return;
         L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappyCounters.has(id), loc.type, vfGroup(id)))
-            .bindTooltip((loc.type === "boucle" ? "⬡ " : "📍 ") + loc.label, { direction: "top", offset: [0, -6] })
+            .bindTooltip(loc.label, { direction: "top", offset: [0, -6] })
             .on("click", () => goToCounter(id))
             .addTo(arrLayer);
     });
@@ -1773,7 +1848,7 @@ function arrRenderCounters(s) {
             "<span class=\"arr-name\" title=\"" + (loc.label || c.id).replace(/"/g, "&quot;") + "\">" +
                 "<span class=\"arr-type arr-type-" + type + "\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" + (loc.label || c.id) + "</span>" +
             "<div class=\"arr-bar-wrap\"><div class=\"arr-bar\" style=\"width:" + (c.avg / max * 100).toFixed(1) + "%\"></div></div>" +
-            "<span class=\"arr-vol\">" + (c.stopped ? "⛔ inactif" : arrFmt(c.avg) + " / j") + "</span></div>";
+            "<span class=\"arr-vol\">" + (c.stopped ? "<span class=\"arr-stopped\">inactif</span>" : arrFmt(c.avg) + " / j") + "</span></div>";
     }).join("");
 }
 
@@ -1940,7 +2015,7 @@ function renderBixiCards() {
         const y = complete[complete.length - 1];
         const prev = bixiData[String(+y - 1)];
         cards.push({
-            icon: "📅", title: "Année " + y, date: "Du 1er janvier au 31 décembre",
+            title: "Année " + y, date: "Du 1er janvier au 31 décembre",
             total: bixiFmt(bixiData[y].trips), sub: "trajets",
             meta: prev ? "<span>" + bixiPctHtml(bixiPct(bixiData[y].trips, prev.trips)) + " vs " + (+y - 1) + "</span>" : "",
         });
@@ -1951,7 +2026,7 @@ function renderBixiCards() {
         const ytd = bixiData[cur].trips;
         const prevYtd = bixiData[prevY] ? bixiSumUntil(prevY, last.slice(5)) : 0;
         cards.push({
-            icon: "🚀", title: cur + " à ce jour", date: "Jusqu’au " + bixiFmtDate(last),
+            title: cur + " à ce jour", date: "Jusqu’au " + bixiFmtDate(last),
             total: bixiFmt(ytd), sub: "trajets",
             meta: prevYtd ? "<span>" + bixiPctHtml(bixiPct(ytd, prevYtd)) + " vs même période en " + prevY + "</span>" : "",
         });
@@ -1959,20 +2034,20 @@ function renderBixiCards() {
     let best = null;
     ys.forEach(y => Object.entries(bixiData[y].daily).forEach(([d, n]) => { if (!best || n > best.n) best = { d, n }; }));
     if (best) {
-        cards.push({ icon: "🏆", title: "Record en une journée", date: bixiFmtDate(best.d), total: bixiFmt(best.n), sub: "trajets", meta: "" });
+        cards.push({ title: "Record en une journée", date: bixiFmtDate(best.d), total: bixiFmt(best.n), sub: "trajets", meta: "" });
     }
     if (complete.length >= 2) {
         const first = complete[0], last = complete[complete.length - 1];
         const a = bixiData[first].trips, b = bixiData[last].trips;
         cards.push({
-            icon: "📈", title: "Croissance depuis " + first, date: first + " → " + last,
+            title: "Croissance depuis " + first, date: first + " → " + last,
             total: "×" + (b / a).toLocaleString("fr-CA", { maximumFractionDigits: 1 }), sub: "trajets annuels",
             meta: "<span>" + bixiFmt(a) + " → <strong>" + bixiFmt(b) + "</strong></span>",
         });
     }
     el.innerHTML = cards.map(c =>
         "<div class=\"global-card\">" +
-            "<div class=\"global-card-title\">" + c.icon + " " + c.title + "</div>" +
+            "<div class=\"global-card-title\">" + c.title + "</div>" +
             "<div class=\"global-card-date\">" + c.date + "</div>" +
             "<div class=\"global-card-total\">" + c.total + "</div>" +
             "<div class=\"global-card-sub\">" + c.sub + "</div>" +

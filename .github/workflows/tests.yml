@@ -36,3 +36,7 @@ jobs:
 
       - name: Test de la page dans le navigateur
         run: python3 test_site.py
+
+      # Chaque chiffre affiché recalculé depuis data/site.json
+      - name: Chiffres affichés par la page
+        run: python3 test_site_values.py
