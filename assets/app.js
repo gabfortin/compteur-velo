@@ -1381,7 +1381,7 @@ function hiverSeason() {
     return _hiverSeason;
 }
 
-function computeWinterStats(dailyMap) {
+function computeWinterStats(dailyMap, weekdaysOnly) {
     const season = hiverSeason();
     const dowSum = Array(7).fill(0), dowCount = Array(7).fill(0);
     const dowTempSum = Array(7).fill(0), dowTempCount = Array(7).fill(0);
@@ -1397,11 +1397,12 @@ function computeWinterStats(dailyMap) {
     let firstDate = null, lastDate = null;
     Object.entries(dailyMap).forEach(([date, v]) => {
         if (!isWinterDate(date) || winterSeasonLabel(date) !== season) return;
+        const dow = (new Date(date + 'T00:00:00').getDay() + 6) % 7;
+        if (weekdaysOnly && dow >= 5) return;
         if (!firstDate || date < firstDate) firstDate = date;
         if (!lastDate || date > lastDate) lastDate = date;
         winterTotal += v;
         winterDays++;
-        const dow = (new Date(date + 'T00:00:00').getDay() + 6) % 7;
         dowSum[dow] += v;
         dowCount[dow]++;
         if (busiest === null || v > busiest.v) busiest = { date, v };
@@ -1489,6 +1490,20 @@ function populateHiverCounterSelect() {
     sel.addEventListener('change', function() {
         renderHiverDowCharts(this.value);
     });
+
+    const btnFull = document.getElementById('btnHiverFullWeek');
+    const btnWeekdays = document.getElementById('btnHiverWeekdays');
+    if (btnFull && btnWeekdays && !btnFull.dataset.bound) {
+        btnFull.dataset.bound = '1';
+        const setMode = weekdaysOnly => {
+            hiverWeekdaysOnly = weekdaysOnly;
+            btnFull.classList.toggle('active', !weekdaysOnly);
+            btnWeekdays.classList.toggle('active', weekdaysOnly);
+            renderHiverDowCharts(getSelectedHiverCounter());
+        };
+        btnFull.addEventListener('click', () => setMode(false));
+        btnWeekdays.addEventListener('click', () => setMode(true));
+    }
 }
 
 function renderHiverFacts() {
@@ -1687,10 +1702,14 @@ function renderHiverCounterWarning(instance, stats) {
     ).join('');
 }
 
+let hiverWeekdaysOnly = false;
+
 function renderHiverDowCharts(instance) {
     const dailyMap = instance === '__all__' ? hiverGlobalDaily() : dailyTotalsFor(instance);
-    const stats = computeWinterStats(dailyMap);
-    const labels = DOW_LABELS_FR;
+    const stats = computeWinterStats(dailyMap, hiverWeekdaysOnly);
+    const labels = hiverWeekdaysOnly ? DOW_LABELS_FR.slice(0, 5) : DOW_LABELS_FR;
+    const avgPassages = hiverWeekdaysOnly ? stats.avgPassages.slice(0, 5) : stats.avgPassages;
+    const avgTemp = hiverWeekdaysOnly ? stats.avgTemp.slice(0, 5) : stats.avgTemp;
 
     ['__hiver_dow_passages__', '__hiver_dow_temp__'].forEach(k => {
         if (charts[k]) { charts[k].destroy(); charts[k] = null; }
@@ -1704,7 +1723,7 @@ function renderHiverDowCharts(instance) {
                 labels,
                 datasets: [{
                     label: 'Passages moyens',
-                    data: stats.avgPassages,
+                    data: avgPassages,
                     backgroundColor: 'rgba(14,165,216,0.75)',
                     borderColor: '#0EA5D8',
                     borderWidth: 1,
@@ -1722,7 +1741,7 @@ function renderHiverDowCharts(instance) {
                 labels,
                 datasets: [{
                     label: 'Température max. moyenne',
-                    data: stats.avgTemp,
+                    data: avgTemp,
                     borderColor: '#22D3EE',
                     backgroundColor: 'rgba(34,211,238,0.18)',
                     fill: true,
@@ -1738,7 +1757,9 @@ function renderHiverDowCharts(instance) {
 
     renderHiverWeatherBreakdown(stats);
     renderHiverRecords(stats, instance);
-    renderHiverCounterWarning(instance, stats);
+    // L'avertissement par compteur porte sur la disponibilité des données, pas sur le
+    // sous-ensemble de jours choisi : toujours basé sur la semaine complète.
+    renderHiverCounterWarning(instance, hiverWeekdaysOnly ? computeWinterStats(dailyMap) : stats);
 }
 
 function getSelectedHiverCounter() {

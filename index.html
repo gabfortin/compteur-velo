@@ -479,10 +479,14 @@
       </div>
       <div class="global-section" style="margin-bottom:20px;">
         <div class="global-section-title" style="margin-bottom:12px;">Explorer un compteur l'hiver</div>
-        <div class="select-wrapper" style="max-width:480px;margin-bottom:18px;">
+        <div class="select-wrapper" style="max-width:480px;margin-bottom:12px;">
           <select id="hiverCounterSelect">
             <option value="__all__">Tous les compteurs — moyenne combinée</option>
           </select>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:18px;">
+          <button class="dir-btn active" id="btnHiverFullWeek">Semaine complète</button>
+          <button class="dir-btn" id="btnHiverWeekdays">Lundi au vendredi</button>
         </div>
         <div id="hiverCounterWarning"></div>
         <div class="hiver-chart-row">
