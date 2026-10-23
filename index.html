@@ -212,6 +212,7 @@
                 </select>
             </div>
             <div style="display:flex;gap:6px;margin-left:auto;align-items:center;">
+                <button class="dir-btn" id="btnShareCounter" title="Copier le lien vers ce compteur">🔗 Partager</button>
                 <div id="bixiToggle" style="display:none;">
                     <button class="bixi-btn active" id="btnBixi">Bixi</button>
                 </div>
@@ -272,6 +273,7 @@
             <span class="anomaly-info-btn" tabindex="0" onclick="showView('methodo')" data-tooltip="Voir la méthodologie de détection">ℹ</span>
         </div>
         <div id="vfQualityWarning"><span class="warn-icon" id="vfQualityIcon"></span><span id="vfQualityText"></span></div>
+        <div id="cityGapWarning"><span class="warn-icon">🏛️</span><span id="cityGapWarningText"></span></div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 
         </div>
@@ -356,6 +358,21 @@
         </div>
       </div>
 
+      <!-- Coupure de financement municipal -->
+      <div class="methodo-section">
+        <h3>🏛️ Coupure de financement municipal (printemps 2026)</h3>
+        <p>La Ville de Montréal a cessé de financer le traitement des données Éco-Compteur pendant plusieurs semaines au printemps 2026 (<a href="https://www.24heures.ca/2026/04/01/le-comptage-velo-est-suspendu-a-montreal-faute-de-financement" target="_blank" rel="noopener">24 Heures, 1<sup>er</sup> avril 2026 ↗</a>). Contrairement à ce qu'on pourrait croire, cet épisode n'a pas touché l'ensemble du réseau : d'après les données journalières, seuls <strong>6 compteurs</strong> montrent une interruption complète commençant entre janvier et avril 2026 et se terminant par une reprise en mai 2026. Ces compteurs sont signalés individuellement (bandeau dans leur fiche, bande grisée sur leur graphique 6/12 mois).</p>
+        <div class="algo-box">
+          <strong>Compteurs concernés :</strong><br>
+          vf-100034805 (Gouin / Lajeunesse) — 20 janvier au 22 mai 2026<br>
+          vf-100055268 (Rachel / Pie IX) — 20 mars au 5 mai 2026<br>
+          vf-300046833 (Avenue des Pins EDC+) — 20 mars au 5 mai 2026<br>
+          det-00967-13 (Boucherville &amp; Notre-Dame) — 9 février au 27 mai 2026<br>
+          det-00970-01 (Notre-Dame &amp; Curatteau) — 9 février au 27 mai 2026<br>
+          det-00976-02 (Honoré-Beaugrand &amp; Notre-Dame) — 9 février au 27 mai 2026
+        </div>
+      </div>
+
       <!-- Détection anomalies -->
       <div class="methodo-section">
         <h3>🔍 Détection des anomalies</h3>
@@ -433,7 +450,7 @@
       <div class="global-section" style="margin-bottom:20px;">
         <div class="global-section-title" style="margin-bottom:12px;">Évolution annuelle — passages totaux</div>
         <canvas id="global-yearly-chart" style="height:260px;"></canvas>
-        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Tous les compteurs confondus. Les capteurs photo/vidéo ne sont publiés par la Ville que depuis 2026 : une partie de la hausse de 2026 vient de leur ajout, et non d'une hausse équivalente de l'achalandage. Le nombre de compteurs de chaque année est indiqué dans l'info-bulle.</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Tous les compteurs confondus. Les capteurs photo/vidéo ne sont publiés par la Ville que depuis 2026 : une partie de la hausse de 2026 vient de leur ajout, et non d'une hausse équivalente de l'achalandage. Le nombre de compteurs de chaque année est indiqué dans l'info-bulle. Par ailleurs, 6 compteurs n'ont transmis aucune donnée valide pendant plusieurs semaines au printemps 2026 (entre janvier et mai, selon le compteur) après que la Ville a cessé de financer le traitement des données Éco-Compteur — ces compteurs sont signalés individuellement dans leur fiche. (<a href="https://www.24heures.ca/2026/04/01/le-comptage-velo-est-suspendu-a-montreal-faute-de-financement" target="_blank" rel="noopener">source ↗</a>)</p>
       </div>
       <div id="global-bottom">
         <div class="global-section" id="global-arr"></div>
@@ -452,13 +469,13 @@
       <div class="global-section" style="margin-bottom:20px;">
         <div class="global-section-title" style="margin-bottom:12px;">Évolution du vélo d'hiver au fil des années</div>
         <canvas id="hiver-trend-chart" style="height:260px;"></canvas>
-        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Total des passages de décembre à mars, tous compteurs confondus. Le nombre de compteurs actifs a augmenté au fil des années (voir l'info-bulle) — une partie de la hausse reflète l'ajout de nouveaux capteurs plutôt qu'une hausse équivalente de l'achalandage. Les capteurs photo/vidéo ne sont publiés que depuis l'hiver 2025–26.</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Total des passages de décembre à mars, tous compteurs confondus. Le nombre de compteurs actifs a augmenté au fil des années (voir l'info-bulle) — une partie de la hausse reflète l'ajout de nouveaux capteurs plutôt qu'une hausse équivalente de l'achalandage. Les capteurs photo/vidéo ne sont publiés que depuis l'hiver 2025–26. La fin de l'hiver 2025–26 (janvier à mars 2026) est en outre sous-estimée pour quelques compteurs : la Ville a cessé de financer le traitement des données Éco-Compteur pendant plusieurs semaines cette saison-là (<a href="https://www.24heures.ca/2026/04/01/le-comptage-velo-est-suspendu-a-montreal-faute-de-financement" target="_blank" rel="noopener">source ↗</a>).</p>
       </div>
       <div class="global-section" style="margin-bottom:20px;">
         <div class="global-section-title" style="margin-bottom:12px;">BIXI l'hiver</div>
         <div id="hiver-bixi-cards"></div>
         <canvas id="hiver-bixi-chart" style="height:220px;margin-top:12px;"></canvas>
-        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Les BIXI d'hiver ont été introduits en 2023 — les saisons précédentes n'ont pas de données de décembre à mars.</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:8px;">Les BIXI d'hiver ont été introduits en 2023 — les saisons précédentes n'ont pas de données de décembre à mars. Les données ouvertes BIXI sont publiées avec un délai d'environ 3 mois : les mois les plus récents de la saison en cours peuvent donc être incomplets, voire absents.</p>
       </div>
       <div class="global-section" style="margin-bottom:20px;">
         <div class="global-section-title" style="margin-bottom:12px;">Explorer un compteur l'hiver</div>
@@ -467,6 +484,7 @@
             <option value="__all__">Tous les compteurs — moyenne combinée</option>
           </select>
         </div>
+        <div id="hiverCounterWarning"></div>
         <div class="hiver-chart-row">
           <div class="hiver-chart-col">
             <div>Passages moyens par jour de semaine</div>

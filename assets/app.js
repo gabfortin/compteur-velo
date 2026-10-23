@@ -14,6 +14,10 @@ const charts = {};
 const countersByArrondissement = {};
 let specificDate = null;
 let combinedInstance = null;
+let currentView = 'main';
+// Désactivé jusqu'à ce que la restauration initiale depuis l'URL soit réglée,
+// pour que la sélection du compteur par défaut n'écrase pas un lien partagé.
+let hashSyncEnabled = false;
 
 
 // ── Données (data/site.json) ─────────────────────────────────────────────────
@@ -45,6 +49,23 @@ const counterLocations = SITE_DATA.counterLocations;
 const gappyCounters = new Set(SITE_DATA.gappyCounters);
 const anomalyDays = SITE_DATA.anomalyDays;
 const vfDataQuality = SITE_DATA.vfDataQuality;
+// Coupure de financement municipal (printemps 2026) : la Ville a cessé de financer
+// le traitement des données Éco-Compteur, et certains compteurs n'ont transmis aucune
+// donnée valide pendant plusieurs semaines (reprise début mai 2026). Plages vérifiées
+// compteur par compteur à partir des données journalières (trou commençant entre
+// janvier et avril 2026, avec reprise en mai 2026) — ne touche pas tout le réseau.
+const CITY_FUNDING_GAP_SOURCE = {
+    label: '24 Heures, 1 avril 2026',
+    url: 'https://www.24heures.ca/2026/04/01/le-comptage-velo-est-suspendu-a-montreal-faute-de-financement',
+};
+const CITY_FUNDING_GAP = {
+    'det-00967-13': ['2026-02-09', '2026-05-27'],
+    'det-00970-01': ['2026-02-09', '2026-05-27'],
+    'det-00976-02': ['2026-02-09', '2026-05-27'],
+    'vf-100034805': ['2026-01-20', '2026-05-22'],
+    'vf-100055268': ['2026-03-20', '2026-05-05'],
+    'vf-300046833': ['2026-03-20', '2026-05-05'],
+};
 const weatherData = SITE_DATA.weatherData;
 const bixiNearby = SITE_DATA.bixiNearby;
 const bixiExceedsDays = SITE_DATA.bixiExceedsDays;
@@ -446,6 +467,47 @@ function createChart(id) {
                 }
             } : null;
 
+            // ── Coupure de financement municipal (printemps 2026) ──
+            // Compteur concerné et plage connues (voir CITY_FUNDING_GAP) : on grise la
+            // période même si elle n'a pas été détectée comme anomalie statistique.
+            const fundingGap = !combinedInstance && CITY_FUNDING_GAP[id];
+            const fundingGapPlugin = fundingGap ? {
+                id: 'fundingGapViz',
+                beforeDraw(chart) {
+                    if (isDaily) return;
+                    const {ctx: c, chartArea: area, scales: {x: xAxis}} = chart;
+                    if (!area) return;
+                    const labels = chart.data.labels;
+                    const gStart = new Date(fundingGap[0] + 'T00:00:00');
+                    const gEnd = new Date(fundingGap[1] + 'T23:59:59');
+                    let x1 = null, x2 = null;
+                    labels.forEach((lbl, i) => {
+                        const d = new Date(lbl.replace(' ', 'T'));
+                        if (d >= gStart && d <= gEnd) {
+                            const px = xAxis.getPixelForValue(i);
+                            if (x1 === null) x1 = px;
+                            x2 = px;
+                        }
+                    });
+                    if (x1 === null) return;
+                    c.save();
+                    c.fillStyle = 'rgba(245,158,11,0.14)';
+                    c.fillRect(x1, area.top, x2 - x1, area.bottom - area.top);
+                    c.strokeStyle = 'rgba(245,158,11,0.6)';
+                    c.setLineDash([4, 3]);
+                    c.strokeRect(x1, area.top, x2 - x1, area.bottom - area.top);
+                    c.setLineDash([]);
+                    if (x2 - x1 > 70) {
+                        const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        c.fillStyle = dark ? '#fcd34d' : '#92600a';
+                        c.font = '11px sans-serif';
+                        c.textAlign = 'center';
+                        c.fillText('Coupure de financement (Ville)', (x1 + x2) / 2, area.top + 14);
+                    }
+                    c.restore();
+                }
+            } : null;
+
             // Barres fantômes (vue par jour) — dataset réel pour que le hover fonctionne
             if (!combinedInstance && isDaily && missingDaySet.size) {
                 const missingVals = data.labels.map(lbl => { const a = anomalies[lbl]; return (a && a.total === 0) ? a.expected : null; });
@@ -473,7 +535,7 @@ function createChart(id) {
             charts[id] = new Chart(ctx, {
                 type: type,
                 data: data,
-                plugins: missingPlugin ? [missingPlugin] : [],
+                plugins: [missingPlugin, fundingGapPlugin].filter(Boolean),
                 options: {
                     responsive: true,
                     animation: { duration: 500, easing: 'easeInOutQuart' },
@@ -596,6 +658,22 @@ document.getElementById('btnBixi').addEventListener('click', function() {
     }
 });
 
+document.getElementById('btnShareCounter').addEventListener('click', async function() {
+    const instance = getSelectedCounter();
+    if (!instance) return;
+    syncUrlHash(instance);
+    const url = location.href;
+    const btn = this;
+    const original = btn.textContent;
+    try {
+        await navigator.clipboard.writeText(url);
+        btn.textContent = '✓ Lien copié';
+    } catch (e) {
+        window.prompt('Copiez ce lien :', url);
+    }
+    setTimeout(() => { btn.textContent = original; }, 1800);
+});
+
 function hasDataForPeriod(instance) {
     return instance && chartData[instance] && chartData[instance].labels.length > 0;
 }
@@ -668,6 +746,17 @@ function updateVfQualityWarning(instance) {
     el.style.display = 'flex';
 }
 
+function updateCityGapWarning(instance) {
+    const el = document.getElementById('cityGapWarning');
+    const range = instance && CITY_FUNDING_GAP[instance];
+    if (!range) { el.style.display = 'none'; return; }
+    const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-CA', {day: 'numeric', month: 'long', year: 'numeric'});
+    document.getElementById('cityGapWarningText').innerHTML =
+        `<strong>Coupure de financement municipal</strong> — Ce compteur n'a transmis aucune donnée valide du <strong>${fmt(range[0])}</strong> au <strong>${fmt(range[1])}</strong> : la Ville de Montréal avait cessé de financer le traitement des données Éco-Compteur durant cette période. ` +
+        `<a href="${CITY_FUNDING_GAP_SOURCE.url}" target="_blank" rel="noopener">Source : ${CITY_FUNDING_GAP_SOURCE.label} ↗</a>`;
+    el.style.display = 'flex';
+}
+
 function selectCounter(instance) {
     // Reset combine state on counter switch
     combinedInstance = null;
@@ -693,17 +782,30 @@ function selectCounter(instance) {
         updateBixiToggle(instance);
         updateAnomalyWarning(instance);
         updateVfQualityWarning(instance);
+        updateCityGapWarning(instance);
     } else {
         noDataMsg.style.display = 'none';
         document.getElementById('dataWarning').style.display = 'none';
         document.getElementById('anomalyWarning').style.display = 'none';
         document.getElementById('vfQualityWarning').style.display = 'none';
+        document.getElementById('cityGapWarning').style.display = 'none';
         updateStats(null);
         updateDayLabel(null);
         updateDirToggle(null);
         updateBixiToggle(null);
     }
     if (typeof markers !== 'undefined') updateMapSelection(instance);
+
+    // ── Lien partagé ── tant qu'on est sur l'onglet Compteurs, l'ancre de l'URL
+    // suit le compteur affiché (voir aussi le bouton #btnShareCounter).
+    if (hashSyncEnabled && currentView === 'main') {
+        const curHash = (location.hash || '').replace(/^#/, '');
+        if (instance) {
+            syncUrlHash(instance);
+        } else if (counterLocations[curHash]) {
+            syncUrlHash('');
+        }
+    }
 }
 
 function applyViewMode(val) {
@@ -1534,6 +1636,57 @@ function renderHiverRecords(stats, instance) {
         (rows.length ? rows.join('') : "<p style='color:var(--faint);font-size:13px;'>Pas assez de données hivernales pour ce compteur.</p>");
 }
 
+function renderHiverCounterWarning(instance, stats) {
+    const el = document.getElementById('hiverCounterWarning');
+    if (!el) return;
+    if (instance === '__all__') { el.innerHTML = ''; return; }
+
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const loc = counterLocations[instance];
+    const q = (typeof vfDataQuality !== 'undefined') ? vfDataQuality[instance] : null;
+    const allDates = Object.keys(dailyTotalsFor(instance)).sort();
+    const firstEverDate = allDates.length ? allDates[0] : null;
+    const season = stats.season;
+    const seasonStart = season ? season.slice(0, 4) + '-12-01' : null;
+    const seasonEnd = season ? (parseInt(season.slice(0, 4), 10) + 1) + '-03-31' : null;
+    const gap = CITY_FUNDING_GAP[instance];
+    const gapOverlapsWinter = gap && seasonStart && seasonEnd && gap[0] <= seasonEnd && gap[1] >= seasonStart;
+    const rows = [];
+
+    if (gapOverlapsWinter) {
+        rows.push({ cls: 'stopped', icon: '🏛️',
+            text: "<strong>Coupure de financement municipal</strong> — ce compteur n'a transmis aucune donnée valide du <strong>" + fmtDate(gap[0]) + "</strong> au <strong>" + fmtDate(gap[1]) + "</strong> (la Ville avait cessé de financer le traitement des données Éco-Compteur) : les statistiques de l'hiver " + season + " sont donc incomplètes pour cette période. <a href=\"" + CITY_FUNDING_GAP_SOURCE.url + "\" target=\"_blank\" rel=\"noopener\">Source : " + CITY_FUNDING_GAP_SOURCE.label + " ↗</a>" });
+    }
+
+    if (stats.winterDays === 0) {
+        if (firstEverDate && seasonStart && firstEverDate > seasonStart) {
+            rows.push({ cls: 'lag', icon: 'ℹ️',
+                text: "Ce compteur est en service depuis le <strong>" + fmtDate(firstEverDate) + "</strong>, soit après le début de l'hiver " + season + " : il n'a pas encore de données pour cette saison hivernale." });
+        } else if (q && q.group === 'C') {
+            rows.push({ cls: 'stopped', icon: '⛔',
+                text: "Ce compteur n'a transmis aucune donnée récente (depuis le <strong>" + fmtDate(q.last_complete || q.last_any) + "</strong>) — il est peut-être désaffecté ou en réparation, ce qui explique l'absence de données hivernales." });
+        } else {
+            rows.push({ cls: 'lag', icon: '⚠️',
+                text: "Aucune donnée n'est disponible pour ce compteur durant l'hiver " + (season || '') + " — il a pu être retiré ou mis hors service pendant la saison froide." });
+        }
+    } else if (q && q.group === 'C') {
+        rows.push({ cls: 'stopped', icon: '⛔',
+            text: "Ce compteur semble inactif depuis le <strong>" + fmtDate(q.last_complete || q.last_any) + "</strong> — les statistiques ci-dessous peuvent donc être incomplètes pour la fin de la saison." });
+    } else if (q && q.group === 'B') {
+        rows.push({ cls: 'lag', icon: '⚠️',
+            text: "Les données de ce compteur s'arrêtent au <strong>" + fmtDate(q.last_complete) + "</strong> (délai de publication d'environ " + q.lag_days + " jours de la Ville) — les jours les plus récents de l'hiver ne sont pas encore pris en compte." });
+    }
+
+    if (loc && loc.type === 'boucle') {
+        rows.push({ cls: 'info', icon: '❄️',
+            text: "Ce compteur est une <strong>boucle magnétique au sol</strong>, installée sur la piste cyclable : si celle-ci n'était pas bien déneigée, les cyclistes ont pu circuler sur la rue plutôt que sur la piste, et ces passages ne sont alors pas comptabilisés ici." });
+    }
+
+    el.innerHTML = rows.map(r =>
+        "<div class='hiver-warn-row " + r.cls + "'><span class='warn-icon'>" + r.icon + "</span><span>" + r.text + "</span></div>"
+    ).join('');
+}
+
 function renderHiverDowCharts(instance) {
     const dailyMap = instance === '__all__' ? hiverGlobalDaily() : dailyTotalsFor(instance);
     const stats = computeWinterStats(dailyMap);
@@ -1585,6 +1738,7 @@ function renderHiverDowCharts(instance) {
 
     renderHiverWeatherBreakdown(stats);
     renderHiverRecords(stats, instance);
+    renderHiverCounterWarning(instance, stats);
 }
 
 function getSelectedHiverCounter() {
@@ -2548,7 +2702,20 @@ document.getElementById('btnHistMonthly').addEventListener('click', function() {
     setTimeout(() => buildTimelineChart(getSelectedCounter(), 'monthly'), 0);
 });
 
+const VIEW_NAMES = new Set(['main', 'global', 'hiver', 'bixi', 'arr', 'methodo']);
+
+// Met à jour l'ancre de l'URL sans déclencher le défilement natif du navigateur
+// vers un élément du même id (les compteurs ont des éléments portant leur
+// identifiant comme id) — contrairement à une affectation directe à location.hash.
+function syncUrlHash(hash) {
+    const current = (location.hash || '').replace(/^#/, '');
+    if (current === hash) return;
+    const url = hash ? location.pathname + location.search + '#' + hash : location.pathname + location.search;
+    history.pushState(null, '', url);
+}
+
 function showView(view) {
+    currentView = view;
     const isMain   = view === 'main';
     const isGlobal = view === 'global';
     const isHiver  = view === 'hiver';
@@ -2577,8 +2744,33 @@ function showView(view) {
     if (isHiver) renderHiverPage();
     if (isBixi) renderBixiPage();
     if (isArr) renderArrPage();
+    // La carte Leaflet peut avoir été (re)dimensionnée pendant qu'elle était masquée
+    // (ex. arrivée directe sur un autre onglet via l'URL) — recalculer sa taille.
+    if (isMain && map) setTimeout(() => map.invalidateSize(), 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // ── URL par onglet ── chaque vue a sa propre ancre (#global, #hiver, …),
+    // ce qui permet de la partager ou de revenir en arrière avec le bouton précédent.
+    // Sur l'onglet Compteurs, on conserve l'ancre si c'est déjà un identifiant de
+    // compteur valide (lien partagé en cours de restauration, ou déjà sélectionné) ;
+    // sinon (arrivée depuis un autre onglet) on repart d'une URL propre.
+    const curHash = (location.hash || '').replace(/^#/, '');
+    const hash = isMain ? (counterLocations[curHash] ? curHash : '') : view;
+    syncUrlHash(hash);
 }
+
+function showViewFromHash() {
+    const raw = (location.hash || '').replace(/^#/, '');
+    if (raw && !VIEW_NAMES.has(raw) && counterLocations[raw]) {
+        showView('main');
+        setTimeout(() => setCounterFromMap(raw), 0);
+        return;
+    }
+    showView(VIEW_NAMES.has(raw) ? raw : 'main');
+}
+window.addEventListener('popstate', showViewFromHash);
+hashSyncEnabled = true;
+if ((location.hash || '').replace(/^#/, '')) showViewFromHash();
 
 // Masquer l'écran de chargement après l'initialisation (carte incluse, setTimeout ci-dessus)
 setTimeout(() => {
