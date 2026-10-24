@@ -905,6 +905,7 @@ button.nav-link.active { background: #fff; }
 .global-card-total {
     font-size: 36px; font-weight: 800; letter-spacing: -0.035em; color: var(--accent-strong); line-height: 1.05;
 }
+.global-card-unit { font-size: 0.42em; font-weight: 700; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
 .global-card-sub {
     font-size: 11px; color: var(--faint); text-transform: uppercase;
     letter-spacing: 0.06em; margin-top: 4px; margin-bottom: 14px;

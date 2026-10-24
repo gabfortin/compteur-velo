@@ -1423,7 +1423,7 @@ function computeWinterStats(dailyMap, weekdaysOnly) {
             cats.doux.sum += v; cats.doux.count++;
         }
         if (v > 0 && (coldestRidden === null || w.tmin < coldestRidden.tmin)) {
-            coldestRidden = { date, tmin: w.tmin, v };
+            coldestRidden = { date, tmin: w.tmin, tmax: w.tmax, v };
         }
         if (v > 0 && snow > 0 && (snowiestRidden === null || snow > snowiestRidden.snow)) {
             snowiestRidden = { date, snow, v };
@@ -1529,7 +1529,10 @@ function renderHiverFacts() {
         },
         {
             title: "Jour le plus froid pédalé", date: stats.coldestRidden ? fmtDate(stats.coldestRidden.date) : '—',
-            total: stats.coldestRidden ? stats.coldestRidden.tmin.toFixed(1) + '°C' : '—', sub: 'minimum ce jour',
+            // Minimum de la journée (souvent la nuit) : étiqueté, avec le maximum pour contexte
+            total: stats.coldestRidden ? stats.coldestRidden.tmin.toFixed(1) + "°C<span class='global-card-unit'>min</span>" : '—',
+            sub: stats.coldestRidden && stats.coldestRidden.tmax != null
+                ? '(max ' + stats.coldestRidden.tmax.toFixed(1) + '°C ce jour-là)' : 'minimum ce jour',
             meta: stats.coldestRidden ? "<span><strong>" + fmt(stats.coldestRidden.v) + "</strong> passages quand même</span>" : '',
         },
         {
@@ -1642,7 +1645,8 @@ function renderHiverRecords(stats, instance) {
         rows.push("<p>Journée la plus achalandée de l'hiver pour <strong>" + label + "</strong> : <strong>" + fmtDate(stats.busiest.date) + "</strong>, avec <strong>" + fmt(stats.busiest.v) + "</strong> passages.</p>");
     }
     if (stats.coldestRidden) {
-        rows.push("<p>Malgré <strong>" + stats.coldestRidden.tmin.toFixed(1) + " °C</strong> le " + fmtDate(stats.coldestRidden.date) + ", <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages ont tout de même été comptés.</p>");
+        const maxTxt = stats.coldestRidden.tmax != null ? " (max " + stats.coldestRidden.tmax.toFixed(1) + " °C)" : "";
+        rows.push("<p>Malgré un minimum de <strong>" + stats.coldestRidden.tmin.toFixed(1) + " °C</strong>" + maxTxt + " le " + fmtDate(stats.coldestRidden.date) + ", <strong>" + fmt(stats.coldestRidden.v) + "</strong> passages ont tout de même été comptés.</p>");
     }
     if (stats.snowiestRidden) {
         rows.push("<p>Le " + fmtDate(stats.snowiestRidden.date) + ", sous " + stats.snowiestRidden.snow.toFixed(1) + " cm de neige, <strong>" + fmt(stats.snowiestRidden.v) + "</strong> cyclistes ont quand même été comptés.</p>");

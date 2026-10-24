@@ -487,6 +487,11 @@ def test_hiver_page(page, today):
     check("Jour le plus froid : température", close(num(shown[1]['total']), w['coldest'], 0.05),
           f"{shown[1]['total']} ≠ {w['coldest']}")
     check("Jour le plus froid : date", shown[1]['date'] in [fmt_date(d) for d in w['coldest_dates']], shown[1]['date'])
+    check("Jour le plus froid : étiqueté « min »", 'MIN' in shown[1]['total'].upper(), shown[1]['total'])
+    maxes = {WEATHER[d]['tmax'] for d in w['coldest_dates']}
+    sub = page.evaluate("() => document.querySelectorAll('#hiver-cards .global-card-sub')[1].innerText")
+    check("Jour le plus froid : maximum de la journée entre parenthèses",
+          any(close(num(sub), m, 0.05) for m in maxes) and 'MAX' in sub.upper(), f"{sub} ∉ {maxes}")
     cold_v = {w['days'][d] for d in w['coldest_dates']}
     check("Jour le plus froid : passages", num(shown[1]['meta']) in cold_v, f"{shown[1]['meta']} ∉ {cold_v}")
     check("Record hivernal : valeur", num(shown[2]['total']) == w['busiest'], f"{shown[2]['total']} ≠ {w['busiest']}")
@@ -549,6 +554,8 @@ def test_hiver_page(page, today):
             check(f"{tag} Fait marquant : record", ws['busiest'] in nums(rec), rec)
         if ws['coldest'] is not None:
             check(f"{tag} Fait marquant : jour le plus froid", any(close(x, ws['coldest'], 0.05) for x in nums(rec)), rec)
+            check(f"{tag} Fait marquant : maximum du jour le plus froid",
+                  any(close(x, WEATHER[d]['tmax'], 0.05) for d in ws['coldest_dates'] for x in nums(rec)), rec)
         if ws['snowiest'] is not None:
             check(f"{tag} Fait marquant : jour le plus enneigé", any(close(x, ws['snowiest'], 0.05) for x in nums(rec)), rec)
     page.select_option('#hiverCounterSelect', '__all__')
