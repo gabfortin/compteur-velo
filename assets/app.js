@@ -936,14 +936,37 @@ function filterDataByPeriod(days) {
 (function() {
     const arrondissements = Object.keys(countersByArrondissement);
     if (!arrondissements.length) return;
-    // Compteur affiché par défaut au chargement : choisi au hasard parmi les
-    // compteurs actifs (type « boucle », avec données) sans problème récent
-    // (ni délai de publication / inactivité, ni trou de données).
-    const healthyCounters = Object.keys(counterLocations).filter(id =>
-        counterLocations[id].type === 'boucle' && vfGroup(id) === 'A' && !gappyCounters.has(id));
-    const defaultCounter = healthyCounters.length
-        ? healthyCounters[Math.floor(Math.random() * healthyCounters.length)]
-        : 'vf-300046833';
+
+    let defaultCounter = 'vf-300046833';
+    try {
+        // Un compteur n'est éligible que si son arrondissement se résout
+        // correctement dans countersByArrondissement (sinon le remplissage du
+        // menu mobile plus bas échoue) — ex. vu après coup, ce qui causait un
+        // échec de chargement aléatoire selon le compteur tiré au hasard.
+        const arrOk = id => {
+            const arr = counterLocations[id] && counterLocations[id].arrondissement;
+            return !!arr && Array.isArray(countersByArrondissement[arr])
+                && countersByArrondissement[arr].some(c => c.value === id);
+        };
+        // Compteur affiché par défaut au chargement : choisi au hasard parmi la
+        // moitié des compteurs admissibles (actifs, sans problème récent) qui ont
+        // le plus de passages, pour éviter de tomber sur un compteur peu fréquenté.
+        const healthyCounters = Object.keys(counterLocations).filter(id =>
+            counterLocations[id].type === 'boucle' && vfGroup(id) === 'A' && !gappyCounters.has(id) && arrOk(id));
+        const avgDailyTotal = id => {
+            const totals = Object.values(dailyTotalsFor(id));
+            return totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+        };
+        const topHalf = healthyCounters
+            .map(id => ({ id, avg: avgDailyTotal(id) }))
+            .sort((a, b) => b.avg - a.avg)
+            .slice(0, Math.max(1, Math.ceil(healthyCounters.length / 2)))
+            .map(c => c.id);
+        if (topHalf.length) defaultCounter = topHalf[Math.floor(Math.random() * topHalf.length)];
+    } catch (e) {
+        console.error('Sélection du compteur par défaut : repli sur la valeur fixe.', e);
+    }
+
     const defaultArr = counterLocations[defaultCounter]?.arrondissement
         || arrondissements[0];
 
@@ -954,13 +977,15 @@ function filterDataByPeriod(days) {
     const arrSelect = document.getElementById('arrondissementSelect');
     arrSelect.value = defaultArr;
     const mobileSelect = document.getElementById('counterSelectMobile');
-    countersByArrondissement[defaultArr].forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.value;
-        opt.textContent = c.label;
-        mobileSelect.appendChild(opt);
-    });
-    document.getElementById('counterSelectWrapper').style.visibility = 'visible';
+    if (countersByArrondissement[defaultArr]) {
+        countersByArrondissement[defaultArr].forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.value;
+            opt.textContent = c.label;
+            mobileSelect.appendChild(opt);
+        });
+        document.getElementById('counterSelectWrapper').style.visibility = 'visible';
+    }
     mobileSelect.value = defaultCounter;
 
     selectCounter(defaultCounter);
