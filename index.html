@@ -255,7 +255,7 @@
                 <strong class="desktop-only">Données potentiellement erronées</strong><strong class="mobile-only">Données suspectes</strong><span class="desktop-only"> — volumes anormalement bas détectés :</span><br>
                 <div id="anomalyDetails" style="margin-top:3px;font-size:12px;line-height:1.7;"></div>
             </div>
-            <span class="anomaly-info-btn" tabindex="0" onclick="showView('methodo')" data-tooltip="Voir la méthodologie de détection">ℹ</span>
+            <span class="anomaly-info-btn" tabindex="0" onclick="openMethodoModal()" data-tooltip="Voir la méthodologie de détection">ℹ</span>
         </div>
         <div id="vfQualityWarning"><span class="warn-icon" id="vfQualityIcon"></span><span id="vfQualityText"></span></div>
         <div id="cityGapWarning"><span class="warn-icon">🏛️</span><span id="cityGapWarningText"></span></div>
@@ -275,20 +275,21 @@
         </div>
     </div>
 
-    <!-- ══ Page Méthodologie ═══════════════════════════════════════════════ -->
-    <div id="methodo-page" style="display:none">
+    <!-- ══ Popup Méthodologie ═══════════════════════════════════════════════ -->
+    <div id="methodo-overlay" class="modal-overlay" hidden>
+    <div id="methodo-page" role="dialog" aria-modal="true" aria-labelledby="methodo-title">
+      <button type="button" id="methodoCloseBtn" class="modal-close" aria-label="Fermer la méthodologie">×</button>
       <div class="methodo-hero">
-        <h2>Méthodologie &amp; Sources de données</h2>
+        <h2 id="methodo-title">Méthodologie &amp; Sources de données</h2>
         <p>Comment les données sont collectées, traitées et validées avant d'être affichées sur cette carte.</p>
       </div>
 
       <!-- Sources -->
       <div class="methodo-section">
-        <h3>📡 Sources de données</h3>
+        <h3>Sources de données</h3>
         <div class="source-grid">
           <div class="source-card">
             <div class="source-card-top">
-              <span class="source-card-icon">🚦</span>
               <div>
                 <div class="source-card-title">Capteurs photo/vidéo <span class="mbadge mbadge-fut">Capteur photo/vidéo</span></div>
                 <div class="source-card-sub">Vélos - comptage permanent — Ville de Montréal</div>
@@ -299,7 +300,6 @@
           </div>
           <div class="source-card">
             <div class="source-card-top">
-              <span class="source-card-icon">🔵</span>
               <div>
                 <div class="source-card-title">Capteurs au sol <span class="mbadge mbadge-boucle">Capteur au sol</span></div>
                 <div class="source-card-sub">Vélos - comptage sur les pistes cyclables — Ville de Montréal</div>
@@ -310,7 +310,6 @@
           </div>
           <div class="source-card">
             <div class="source-card-top">
-              <span class="source-card-icon">🚲</span>
               <div>
                 <div class="source-card-title">BIXI Montréal <span class="mbadge mbadge-bixi">BIXI</span></div>
                 <div class="source-card-sub">bixi.csv — BIXI open data</div>
@@ -321,7 +320,6 @@
           </div>
           <div class="source-card">
             <div class="source-card-top">
-              <span class="source-card-icon">🌤️</span>
               <div>
                 <div class="source-card-title">Météo quotidienne <span class="mbadge mbadge-meteo">Météo</span></div>
                 <div class="source-card-sub">Open-Meteo API (archive + prévisions)</div>
@@ -345,7 +343,7 @@
 
       <!-- Coupure de financement municipal -->
       <div class="methodo-section">
-        <h3>🏛️ Coupure de financement municipal (printemps 2026)</h3>
+        <h3>Coupure de financement municipal (printemps 2026)</h3>
         <p>La Ville de Montréal a cessé de financer le traitement des données Éco-Compteur pendant plusieurs semaines au printemps 2026 (<a href="https://www.24heures.ca/2026/04/01/le-comptage-velo-est-suspendu-a-montreal-faute-de-financement" target="_blank" rel="noopener">24 Heures, 1<sup>er</sup> avril 2026 ↗</a>). Contrairement à ce qu'on pourrait croire, cet épisode n'a pas touché l'ensemble du réseau : d'après les données journalières, seuls <strong>6 compteurs</strong> montrent une interruption complète commençant entre janvier et avril 2026 et se terminant par une reprise en mai 2026. Ces compteurs sont signalés individuellement (bandeau dans leur fiche, bande grisée sur leur graphique 6/12 mois).</p>
         <div class="algo-box">
           <strong>Compteurs concernés :</strong><br>
@@ -360,7 +358,7 @@
 
       <!-- Détection anomalies -->
       <div class="methodo-section">
-        <h3>🔍 Détection des anomalies</h3>
+        <h3>Détection des anomalies</h3>
         <p>Des jours suspects (dysfonctionnement probable du capteur) sont identifiés par deux méthodes complémentaires. Un jour est signalé dès qu'<em>au moins l'une</em> se déclenche :</p>
         <div class="algo-box">
           <strong>Méthode 1 — Z-score par jour de semaine :</strong> le taux horaire (passages/h) du jour est comparé à la moyenne <code>μ</code> et l'écart-type <code>σ</code> de tous les jours complets (≥ 18 h de données) du même jour de semaine. Signalé si <code>taux &lt; μ − 2,5σ</code> ET <code>taux &lt; 50 % de μ</code>.
@@ -372,19 +370,19 @@
           <strong>Jours entièrement absents :</strong> une journée sans aucune donnée dans la plage active du compteur est signalée si le volume attendu (estimé par les méthodes ci-dessus) dépasse <code>25 % de la médiane journalière</code> du compteur (plancher absolu : 10 passages).
         </div>
         <div class="algo-warn">
-          <strong>🌧 Exclusion météo :</strong> les jours présentant des conditions sévères sont automatiquement exclus de la détection — pluie &gt; 15 mm, neige &gt; 5 cm, ou température maximale &lt; −15 °C.
+          <strong>Exclusion météo :</strong> les jours présentant des conditions sévères sont automatiquement exclus de la détection — pluie &gt; 15 mm, neige &gt; 5 cm, ou température maximale &lt; −15 °C.
         </div>
       </div>
 
       <!-- Validation BIXI -->
       <div class="methodo-section">
-        <h3>🚲 Validation croisée BIXI</h3>
+        <h3>Validation croisée BIXI</h3>
         <p>Pour les compteurs situés à proximité de stations BIXI, le volume journalier BIXI (départs + arrivées) est affiché en superposition. Si le volume BIXI dépasse le volume du capteur pour une journée donnée, la barre est marquée d'un badge <em>«&nbsp;Bixi &gt; capteur&nbsp;»</em> — signal possible d'une sous-comptabilisation.</p>
       </div>
 
       <!-- Fenêtre temporelle -->
       <div class="methodo-section">
-        <h3>📅 Fenêtre temporelle</h3>
+        <h3>Fenêtre temporelle</h3>
         <p>Seules les données des <strong>12 derniers mois glissants</strong> (365 jours) sont chargées et affichées. Cette limite s'applique uniformément aux deux types de capteurs et est recalculée à chaque génération du HTML.</p>
         <p>Le détail <strong>horaire</strong> (vue timeline, jour spécifique) couvre les <strong>90 derniers jours</strong> de chaque compteur ; au-delà, les vues 6 et 12 mois s'appuient sur les totaux journaliers, et l'heure de pointe est précalculée à partir des données horaires complètes.</p>
         <p>Pour les capteurs au sol, les intervalles de 15 minutes sont agrégés en tranches horaires par simple sommation — la même granularité que les données des capteurs photo/vidéo.</p>
@@ -403,17 +401,17 @@
 
       <!-- Données historiques -->
       <div class="methodo-section">
-        <h3>📈 Données historiques (2009–présent)</h3>
+        <h3>Données historiques (2009–présent)</h3>
         <p>En complément des 12 derniers mois glissants, le site intègre des données agrégées depuis <strong>2009</strong> pour deux fonctionnalités :</p>
         <ul>
           <li><strong>Vue Globale — évolution annuelle :</strong> diagramme à barres du total de passages pour tous les compteurs confondus, de 2009 à l'année courante (partielle). L'année en cours apparaît avec une barre plus claire pour signaler qu'elle est incomplète.</li>
           <li><strong>Vue Compteur — Comparer &amp; Historique :</strong> deux boutons apparaissent sous le graphique principal pour les compteurs disposant de données antérieures à l'année courante. Ces boutons sont masqués pour les détecteurs récents sans historique.</li>
         </ul>
         <div class="algo-box">
-          <strong>📊 Comparer avec une année :</strong> deux sélecteurs (Année A / Année B) permettent de comparer le total annuel de deux années quelconques. Par défaut, A = année courante, B = année la plus récente dans l'historique du compteur.
+          <strong>Comparer avec une année :</strong> deux sélecteurs (Année A / Année B) permettent de comparer le total annuel de deux années quelconques. Par défaut, A = année courante, B = année la plus récente dans l'historique du compteur.
         </div>
         <div class="algo-box">
-          <strong>📅 Historique multi-années :</strong> deux sous-modes disponibles :<br>
+          <strong>Historique multi-années :</strong> deux sous-modes disponibles :<br>
           — <em>Annuel</em> : une barre par année, total de passages.<br>
           — <em>Mensuel</em> : une courbe Jan–Déc par année (toutes les années disponibles superposées), pour visualiser la saisonnalité.
         </div>
@@ -422,6 +420,7 @@
           Les totaux annuels ne sont pas directement comparables entre toutes les années : le nombre de compteurs actifs et leur couverture géographique ont évolué depuis 2009 (de quelques capteurs sur Rachel et Berri à plus d'une centaine aujourd'hui). Une hausse du total peut refléter l'ajout de nouveaux compteurs autant qu'une augmentation réelle du vélo.
         </div>
       </div>
+    </div>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
@@ -593,7 +592,7 @@
     <div class="watermark">
         <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a></p>
         <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>
-        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez l'<a href="#" onclick="showView('methodo');return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color='#1DB860'" onmouseout="this.style.color='rgba(29,184,96,0.7)'">onglet Méthodologie</a>.</p>
+        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez la <a href="#" onclick="openMethodoModal();return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color='#1DB860'" onmouseout="this.style.color='rgba(29,184,96,0.7)'">page Méthodologie</a>.</p>
         <p style="font-size:0.7rem;color:#aaa;margin-top:4px;">Page mise à jour le <span id="updated-at">—</span> UTC</p>
     </div>
     <div class="version-badge">v<span id="app-version"></span></div>

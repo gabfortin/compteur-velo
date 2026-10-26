@@ -757,8 +757,49 @@ p strong { color: var(--accent-strong); }
 }
 button.nav-link { background: none; border: none; cursor: pointer; font-family: inherit; }
 button.nav-link.active { background: #fff; }
-/* ── Page Méthodologie ───────────────────────────────────────── */
-#methodo-page { max-width: 820px; margin: 0 auto; padding: 32px 16px 60px; }
+/* ── Popup Méthodologie ──────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(10,16,13,0.6);
+    overflow-y: auto;
+    padding: 64px 16px 40px;
+    -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+}
+.modal-overlay[hidden] { display: none; }
+.modal-close {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 2001;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: var(--text);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px -4px rgba(0,0,0,0.4);
+    transition: transform 0.15s, background 0.15s;
+}
+.modal-close:hover { background: #f3f4f6; transform: scale(1.06); }
+#methodo-page {
+    position: relative;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 20px 60px;
+    background: rgba(255,255,255,0.97);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+}
 .methodo-hero { text-align: center; margin-bottom: 40px; }
 .methodo-hero h2 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); margin-bottom: 8px; justify-content: center; }
 .methodo-hero h2::before { display: none; }
@@ -779,7 +820,12 @@ button.nav-link.active { background: #fff; }
 .methodo-section ul { font-size: 14px; color: var(--text-2); line-height: 1.75; padding-left: 22px; margin-bottom: 12px; }
 .methodo-section li { margin-bottom: 3px; }
 .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 600px) { .source-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+    .source-grid { grid-template-columns: 1fr; }
+    .modal-overlay { padding: 56px 8px 24px; }
+    #methodo-page { padding: 40px 14px 40px; }
+    .modal-close { top: 10px; right: 10px; width: 38px; height: 38px; font-size: 22px; }
+}
 .source-card { background: var(--glass-soft); border: 1px solid var(--glass-border); border-radius: var(--r-md);
     padding: 16px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--inner); }
 .source-card-top { display: flex; align-items: center; gap: 10px; }
@@ -1135,6 +1181,9 @@ button.nav-link.active { background: #fff; }
     .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover { background: rgba(255,255,255,0.07); }
     .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
     #nav-more-menu { background: rgba(24,33,29,0.97); }
+    #methodo-page { background: rgba(24,33,29,0.97); }
+    .modal-close { background: rgba(44,57,51,0.95); color: var(--text); }
+    .modal-close:hover { background: rgba(60,76,68,0.95); }
     #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }
     .global-top-row:hover, .arr-counter-row:hover { background: rgba(255,255,255,0.06); }
     .arr-bar-wrap { background: rgba(255,255,255,0.08); }

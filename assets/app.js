@@ -2762,7 +2762,7 @@ document.getElementById('btnHistMonthly').addEventListener('click', function() {
     setTimeout(() => buildTimelineChart(getSelectedCounter(), 'monthly'), 0);
 });
 
-const VIEW_NAMES = new Set(['main', 'global', 'hiver', 'bixi', 'arr', 'methodo']);
+const VIEW_NAMES = new Set(['main', 'global', 'hiver', 'bixi', 'arr']);
 
 // Met à jour l'ancre de l'URL sans déclencher le défilement natif du navigateur
 // vers un élément du même id (les compteurs ont des éléments portant leur
@@ -2774,19 +2774,43 @@ function syncUrlHash(hash) {
     history.pushState(null, '', url);
 }
 
+function openMethodoModal() {
+    document.getElementById('methodo-overlay').hidden = false;
+    document.body.style.overflow = 'hidden';
+    syncUrlHash('methodo');
+    document.getElementById('methodoCloseBtn').focus();
+}
+
+function closeMethodoModal() {
+    const overlay = document.getElementById('methodo-overlay');
+    if (overlay.hidden) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    if ((location.hash || '').replace(/^#/, '') === 'methodo') {
+        const instance = getSelectedCounter();
+        syncUrlHash(currentView === 'main' ? (instance || '') : currentView);
+    }
+}
+
+document.getElementById('methodoCloseBtn').addEventListener('click', closeMethodoModal);
+document.getElementById('methodo-overlay').addEventListener('click', e => {
+    if (e.target.id === 'methodo-overlay') closeMethodoModal();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeMethodoModal();
+});
+
 function showView(view) {
     currentView = view;
     const isMain   = view === 'main';
     const isGlobal = view === 'global';
     const isHiver  = view === 'hiver';
-    const isMeth   = view === 'methodo';
     const isBixi   = view === 'bixi';
     const isArr    = view === 'arr';
     document.getElementById('main-header').style.display    = isMain   ? '' : 'none';
     document.getElementById('main-container').style.display = isMain   ? '' : 'none';
     document.getElementById('global-page').style.display    = isGlobal ? '' : 'none';
     document.getElementById('hiver-page').style.display     = isHiver  ? '' : 'none';
-    document.getElementById('methodo-page').style.display   = isMeth   ? '' : 'none';
     document.getElementById('bixi-page').style.display      = isBixi   ? '' : 'none';
     document.getElementById('arr-page').style.display       = isArr    ? '' : 'none';
     document.getElementById('nav-compteurs').classList.toggle('active', isMain);
@@ -2819,6 +2843,9 @@ function showView(view) {
 
 function showViewFromHash() {
     const raw = (location.hash || '').replace(/^#/, '');
+    if (raw === 'methodo') { openMethodoModal(); return; }
+    const overlay = document.getElementById('methodo-overlay');
+    if (overlay && !overlay.hidden) { overlay.hidden = true; document.body.style.overflow = ''; }
     if (raw && !VIEW_NAMES.has(raw) && counterLocations[raw]) {
         showView('main');
         setTimeout(() => setCounterFromMap(raw), 0);
