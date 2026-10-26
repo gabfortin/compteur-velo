@@ -933,6 +933,33 @@ function filterDataByPeriod(days) {
     }
 }
 
+// Paires exclues du dropdown "Combiner avec" : capteurs non-complémentaires
+// (rues différentes, doublons, Eco-Display, etc.). Déclaré avant l'IIFE
+// ci-dessous, qui sélectionne le compteur par défaut et appelle selectCounter()
+// -> populateCombineSelect(), lequel référence cette constante.
+const EXCLUDED_COMBINE_PAIRS = new Set([
+    // ── 0–200 m ──
+    'vf-100060991|vf-100060992',  // Avenue Westmount + Avenue Lansdowne — rues différentes
+    'vf-100052600|vf-100061409',  // Rachel 3 (Angus) + Rachel/Angus — probable doublon
+    'vf-100034805|vf-100041114',  // Gouin/Lajeunesse + Eco-Display Parc Stanley
+    'vf-100011747|vf-100047030',  // Saint-Antoine/St-Urbain + Viger/St-Urbain — intersections ≠
+    'det-00385-01|det-00421-01',  // Canadiens&Peel + René-Lévesque&Peel — points ≠ sur Peel
+    // 'vf-300014995|vf-300014996' — REV St-Denis Duluth/Rachel : paire valide
+    'vf-100003032|vf-300034853',  // Berri1 + Ontario&Savoie — rues différentes
+    'det-00467-01|vf-100011747',  // Viger&St-Urbain + Saint-Antoine/St-Urbain — intersections ≠
+    // ── 200–300 m ──
+    'det-00967-13|det-00970-01',  // Boucherville&Notre-Dame + Notre-Dame&Curatteau — points ≠
+    'det-00789-01|vf-100055268',  // Bourbonnière&Sherbrooke + Rachel/PieIX — rues différentes
+    'det-00268-02|vf-300021685',  // L-H-LaFontaine&Perras Est + A25/Gouin — rues différentes
+    'det-00268-03|vf-300021685',  // L-H-LaFontaine&Perras Ouest + A25/Gouin — rues différentes
+    'vf-100012218|vf-100052603',  // Boyer/Rosemont + Piste des Carrières — voies différentes
+    'det-00385-01|det-00402-02',  // Canadiens&Peel + Peel&Saint-Antoine — points ≠ sur Peel
+    'det-00399-01|det-00402-01',  // Notre-Dame&Peel Sud + Peel&Saint-Antoine Nord — intersections ≠
+    'det-00399-02|det-00402-01',  // Notre-Dame&Peel Nord + Peel&Saint-Antoine Nord — intersections ≠
+    'vf-100012217|vf-300014996',  // Rachel/HôteldeVille + REV St-Denis/Rachel — intersections ≠
+    'det-01364-01|det-01725-01',  // Charlevoix&Wellington + Gaétan-Laberge&A-15 — rues différentes
+]);
+
 (function() {
     const arrondissements = Object.keys(countersByArrondissement);
     if (!arrondissements.length) return;
@@ -1021,30 +1048,6 @@ document.getElementById('specificDatePicker').addEventListener('change', functio
 });
 
 // ── Combiner deux compteurs ──
-// Paires exclues du dropdown "Combiner avec" :
-// capteurs non-complémentaires (rues différentes, doublons, Eco-Display, etc.)
-const EXCLUDED_COMBINE_PAIRS = new Set([
-    // ── 0–200 m ──
-    'vf-100060991|vf-100060992',  // Avenue Westmount + Avenue Lansdowne — rues différentes
-    'vf-100052600|vf-100061409',  // Rachel 3 (Angus) + Rachel/Angus — probable doublon
-    'vf-100034805|vf-100041114',  // Gouin/Lajeunesse + Eco-Display Parc Stanley
-    'vf-100011747|vf-100047030',  // Saint-Antoine/St-Urbain + Viger/St-Urbain — intersections ≠
-    'det-00385-01|det-00421-01',  // Canadiens&Peel + René-Lévesque&Peel — points ≠ sur Peel
-    // 'vf-300014995|vf-300014996' — REV St-Denis Duluth/Rachel : paire valide
-    'vf-100003032|vf-300034853',  // Berri1 + Ontario&Savoie — rues différentes
-    'det-00467-01|vf-100011747',  // Viger&St-Urbain + Saint-Antoine/St-Urbain — intersections ≠
-    // ── 200–300 m ──
-    'det-00967-13|det-00970-01',  // Boucherville&Notre-Dame + Notre-Dame&Curatteau — points ≠
-    'det-00789-01|vf-100055268',  // Bourbonnière&Sherbrooke + Rachel/PieIX — rues différentes
-    'det-00268-02|vf-300021685',  // L-H-LaFontaine&Perras Est + A25/Gouin — rues différentes
-    'det-00268-03|vf-300021685',  // L-H-LaFontaine&Perras Ouest + A25/Gouin — rues différentes
-    'vf-100012218|vf-100052603',  // Boyer/Rosemont + Piste des Carrières — voies différentes
-    'det-00385-01|det-00402-02',  // Canadiens&Peel + Peel&Saint-Antoine — points ≠ sur Peel
-    'det-00399-01|det-00402-01',  // Notre-Dame&Peel Sud + Peel&Saint-Antoine Nord — intersections ≠
-    'det-00399-02|det-00402-01',  // Notre-Dame&Peel Nord + Peel&Saint-Antoine Nord — intersections ≠
-    'vf-100012217|vf-300014996',  // Rachel/HôteldeVille + REV St-Denis/Rachel — intersections ≠
-    'det-01364-01|det-01725-01',  // Charlevoix&Wellington + Gaétan-Laberge&A-15 — rues différentes
-]);
 function pairKey(a, b) { return [a, b].sort().join('|'); }
 
 function haversineM(lat1, lng1, lat2, lng2) {
