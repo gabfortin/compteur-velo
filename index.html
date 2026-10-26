@@ -82,7 +82,6 @@
             <button class="nav-link" id="nav-arr" onclick="showView('arr')">Arrondissements</button>
             <button class="nav-link" id="nav-hiver" onclick="showView('hiver')"><span class="nav-label-full">Vélo d'hiver</span><span class="nav-label-short">Hiver</span></button>
             <button class="nav-link" id="nav-bixi" onclick="showView('bixi')">BIXI</button>
-            <button class="nav-link" id="nav-methodo" onclick="showView('methodo')">Méthodologie</button>
             <div id="nav-more-wrap">
                 <button class="nav-link" id="nav-more" aria-haspopup="true" aria-expanded="false" aria-controls="nav-more-menu">Plus ▾</button>
                 <div id="nav-more-menu" hidden>
@@ -100,21 +99,14 @@
                     <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"></line>
                 </svg>
             </a>
-            <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com" aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu">
+            <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
                 <span id="topbar-profile-name">gabfortin.com</span>
                 <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
             </a>
-            <div id="profile-menu" hidden>
-                <a class="nav-link" href="https://gabfortin.com">gabfortin.com</a>
-                <button class="nav-link" id="nav-methodo-menu" onclick="closeNavMenus();showView('methodo')">Méthodologie</button>
-            </div>
         </div>
     </nav>
     <script>
-        // Sur mobile, la photo ouvre un menu (gabfortin.com / Méthodologie) au lieu du lien direct,
-        // et « Plus » regroupe Vue Globale, Arrondissements et BIXI
-        const profileLink = document.getElementById('topbar-profile');
-        const profileMenu = document.getElementById('profile-menu');
+        // « Plus » regroupe Vue Globale, Arrondissements et BIXI (mobile)
         const moreBtn = document.getElementById('nav-more');
         const moreMenu = document.getElementById('nav-more-menu');
         const isMobileNav = () => window.matchMedia('(max-width: 767px)').matches;
@@ -125,19 +117,12 @@
             btn.setAttribute('aria-expanded', String(open));
         }
         function closeNavMenus() {
-            profileMenu.hidden = true;
             moreMenu.hidden = true;
-            profileLink.setAttribute('aria-expanded', 'false');
             moreBtn.setAttribute('aria-expanded', 'false');
         }
-        profileLink.addEventListener('click', e => {
-            if (!isMobileNav()) return;
-            e.preventDefault();
-            toggleNavMenu(profileLink, profileMenu);
-        });
         moreBtn.addEventListener('click', () => toggleNavMenu(moreBtn, moreMenu));
         document.addEventListener('click', e => {
-            if (!e.target.closest('#topbar-profile-wrap, #nav-more-wrap')) closeNavMenus();
+            if (!e.target.closest('#nav-more-wrap')) closeNavMenus();
         });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNavMenus(); });
         window.addEventListener('resize', () => { if (!isMobileNav()) closeNavMenus(); });

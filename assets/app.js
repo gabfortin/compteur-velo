@@ -737,7 +737,7 @@ function updateVfQualityWarning(instance) {
     if (q.group === 'B') {
         el.className = 'vf-warn-lag';
         iconEl.textContent = '⚠️';
-        textEl.innerHTML = `<strong>Délai de publication</strong> — Les données de ce compteur s'arrêtent au <strong>${fmt(q.last_complete)}</strong>. La Ville de Montréal publie ces données avec environ <strong>${q.lag_days} jours</strong> de délai. Elles seront mises à jour automatiquement.`;
+        textEl.innerHTML = `<strong>Délai de publication</strong> — Les données de ce compteur s'arrêtent au <strong>${fmt(q.last_complete)}</strong>, soit un retard d'environ <strong>${q.lag_days} jours</strong>. Il peut s'agir d'un simple délai de publication de la Ville de Montréal (les données seront alors mises à jour automatiquement), ou d'un problème technique avec ce compteur.`;
     } else if (q.group === 'C') {
         el.className = 'vf-warn-stopped';
         iconEl.textContent = '⛔';
@@ -936,7 +936,14 @@ function filterDataByPeriod(days) {
 (function() {
     const arrondissements = Object.keys(countersByArrondissement);
     if (!arrondissements.length) return;
-    const defaultCounter = 'vf-300046833';
+    // Compteur affiché par défaut au chargement : choisi au hasard parmi les
+    // compteurs actifs (type « boucle », avec données) sans problème récent
+    // (ni délai de publication / inactivité, ni trou de données).
+    const healthyCounters = Object.keys(counterLocations).filter(id =>
+        counterLocations[id].type === 'boucle' && vfGroup(id) === 'A' && !gappyCounters.has(id));
+    const defaultCounter = healthyCounters.length
+        ? healthyCounters[Math.floor(Math.random() * healthyCounters.length)]
+        : 'vf-300046833';
     const defaultArr = counterLocations[defaultCounter]?.arrondissement
         || arrondissements[0];
 
@@ -1693,7 +1700,7 @@ function renderHiverCounterWarning(instance, stats) {
             text: "Ce compteur semble inactif depuis le <strong>" + fmtDate(q.last_complete || q.last_any) + "</strong> — les statistiques ci-dessous peuvent donc être incomplètes pour la fin de la saison." });
     } else if (q && q.group === 'B') {
         rows.push({ cls: 'lag', icon: '⚠️',
-            text: "Les données de ce compteur s'arrêtent au <strong>" + fmtDate(q.last_complete) + "</strong> (délai de publication d'environ " + q.lag_days + " jours de la Ville) — les jours les plus récents de l'hiver ne sont pas encore pris en compte." });
+            text: "Les données de ce compteur s'arrêtent au <strong>" + fmtDate(q.last_complete) + "</strong>, un retard d'environ " + q.lag_days + " jours qui peut être un simple délai de publication de la Ville, ou un problème technique avec ce compteur — les jours les plus récents de l'hiver ne sont pas encore pris en compte." });
     }
 
     if (loc && loc.type === 'boucle') {
@@ -2763,8 +2770,6 @@ function showView(view) {
     document.getElementById('nav-bixi-menu').classList.toggle('active', isBixi);
     document.getElementById('nav-global-menu').classList.toggle('active', isGlobal);
     document.getElementById('nav-more').classList.toggle('active', isGlobal || isArr || isBixi);
-    document.getElementById('nav-methodo').classList.toggle('active', isMeth);
-    document.getElementById('nav-methodo-menu').classList.toggle('active', isMeth);
     if (isGlobal) renderGlobalPage();
     if (isHiver) renderHiverPage();
     if (isBixi) renderBixiPage();

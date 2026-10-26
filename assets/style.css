@@ -849,9 +849,9 @@ button.nav-link.active { background: #fff; }
 @media (min-width: 360px) and (max-width: 767px) {
     #topbar-instagram { display: flex; }
 }
-/* Menu du profil : mobile seulement (Méthodologie y est déplacée) */
 #topbar-profile-wrap, #nav-more-wrap { position: relative; }
-#profile-menu, #nav-more-menu {
+/* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
+#nav-more-menu {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
@@ -864,16 +864,15 @@ button.nav-link.active { background: #fff; }
     border: 1px solid var(--glass-border);
     border-radius: 14px;
     box-shadow: var(--shadow), var(--inner);
+    z-index: 1;
 }
-#profile-menu[hidden], #nav-more-menu[hidden] { display: none; }
-#profile-menu .nav-link, #nav-more-menu .nav-link { display: block; text-align: left; width: 100%; }
-/* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
-#nav-more-menu { z-index: 1; }
+#nav-more-menu[hidden] { display: none; }
+#nav-more-menu .nav-link { display: block; text-align: left; width: 100%; }
 @media (max-width: 767px) {
-    #nav-methodo, #nav-global, #nav-arr, #nav-bixi { display: none; }
+    #nav-global, #nav-arr, #nav-bixi { display: none; }
 }
 @media (min-width: 768px) {
-    #profile-menu, #nav-more-wrap { display: none !important; }
+    #nav-more-wrap { display: none !important; }
     #topbar { top: 14px; margin-top: 14px; padding: 0 8px 0 10px; }
     #topbar-profile-name { display: inline; }
     .nav-label-short { display: none; }
@@ -1135,7 +1134,7 @@ button.nav-link.active { background: #fff; }
     #topbar { background: rgba(18,26,23,0.72); }
     .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover { background: rgba(255,255,255,0.07); }
     .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
-    #profile-menu, #nav-more-menu { background: rgba(24,33,29,0.97); }
+    #nav-more-menu { background: rgba(24,33,29,0.97); }
     #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }
     .global-top-row:hover, .arr-counter-row:hover { background: rgba(255,255,255,0.06); }
     .arr-bar-wrap { background: rgba(255,255,255,0.08); }
