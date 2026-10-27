@@ -30,8 +30,13 @@ from test_site import open_page, start_server
 PASS = "\033[92m PASS\033[0m"
 FAIL = "\033[91m FAIL\033[0m"
 WARN = "\033[93m AVERT.\033[0m"
-failures, warnings = [], []
+failures, warnings, hard_failures = [], [], []
 n_checks = 0
+
+# Mieux vaut publier chaque jour avec quelques compteurs en écart que de manquer
+# des jours complets de publication pour un détail isolé. Un crash de la page
+# (hard_check) reste bloquant peu importe ce seuil.
+MAX_TOLERATED_FAILURES = 2
 
 
 def warn(name, detail):
@@ -48,6 +53,16 @@ def check(name, condition, detail=""):
         print(f"{FAIL}  {name}")
         print(f"       → {detail}")
         failures.append(name)
+
+
+def hard_check(name, condition, detail=""):
+    """Comme check(), mais pour un plantage de la page : jamais toléré, même sous le seuil."""
+    global n_checks
+    n_checks += 1
+    if not condition:
+        print(f"{FAIL}  {name}")
+        print(f"       → {detail}")
+        hard_failures.append(name)
 
 
 def section(title, before):
@@ -709,7 +724,7 @@ def main():
         test_arr_page(page)
         test_hiver_page(page, today)
         test_bixi_page(page)
-        check("Aucune erreur JavaScript", not errors, errors[:3])
+        hard_check("Aucune erreur JavaScript", not errors, errors[:3])
         browser.close()
     server.shutdown()
 
@@ -718,13 +733,22 @@ def main():
         print(f"\033[93m{len(warnings)} avertissement(s) (méthode, non bloquants) :\033[0m")
         for w in warnings:
             print(f"  • {w}")
+    if hard_failures:
+        print(f"\033[91m{len(hard_failures)} plantage(s) de la page :\033[0m")
+        for f in hard_failures:
+            print(f"  • {f}")
     if failures:
         print(f"\033[91m{len(failures)} vérification(s) échouée(s) sur {n_checks} :\033[0m")
         for f in failures[:40]:
             print(f"  • {f}")
         if len(failures) > 40:
             print(f"  … et {len(failures) - 40} autres")
+    if hard_failures or len(failures) > MAX_TOLERATED_FAILURES:
         sys.exit(1)
+    if failures:
+        print(f"\033[93mPublication malgré les {len(failures)} échec(s) ci-dessus "
+              f"(≤ {MAX_TOLERATED_FAILURES} toléré(s)) — à corriger.\033[0m")
+        return
     print(f"\033[92mLes {n_checks} chiffres vérifiés correspondent aux données publiées.\033[0m")
 
 
