@@ -121,12 +121,24 @@ def main():
 
         for button, element in [('#nav-global', '#global-page'), ('#nav-arr', '#arr-page'),
                                 ('#nav-hiver', '#hiver-page'), ('#nav-bixi', '#bixi-page'),
-                                ('#nav-methodo', '#methodo-page'), ('#nav-compteurs', '#main-container')]:
+                                ('#nav-compteurs', '#main-container')]:
             n_errors = len(errors)
             page.click(button)
             page.wait_for_timeout(500)
             check(f"Onglet {button} affiché sans erreur",
                   page.locator(element).is_visible() and len(errors) == n_errors, errors[n_errors:][:2])
+
+        # Méthodologie : plus un onglet de nav, mais un popup ouvert depuis le lien du bas de page.
+        n_errors = len(errors)
+        page.click('a[onclick^="openMethodoModal"]')
+        page.wait_for_timeout(500)
+        check("Popup Méthodologie affiché sans erreur",
+              page.locator('#methodo-page').is_visible() and len(errors) == n_errors, errors[n_errors:][:2])
+        page.click('#methodoCloseBtn')
+        page.wait_for_timeout(300)
+        check("Popup Méthodologie fermé après clic sur ×",
+              not page.locator('#methodo-page').is_visible())
+
         check("Aucune erreur JavaScript (ordinateur)", not errors, errors[:3])
         page.close()
 
