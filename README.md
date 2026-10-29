@@ -21,7 +21,9 @@ compteur-velo/
 │   ├── comptagevelo2010.csv … comptagevelo2018.csv
 │   ├── comptage_velo_2019.csv … comptage_velo_2025.csv
 │   └── localisation_des_compteurs_velo.csv
-├── velo_meta_cache.json     # Cache Nominatim (arrondissement + rue des boucles magnétiques)
+├── velo_meta_cache.json     # Cache arrondissement (point-in-polygon) + rue des boucles magnétiques
+├── data/
+│   └── districts-electoraux-2025.json  # Polygones des districts électoraux (→ arrondissement) — Ville de Montréal
 ├── genMap.py                # Script de génération des données (data/site.json)
 ├── site_format.py           # Format de data/site.json (encodage des heures) — partagé avec les tests
 ├── index.html               # Page statique (HTML) — modifiable directement
@@ -214,7 +216,7 @@ Ces données sont publiées par année selon le schéma `comptage_velo_{année}.
 
 **Différences avec `cyclistes.csv` :**
 - Granularité 15 min (agrégée en horaire par `genMap.py`) vs horaire natif
-- Pas de direction, arrondissement ou nom de rue dans le fichier — ces métadonnées sont obtenues par reverse geocoding Nominatim (OpenStreetMap) et mises en cache dans `velo_meta_cache.json`
+- Pas de direction, arrondissement ou nom de rue dans le fichier — le nom de rue vient de `localisation_des_compteurs_velo_update.csv`, et l'arrondissement est résolu par point-in-polygon sur `data/districts-electoraux-2025.json` ; le tout est mis en cache dans `velo_meta_cache.json`
 - Identifiants numériques (`100041114`) préfixés `vf-` dans `genMap.py` (ex. `vf-100041114`) pour éviter tout conflit avec les `det-` de `cyclistes.csv`
 - 54 capteurs couvrant des emplacements majoritairement différents des 46 détecteurs sur fût
 
@@ -268,13 +270,17 @@ hour_key = f"{row['date']} {row['heure'][:2]}:00:00"
 hourly[cid][hour_key] += int(row['nb_passages'])
 ```
 
-Les métadonnées manquantes (arrondissement, rue) sont obtenues par reverse geocoding via `fetch_nominatim_meta()` (API Nominatim / OpenStreetMap, gratuit, sans clé), avec un délai de 1,1 s entre les requêtes pour respecter la limite de débit. Les résultats sont mis en cache dans `velo_meta_cache.json` — les générations suivantes n'effectuent aucune requête pour les capteurs déjà connus.
+Les métadonnées manquantes sont résolues sans appel réseau : le nom de rue vient de `localisation_des_compteurs_velo_update.csv`, et l'arrondissement est déterminé par point-in-polygon (`resolve_arrondissement()`) sur les districts électoraux de `data/districts-electoraux-2025.json` — chaque district porte directement le nom de son arrondissement (`NOM_ARR`). Les résultats sont mis en cache dans `velo_meta_cache.json` — les générations suivantes ne recalculent rien pour les capteurs déjà connus.
 
 ```python
-# Extrait de fetch_nominatim_meta()
-arr  = addr.get('city_district') or addr.get('quarter') or addr.get('suburb') or 'Montréal'
-rue1 = addr.get('road') or addr.get('pedestrian') or addr.get('path') or 'Écocompteur'
+# Extrait de resolve_arrondissement()
+for nom_arr, rings in _load_arrondissement_districts():
+    if _point_in_polygon(lng, lat, rings):
+        return nom_arr
+return 'Montréal'  # hors des 19 arrondissements (ex. Westmount, Mont-Royal…)
 ```
+
+> **Note historique** : avant mai 2026, l'arrondissement était obtenu par reverse geocoding Nominatim (OpenStreetMap). Ce code a été retiré au profit du fichier de localisation pour les noms de rue, mais la résolution d'arrondissement n'avait pas été remplacée — tous les nouveaux capteurs retombaient alors sur `'Montréal'` par défaut. Le point-in-polygon ci-dessus corrige ce bug.
 
 Les instances sont préfixées `vf-` et fusionnées dans `data{}` :
 
@@ -828,7 +834,7 @@ Une alternative à GitHub Actions, utile pour auto-héberger l'automatisation su
 
 Les URLs de `cyclistes.csv` et `compteurs.csv` sont résolues via l'API CKAN du portail (`package_show` sur l'UUID du dataset [cyclistes](https://donnees.montreal.ca/fr/dataset/cyclistes)). Le script cherche `cyclistes_{année}.csv` (repli : `cyclistes.csv`) et `comptage_velo_{année}.csv`, ainsi que les fichiers de l'année précédente, puis fusionne chaque paire (fenêtre de 12 mois).
 
-`velo_meta_cache.json` est commité dans le dépôt pour que le cache Nominatim persiste entre les runs Docker. Si de nouveaux capteurs apparaissent dans `compteurs.csv` (nouveaux IDs non présents dans le cache), `genMap.py` les géocode lors de la génération et le cache mis à jour est commité dans le même commit que `index.html`.
+`velo_meta_cache.json` est commité dans le dépôt pour que le cache (rue + arrondissement) persiste entre les runs Docker. Si de nouveaux capteurs apparaissent dans `compteurs.csv` (nouveaux IDs non présents dans le cache), `genMap.py` les résout lors de la génération et le cache mis à jour est commité dans le même commit que `index.html`.
 
 ### Variables d'environnement — `.env`
 

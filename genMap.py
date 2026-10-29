@@ -122,6 +122,65 @@ det_quality = classify_det_quality(data)
 
 # ── Intégrer velo-full-2026.csv (compteurs supplémentaires, intervalles 15 min) ──
 
+_DISTRICTS_FILE = 'data/districts-electoraux-2025.json'
+_arrondissement_districts = None  # [(NOM_ARR, [[(lng, lat), ...], ...]), ...] — anneaux, chargé une fois
+
+
+def _point_in_ring(lng, lat, ring):
+    """Ray casting : point (lng, lat) dans un anneau de polygone GeoJSON ?"""
+    inside = False
+    n = len(ring)
+    x, y = lng, lat
+    x1, y1 = ring[0]
+    for i in range(1, n + 1):
+        x2, y2 = ring[i % n]
+        if (y1 > y) != (y2 > y):
+            x_int = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x < x_int:
+                inside = not inside
+        x1, y1 = x2, y2
+    return inside
+
+
+def _point_in_polygon(lng, lat, rings):
+    """Un polygone GeoJSON est [anneau_extérieur, trou1, trou2, ...]."""
+    if not _point_in_ring(lng, lat, rings[0]):
+        return False
+    return not any(_point_in_ring(lng, lat, hole) for hole in rings[1:])
+
+
+def _load_arrondissement_districts():
+    global _arrondissement_districts
+    if _arrondissement_districts is not None:
+        return _arrondissement_districts
+    _arrondissement_districts = []
+    if not os.path.exists(_DISTRICTS_FILE):
+        print(f"{_DISTRICTS_FILE} introuvable — résolution d'arrondissement par polygone désactivée.")
+        return _arrondissement_districts
+    with open(_DISTRICTS_FILE, encoding='utf-8') as f:
+        geo = json.load(f)
+    for feat in geo['features']:
+        nom_arr = feat['properties']['NOM_ARR']
+        geom = feat['geometry']
+        if geom['type'] == 'Polygon':
+            polygons = [geom['coordinates']]
+        else:  # MultiPolygon
+            polygons = geom['coordinates']
+        for rings in polygons:
+            _arrondissement_districts.append((nom_arr, rings))
+    return _arrondissement_districts
+
+
+def resolve_arrondissement(lat, lng):
+    """Trouve l'arrondissement contenant (lat, lng) par point-in-polygon sur les
+    districts électoraux de Montréal (data/districts-electoraux-2025.json).
+    Retombe sur 'Montréal' si aucun district ne contient le point (ex: hors de l'île).
+    """
+    for nom_arr, rings in _load_arrondissement_districts():
+        if _point_in_polygon(lng, lat, rings):
+            return nom_arr
+    return 'Montréal'
+
 
 def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.json'):
     """Charge compteurs.csv (intervalles 15 min), agrège à l'heure et retourne
@@ -170,14 +229,29 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
                     'lng': float(row['longitude'])
                 }
 
-    # Résoudre les nouveaux compteurs depuis le fichier de localisation (sans Nominatim)
+    # Résoudre les nouveaux compteurs : nom depuis le fichier de localisation,
+    # arrondissement par point-in-polygon sur les districts électoraux (sans Nominatim)
     new_cids = [cid for cid in counter_info if cid not in meta_cache]
     if new_cids:
         print(f"Résolution de {len(new_cids)} nouveaux compteurs via le fichier de localisation...")
         for cid in new_cids:
             nom = localisation_noms.get(cid, f'Écocompteur {cid}')
-            meta_cache[cid] = {'arrondissement': 'Montréal', 'rue_1': nom, 'rue_2': ''}
-            print(f"  {cid} → {meta_cache[cid]['rue_1']}")
+            arr = resolve_arrondissement(counter_info[cid]['lat'], counter_info[cid]['lng'])
+            meta_cache[cid] = {'arrondissement': arr, 'rue_1': nom, 'rue_2': ''}
+            print(f"  {cid} → {arr} / {meta_cache[cid]['rue_1']}")
+
+    # Ré-résoudre l'arrondissement des entrées en cache encore marquées 'Montréal'
+    # (fallback historique avant l'ajout de la résolution par polygone)
+    stale_cids = [cid for cid in meta_cache
+                  if meta_cache[cid].get('arrondissement') == 'Montréal' and cid in counter_info]
+    if stale_cids:
+        print(f"Ré-résolution de {len(stale_cids)} compteurs encore marqués 'Montréal'...")
+        for cid in stale_cids:
+            arr = resolve_arrondissement(counter_info[cid]['lat'], counter_info[cid]['lng'])
+            meta_cache[cid]['arrondissement'] = arr
+            print(f"  {cid} → {arr}")
+
+    if new_cids or stale_cids:
         with open(meta_cache_file, 'w', encoding='utf-8') as f:
             json.dump(meta_cache, f, ensure_ascii=False, indent=2)
         print(f"  Cache métadonnées sauvegardé → {meta_cache_file}")
@@ -200,7 +274,7 @@ def load_velo_full(filepath='compteurs.csv', meta_cache_file='velo_meta_cache.js
     for cid in sorted(counter_info):
         instance_id = f"vf-{cid}"
         meta = meta_cache.get(cid, {
-            'arrondissement': 'Montréal',
+            'arrondissement': resolve_arrondissement(counter_info[cid]['lat'], counter_info[cid]['lng']),
             'rue_1': f'Écocompteur {cid}',
             'rue_2': ''
         })
