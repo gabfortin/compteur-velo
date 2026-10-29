@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/style.css?v=2.1.5">
+    <link rel="stylesheet" href="assets/style.css?v=2.1.10">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
@@ -73,6 +73,38 @@
             const remove = () => { const ld = document.getElementById("loading-screen"); if (ld) ld.remove(); };
             window.addEventListener("error", () => setTimeout(remove, 500));
             setTimeout(remove, 20000);
+        })();
+    </script>
+    <!-- Bannière pétition -->
+    <div id="petition-banner" role="region" aria-label="Pétition">
+        <div id="petition-banner-inner">
+            <span id="petition-banner-icon" aria-hidden="true">📣</span>
+            <div id="petition-banner-text">
+                <strong>Pétition demandant la publication intégrale des données des consultations sur la place du vélo à Montréal</strong>
+                <span>Suite à la modification en cours de route du sondage sur le réseau cyclable, nous demandons à la Ville de Montréal de publier l'intégralité des questionnaires, des méthodologies et des données brutes des deux consultations. Signez notre pétition pour garantir un débat citoyen fondé sur la transparence avant son dépôt au conseil municipal par le conseiller Christopher McCray le 16 novembre 2026.</span>
+            </div>
+            <a id="petition-banner-cta" href="https://projetmontreal.org/petition/petition-pour-la-publication-des-donnees-des-consultations-velo" target="_blank" rel="noopener">Signer la pétition</a>
+            <button id="petition-banner-close" type="button" aria-label="Fermer la bannière">×</button>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var KEY = 'petitionBannerDismissed_v1';
+            var banner = document.getElementById('petition-banner');
+            var dismissed = false;
+            try { dismissed = localStorage.getItem(KEY) === '1'; } catch (e) {}
+            if (dismissed) { banner.remove(); return; }
+            function applyHeight() {
+                document.documentElement.style.setProperty('--petition-banner-h', banner.offsetHeight + 'px');
+            }
+            document.documentElement.classList.add('has-petition-banner');
+            applyHeight();
+            window.addEventListener('resize', applyHeight);
+            document.getElementById('petition-banner-close').addEventListener('click', function() {
+                try { localStorage.setItem(KEY, '1'); } catch (e) {}
+                document.documentElement.classList.remove('has-petition-banner');
+                banner.remove();
+            });
         })();
     </script>
     <nav id="topbar">

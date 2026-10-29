@@ -721,6 +721,86 @@ p strong { color: var(--accent-strong); }
     gap: 6px;
     margin-bottom: 10px;
 }
+/* ── Bannière pétition : bande flottante au-dessus de tout, fermable ── */
+#petition-banner {
+    position: fixed;
+    top: 12px; left: 12px; right: 12px;
+    max-width: 1200px;
+    margin: 0 auto;
+    z-index: 1500;
+    background: linear-gradient(100deg, var(--accent-strong), var(--accent));
+    color: #fff;
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    animation: fadeDown 0.5s var(--ease) both;
+}
+#petition-banner-inner {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    padding: 26px 32px;
+}
+#petition-banner-icon { font-size: 46px; flex: none; line-height: 1; }
+#petition-banner-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#petition-banner-text strong { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+#petition-banner-text span { font-size: 15.5px; opacity: 0.94; line-height: 1.45; }
+#petition-banner-cta {
+    flex: none;
+    text-decoration: none;
+    background: #fff;
+    color: var(--accent-strong);
+    font-size: 16px;
+    font-weight: 800;
+    padding: 15px 30px;
+    border-radius: 999px;
+    white-space: nowrap;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 14px -2px rgba(0,0,0,0.25);
+    animation: petitionCtaPulse 3.6s ease-in-out infinite;
+}
+#petition-banner-cta:hover {
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 6px 20px -2px rgba(0,0,0,0.3);
+    animation-play-state: paused;
+}
+@keyframes petitionCtaPulse {
+    0%, 55%, 100% { transform: scale(1); box-shadow: 0 4px 14px -2px rgba(0,0,0,0.25); }
+    8%  { transform: scale(1.07); box-shadow: 0 6px 22px -2px rgba(0,0,0,0.35); }
+    16% { transform: scale(1); box-shadow: 0 4px 14px -2px rgba(0,0,0,0.25); }
+    24% { transform: scale(1.07); box-shadow: 0 6px 22px -2px rgba(0,0,0,0.35); }
+    32% { transform: scale(1); box-shadow: 0 4px 14px -2px rgba(0,0,0,0.25); }
+}
+#petition-banner-close {
+    flex: none;
+    width: 40px; height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+}
+#petition-banner-close:hover { background: rgba(255,255,255,0.3); }
+html.has-petition-banner body { padding-top: calc(var(--petition-banner-h, 0px) + 22px); transition: padding-top 0.3s var(--ease); }
+html.has-petition-banner #topbar { top: calc(var(--petition-banner-h, 0px) + 22px); }
+@media (max-width: 640px) {
+    #petition-banner-inner { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    #petition-banner-icon { font-size: 30px; }
+    #petition-banner-text { flex: 1 1 auto; }
+    #petition-banner-text strong { font-size: 17px; line-height: 1.25; }
+    #petition-banner-text span { display: none; }
+    #petition-banner-close { order: 3; width: 34px; height: 34px; font-size: 20px; }
+    #petition-banner-cta {
+        order: 4;
+        flex: 1 1 100%;
+        text-align: center;
+        padding: 13px 20px;
+        font-size: 15px;
+    }
+}
 /* ── Topbar : barre flottante vitrée ── */
 #topbar {
     position: sticky;
@@ -1137,6 +1217,7 @@ button.nav-link.active { background: #fff; }
 @media (prefers-reduced-motion: reduce) {
     .loading-wheel { animation-duration: 2.5s; }
     body::before { animation: none; }
+    #petition-banner-cta { animation: none; }
 }
 /* Repli si backdrop-filter non supporté : surfaces plus opaques */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
