@@ -316,7 +316,7 @@ Vue calculée entièrement côté navigateur à partir de `allDailyData`, `count
 
 `bixi_stats.py` télécharge les ZIP annuels publiés sur [bixi.com/en/open-data](https://bixi.com/en/open-data/) (formats 2014–2021 et 2022+) et en tire, pour chaque année : trajets par jour, répartition horaire, durée moyenne et répartition des durées, part des membres (jusqu'en 2021), nombre de stations actives et stations de départ les plus populaires. Le résultat est stocké dans `bixi_cache.json` (commité) ; seules les années absentes du cache sont téléchargées, donc l'exécution quotidienne (étape « Historique BIXI » du workflow) ne fait normalement rien, sauf en début d'année.
 
-Chaque année est résumée pour tout le réseau et pour « Montréal seulement » (clé `mtl`) : les trajets partis d'une station située dans l'un des 19 arrondissements de la Ville. Les stations sont situées par point-dans-polygone avec les [limites administratives](https://donnees.montreal.ca/dataset/limites-administratives-agglomeration) des données ouvertes ; si ce fichier est inaccessible, la colonne `STARTSTATIONARRONDISSEMENT` (2022+) sert de repli. Une année du cache sans clé `mtl` est recalculée.
+Chaque année est résumée pour tout le réseau et pour « Montréal seulement » (clé `mtl`) : les trajets partis d'une station située dans l'un des 19 arrondissements de la Ville. Les stations sont situées par point-dans-polygone avec `data/districts-electoraux-2025.json` (même fichier local que `resolve_arrondissement()`, voir Étape 2 — aucun appel réseau) ; si ce fichier est absent, la colonne `STARTSTATIONARRONDISSEMENT` (2022+) sert de repli. Une année du cache sans clé `mtl` est recalculée.
 
 `genMap.py` ajoute l'année en cours (calculée depuis `bixi.csv`, marquée `partial`) et injecte le tout dans `const bixiYearly`. L'onglet propose un filtre « Tout le réseau / Montréal seulement » et affiche les trajets par année, le cumul depuis le 1er janvier, les trajets par mois, un tableau annuel et un explorateur par année (tableau mensuel, heures, jours de semaine, durées, stations).
 
@@ -349,6 +349,18 @@ const bixiExceedsDays = {
         ...
     }
 };
+```
+
+#### Cache de proximité — `.bixi_proximity_cache.json`
+
+`bixi.csv` ne change que lorsque BIXI publie un nouveau ZIP (`fetch_data.sh` ne le re-télécharge pas sinon) — mais sans cache, `genMap.py` reparcourrait ses millions de lignes (et la boucle de distance sur chaque compteur) à **chaque** génération, y compris les jours où seul `cyclistes.csv` a changé.
+
+Avant de traiter `bixi.csv`, `genMap.py` compare une empreinte — `{taille}:{mtime}` du fichier + la liste triée des compteurs — à celle sauvegardée dans `.bixi_proximity_cache.json` (non commité, voir `.gitignore`, même principe que `.bixi_url`). Si elle correspond, `bixiNearby`, `bixiExceedsDays` et le résumé BIXI de l'année en cours sont relus directement depuis ce cache, sans rouvrir `bixi.csv`. Sinon (fichier changé, ou nouveau compteur ajouté — la liste des compteurs fait partie de l'empreinte), le traitement complet a lieu et le cache est réécrit.
+
+```python
+st = os.stat('bixi.csv')
+bixi_fingerprint = f"{st.st_size}:{int(st.st_mtime)}"
+# ... comparé à prox_cache['fingerprint'] et prox_cache['counters']
 ```
 
 ### Étape 5 — Écriture de `data/site.json`

@@ -3,6 +3,7 @@
 .env
 .DS_Store
 .bixi_url
+.bixi_proximity_cache.json
 .claude
 .vscode
 ./logs*

@@ -39,6 +39,7 @@ from zoneinfo import ZoneInfo
 BIXI_CACHE_FILE = 'bixi_cache.json'
 BIXI_OPEN_DATA_URL = 'https://bixi.com/en/open-data/'
 LIMITES_API_URL = 'https://donnees.montreal.ca/api/3/action/package_show?id=limites-administratives-agglomeration'
+LOCAL_DISTRICTS_FILE = 'data/districts-electoraux-2025.json'
 FIRST_YEAR = 2014
 MTL_TZ = ZoneInfo('America/Montreal')
 
@@ -68,27 +69,21 @@ _MTL_BOROUGHS_NORM = {_norm(b) for b in MTL_BOROUGHS}
 
 # ── Limites de la Ville de Montréal ──────────────────────────────────────────
 def load_montreal_polygons():
-    """Polygones des 19 arrondissements (GeoJSON WGS84 des données ouvertes).
+    """Polygones des 19 arrondissements de Montréal.
 
-    Retourne [(bbox, anneaux)] ou None si le téléchargement échoue.
+    Lit LOCAL_DISTRICTS_FILE (districts électoraux, commité dans le dépôt —
+    même source que la résolution d'arrondissement des compteurs dans
+    genMap.py) plutôt que d'interroger l'API CKAN à chaque génération.
+
+    Retourne [(bbox, anneaux)] ou None si le fichier local est absent.
     """
-    try:
-        req = urllib.request.Request(LIMITES_API_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        resources = json.loads(urllib.request.urlopen(req, timeout=30).read())['result']['resources']
-        url = next(r['url'] for r in resources
-                   if r.get('url', '').lower().endswith('.geojson') and 'nad83' not in r['url'].lower()
-                   and 'mtm' not in r['url'].lower())
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        geo = json.loads(urllib.request.urlopen(req, timeout=60).read())
-    except Exception as e:
-        print(f"BIXI : limites de Montréal indisponibles ({e}) — repli sur la colonne arrondissement.")
+    if not os.path.exists(LOCAL_DISTRICTS_FILE):
+        print(f"BIXI : {LOCAL_DISTRICTS_FILE} introuvable — repli sur la colonne arrondissement.")
         return None
+    with open(LOCAL_DISTRICTS_FILE, encoding='utf-8') as f:
+        geo = json.load(f)
     polygons = []
     for feat in geo.get('features', []):
-        values = {_norm(str(v)) for v in (feat.get('properties') or {}).values()}
-        # Arrondissement de la Ville (et non ville liée) : nom connu ou type « Arrondissement »
-        if not (values & _MTL_BOROUGHS_NORM or 'arrondissement' in values):
-            continue
         geom = feat.get('geometry') or {}
         polys = geom.get('coordinates', [])
         if geom.get('type') == 'Polygon':
@@ -98,9 +93,9 @@ def load_montreal_polygons():
             ys = [p[1] for p in rings[0]]
             polygons.append(((min(xs), min(ys), max(xs), max(ys)), rings))
     if not polygons:
-        print("BIXI : aucun arrondissement reconnu dans les limites — repli sur la colonne arrondissement.")
+        print("BIXI : aucun district trouvé dans le fichier local — repli sur la colonne arrondissement.")
         return None
-    print(f"BIXI : {len(polygons)} polygones d'arrondissements chargés.")
+    print(f"BIXI : {len(polygons)} polygones de districts chargés depuis {LOCAL_DISTRICTS_FILE}.")
     return polygons
 
 

@@ -888,35 +888,68 @@ def _haversine_m(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 BIXI_RADIUS_M = 150
+BIXI_PROXIMITY_CACHE_FILE = '.bixi_proximity_cache.json'
 bixi_near_counter = defaultdict(lambda: defaultdict(int))
-bixi_live = bixi_stats.BixiYearAggregator(
-    bixi_stats.load_montreal_polygons() if os.path.exists('bixi.csv') else None)
+_bixi_live_summary = None
+_bixi_live_year = None
 
 if os.path.exists('bixi.csv'):
-    with open('bixi.csv', encoding='utf-8') as f:
-        for row in tqdm(csv.DictReader(f), desc="Données Bixi"):
-            bixi_live.add_row(row)
-            try:
-                slat = float(row['STARTSTATIONLATITUDE'])
-                slng = float(row['STARTSTATIONLONGITUDE'])
-                elat = float(row['ENDSTATIONLATITUDE'])
-                elng = float(row['ENDSTATIONLONGITUDE'])
-                # Jour de Montréal (et non UTC) : comparé aux totaux journaliers des compteurs
-                date = datetime.fromtimestamp(int(row['STARTTIMEMS']) / 1000, tz=timezone.utc) \
-                    .astimezone(bixi_stats.MTL_TZ).strftime('%Y-%m-%d')
-                nearby = set()
-                for inst, loc in counter_locations.items():
-                    clat, clng = loc['lat'], loc['lng']
-                    if abs(slat - clat) < 0.003 and abs(slng - clng) < 0.004:
-                        if _haversine_m(clat, clng, slat, slng) <= BIXI_RADIUS_M:
-                            nearby.add(inst)
-                    if abs(elat - clat) < 0.003 and abs(elng - clng) < 0.004:
-                        if _haversine_m(clat, clng, elat, elng) <= BIXI_RADIUS_M:
-                            nearby.add(inst)
-                for inst in sorted(nearby):
-                    bixi_near_counter[inst][date] += 1
-            except Exception:
-                pass
+    # bixi.csv ne change que lorsque BIXI publie un nouveau ZIP (fetch_data.sh
+    # ne le re-télécharge pas sinon) : repli sur un cache (taille+mtime du
+    # fichier + liste des compteurs) pour éviter de reparcourir ses ~9,5M
+    # lignes — et la boucle de proximité sur les 100+ compteurs — à chaque
+    # génération alors que le résultat serait identique.
+    st = os.stat('bixi.csv')
+    bixi_fingerprint = f"{st.st_size}:{int(st.st_mtime)}"
+    sorted_counters = sorted(counter_locations)
+    prox_cache = None
+    if os.path.exists(BIXI_PROXIMITY_CACHE_FILE):
+        with open(BIXI_PROXIMITY_CACHE_FILE, encoding='utf-8') as f:
+            prox_cache = json.load(f)
+
+    if (prox_cache and prox_cache.get('fingerprint') == bixi_fingerprint
+            and prox_cache.get('counters') == sorted_counters):
+        print("BIXI : bixi.csv inchangé — réutilisation du cache de proximité.")
+        for inst, days in prox_cache['bixi_near_counter'].items():
+            bixi_near_counter[inst] = defaultdict(int, days)
+        _bixi_live_summary = prox_cache['live_summary']
+        _bixi_live_year = prox_cache['live_year']
+    else:
+        bixi_live = bixi_stats.BixiYearAggregator(bixi_stats.load_montreal_polygons())
+        with open('bixi.csv', encoding='utf-8') as f:
+            for row in tqdm(csv.DictReader(f), desc="Données Bixi"):
+                bixi_live.add_row(row)
+                try:
+                    slat = float(row['STARTSTATIONLATITUDE'])
+                    slng = float(row['STARTSTATIONLONGITUDE'])
+                    elat = float(row['ENDSTATIONLATITUDE'])
+                    elng = float(row['ENDSTATIONLONGITUDE'])
+                    # Jour de Montréal (et non UTC) : comparé aux totaux journaliers des compteurs
+                    date = datetime.fromtimestamp(int(row['STARTTIMEMS']) / 1000, tz=timezone.utc) \
+                        .astimezone(bixi_stats.MTL_TZ).strftime('%Y-%m-%d')
+                    nearby = set()
+                    for inst, loc in counter_locations.items():
+                        clat, clng = loc['lat'], loc['lng']
+                        if abs(slat - clat) < 0.003 and abs(slng - clng) < 0.004:
+                            if _haversine_m(clat, clng, slat, slng) <= BIXI_RADIUS_M:
+                                nearby.add(inst)
+                        if abs(elat - clat) < 0.003 and abs(elng - clng) < 0.004:
+                            if _haversine_m(clat, clng, elat, elng) <= BIXI_RADIUS_M:
+                                nearby.add(inst)
+                    for inst in sorted(nearby):
+                        bixi_near_counter[inst][date] += 1
+                except Exception:
+                    pass
+        _bixi_live_year = bixi_live.live_year()
+        _bixi_live_summary = bixi_live.summary(_bixi_live_year)
+        with open(BIXI_PROXIMITY_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({
+                'fingerprint': bixi_fingerprint,
+                'counters': sorted_counters,
+                'bixi_near_counter': {k: dict(v) for k, v in bixi_near_counter.items()},
+                'live_summary': _bixi_live_summary,
+                'live_year': _bixi_live_year,
+            }, f, ensure_ascii=False, separators=(',', ':'))
 
 site_data['bixiNearby'] = {k: dict(v) for k, v in bixi_near_counter.items()}
 
@@ -943,10 +976,9 @@ for inst, bixi_days in bixi_near_counter.items():
 site_data['bixiExceedsDays'] = bixi_exceeds_days
 
 # Statistiques BIXI par année : années passées depuis bixi_cache.json
-# (bixi_stats.py), année du fichier bixi.csv calculée ici.
-_live_year = bixi_live.live_year()
-bixi_years = bixi_stats.merge_live(bixi_stats.load_cache(), bixi_live.summary(_live_year),
-                                   _live_year, datetime.now().year)
+# (bixi_stats.py), année du fichier bixi.csv (résumé calculé ou repris du cache ci-dessus).
+bixi_years = bixi_stats.merge_live(bixi_stats.load_cache(), _bixi_live_summary,
+                                   _bixi_live_year, datetime.now().year)
 site_data['bixiYearly'] = bixi_years
 # Données historiques
 site_data['historicalYearlyTotals'] = hist_yearly
