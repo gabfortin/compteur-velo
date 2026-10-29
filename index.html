@@ -87,26 +87,6 @@
             <button id="petition-banner-close" type="button" aria-label="Fermer la bannière">×</button>
         </div>
     </div>
-    <script>
-        (function() {
-            var KEY = 'petitionBannerDismissed_v1';
-            var banner = document.getElementById('petition-banner');
-            var dismissed = false;
-            try { dismissed = localStorage.getItem(KEY) === '1'; } catch (e) {}
-            if (dismissed) { banner.remove(); return; }
-            function applyHeight() {
-                document.documentElement.style.setProperty('--petition-banner-h', banner.offsetHeight + 'px');
-            }
-            document.documentElement.classList.add('has-petition-banner');
-            applyHeight();
-            window.addEventListener('resize', applyHeight);
-            document.getElementById('petition-banner-close').addEventListener('click', function() {
-                try { localStorage.setItem(KEY, '1'); } catch (e) {}
-                document.documentElement.classList.remove('has-petition-banner');
-                banner.remove();
-            });
-        })();
-    </script>
     <nav id="topbar">
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView('main')">Compteurs</button>
@@ -131,6 +111,7 @@
                     <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"></line>
                 </svg>
             </a>
+            <button id="petition-pill" type="button" title="Pétition vélo" aria-label="Rouvrir la bannière pétition" hidden>📣</button>
             <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
                 <span id="topbar-profile-name">gabfortin.com</span>
                 <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
@@ -158,6 +139,43 @@
         });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNavMenus(); });
         window.addEventListener('resize', () => { if (!isMobileNav()) closeNavMenus(); });
+    </script>
+    <script>
+        (function() {
+            var KEY = 'petitionBannerCollapsed_v1';
+            var banner = document.getElementById('petition-banner');
+            var pill = document.getElementById('petition-pill');
+            var collapsed = false;
+            try { collapsed = localStorage.getItem(KEY) === '1'; } catch (e) {}
+
+            function applyHeight() {
+                document.documentElement.style.setProperty('--petition-banner-h', banner.offsetHeight + 'px');
+            }
+            function expand() {
+                banner.hidden = false;
+                pill.hidden = true;
+                document.documentElement.classList.add('has-petition-banner');
+                applyHeight();
+                try { localStorage.removeItem(KEY); } catch (e) {}
+            }
+            function collapse() {
+                banner.hidden = true;
+                pill.hidden = false;
+                document.documentElement.classList.remove('has-petition-banner');
+                try { localStorage.setItem(KEY, '1'); } catch (e) {}
+            }
+
+            if (collapsed) {
+                banner.hidden = true;
+                pill.hidden = false;
+            } else {
+                document.documentElement.classList.add('has-petition-banner');
+                applyHeight();
+            }
+            window.addEventListener('resize', function() { if (!banner.hidden) applyHeight(); });
+            document.getElementById('petition-banner-close').addEventListener('click', collapse);
+            pill.addEventListener('click', expand);
+        })();
     </script>
     <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">

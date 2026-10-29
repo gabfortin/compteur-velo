@@ -787,12 +787,19 @@ p strong { color: var(--accent-strong); }
 html.has-petition-banner body { padding-top: calc(var(--petition-banner-h, 0px) + 22px); transition: padding-top 0.3s var(--ease); }
 html.has-petition-banner #topbar { top: calc(var(--petition-banner-h, 0px) + 22px); }
 @media (max-width: 640px) {
-    #petition-banner-inner { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    #petition-banner-inner { position: relative; flex-wrap: wrap; padding: 16px; gap: 12px; }
     #petition-banner-icon { font-size: 30px; }
-    #petition-banner-text { flex: 1 1 auto; }
+    #petition-banner-text { flex: 1 1 auto; margin-right: 40px; }
     #petition-banner-text strong { font-size: 17px; line-height: 1.25; }
     #petition-banner-text span { display: none; }
-    #petition-banner-close { order: 3; width: 34px; height: 34px; font-size: 20px; }
+    #petition-banner-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 30px;
+        height: 30px;
+        font-size: 18px;
+    }
     #petition-banner-cta {
         order: 4;
         flex: 1 1 100%;
@@ -800,6 +807,31 @@ html.has-petition-banner #topbar { top: calc(var(--petition-banner-h, 0px) + 22p
         padding: 13px 20px;
         font-size: 15px;
     }
+}
+/* Pastille topbar : réapparaît quand la bannière pétition est réduite (×) */
+#petition-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+    color: #fff;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px -2px rgba(15,40,28,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+    animation: petitionPillPulse 2.4s ease-in-out infinite;
+}
+#petition-pill:hover { transform: scale(1.1); }
+#petition-pill[hidden] { display: none; }
+@keyframes petitionPillPulse {
+    0%, 100% { box-shadow: 0 2px 8px -2px rgba(15,40,28,0.3), 0 0 0 0 rgba(29,184,96,0.45); }
+    50%      { box-shadow: 0 2px 8px -2px rgba(15,40,28,0.3), 0 0 0 6px rgba(29,184,96,0); }
 }
 /* ── Topbar : barre flottante vitrée ── */
 #topbar {
@@ -974,6 +1006,10 @@ button.nav-link.active { background: #fff; }
 #topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
 @media (min-width: 360px) and (max-width: 767px) {
     #topbar-instagram { display: flex; }
+}
+/* Pastille pétition avant l'icône Instagram (mobile seulement) */
+@media (max-width: 767px) {
+    #petition-pill { order: -1; }
 }
 #topbar-profile-wrap, #nav-more-wrap { position: relative; }
 /* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
@@ -1218,6 +1254,7 @@ button.nav-link.active { background: #fff; }
     .loading-wheel { animation-duration: 2.5s; }
     body::before { animation: none; }
     #petition-banner-cta { animation: none; }
+    #petition-pill { animation: none; }
 }
 /* Repli si backdrop-filter non supporté : surfaces plus opaques */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
