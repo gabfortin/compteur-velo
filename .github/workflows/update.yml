@@ -1,4 +1,4 @@
-name: Mise à jour quotidienne
+name: Mise à jour quotidienne des données
 
 on:
   schedule:
@@ -90,5 +90,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Mise à jour automatique — $(date '+%Y-%m-%d')"
+          git commit -m "data: mise à jour quotidienne ($(date -u '+%Y-%m-%d'), v$(tr -d '[:space:]' < version.txt))"
           git push

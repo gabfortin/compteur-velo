@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/style.css?v=2.1.14">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
@@ -88,6 +88,8 @@
         </div>
     </div>
     <nav id="topbar">
+        <!-- Marque : le nom apparaît quand le grand titre sort de l'écran (titre-barre.js), sans emoji -->
+        <a class="brand" href="./" aria-label="Compteurs Vélo Montréal"><span class="brand-texte">Compteurs Vélo</span></a>
         <div id="topbar-nav">
             <button class="nav-link active" id="nav-compteurs" onclick="showView('main')">Compteurs</button>
             <button class="nav-link" id="nav-global" onclick="showView('global')">Vue Globale</button>
@@ -106,7 +108,7 @@
         <div id="topbar-profile-wrap">
             <!-- Pastille pétition (bannière minimisée) : à gauche du bouton « i » -->
             <button id="petition-pill" type="button" title="Pétition vélo" aria-label="Rouvrir la bannière pétition" hidden>📣</button>
-            <button type="button" id="topbar-info" class="gf-info-btn" aria-haspopup="dialog" aria-controls="apropos-overlay" aria-label="À propos de ce site" title="À propos">
+            <button type="button" id="gfInfoBtn" class="gf-info-btn" aria-haspopup="dialog" aria-controls="gfInfoOverlay" aria-label="À propos de ce site" title="À propos">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="7.6" r="1.4" fill="currentColor"/>
                     <path d="M12 11v6.2" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
@@ -125,6 +127,7 @@
             </a>
         </div>
     </nav>
+    <script src="assets/titre-barre.js?v=2.2.0" data-barre="#topbar" data-titre="#main-header h1"></script>
     <script>
         // « Plus » regroupe Vue Globale, Arrondissements et BIXI (mobile)
         const moreBtn = document.getElementById('nav-more');
@@ -187,6 +190,7 @@
     <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
         <h1>Compteurs Vélo Montréal</h1>
+        <p class="freshness" id="fraicheur" data-fraicheur hidden></p>
     </div>
     <div class="container" id="main-container">
         <div class="select-wrapper desktop-only">
@@ -486,6 +490,7 @@
       <div class="site-header" id="global-header">
         <h1>Vue Globale</h1>
         <p class="subtitle" style="display:block">Passages agrégés de tous les compteurs actifs</p>
+        <p class="freshness" data-fraicheur hidden></p>
       </div>
       <div id="global-cards"></div>
       <div class="global-section" style="margin-bottom:20px;">
@@ -505,6 +510,7 @@
       <div class="site-header" id="hiver-header">
         <h1>Vélo d'hiver à Montréal</h1>
         <p class="subtitle" style="display:block">Décembre à mars — le vélo ne s'arrête pas pour l'hiver</p>
+        <p class="freshness" data-fraicheur hidden></p>
       </div>
       <div id="hiver-cards"></div>
       <div class="global-section" style="margin-bottom:20px;">
@@ -554,6 +560,7 @@
       <div class="site-header">
         <h1>Le vélo par arrondissement</h1>
         <p class="subtitle" style="display:block">Compteurs, achalandage et météo des 12 derniers mois</p>
+        <p class="freshness" data-fraicheur hidden></p>
       </div>
       <div class="select-wrapper" id="arr-picker">
         <select id="arrPageSelect" aria-label="Arrondissement"></select>
@@ -592,6 +599,7 @@
       <div class="site-header" id="bixi-header">
         <h1>BIXI à Montréal</h1>
         <p class="subtitle" style="display:block">La croissance du vélopartage, année après année</p>
+        <p class="freshness" data-fraicheur hidden></p>
       </div>
       <div id="bixi-scope" role="group" aria-label="Périmètre">
         <button class="hist-btn active" data-scope="all">Tout le réseau</button>
@@ -647,10 +655,10 @@
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
     <!-- ══ Popup À propos (bouton « i » de la barre du haut) ════════════════ -->
-    <div id="apropos-overlay" class="gf-info-overlay">
-      <div id="apropos-page" class="gf-info-panel" role="dialog" aria-modal="true" aria-labelledby="apropos-title">
-        <button type="button" id="aproposCloseBtn" class="gf-info-close" aria-label="Fermer « À propos »">✕</button>
-        <h2 id="apropos-title">À propos de ce site</h2>
+    <div class="gf-info-overlay" id="gfInfoOverlay">
+      <div class="gf-info-panel" role="dialog" aria-modal="true" aria-labelledby="gfInfoTitle">
+        <button type="button" class="gf-info-close" id="gfInfoClose" aria-label="Fermer « À propos »">✕</button>
+        <h2 id="gfInfoTitle">À propos de ce site</h2>
         <p>Passages de cyclistes à Montréal, compteur par compteur : graphiques horaires et journaliers, carte et historique depuis 2009, à partir des données ouvertes de la Ville. Mis à jour chaque jour.</p>
         <ul>
           <li><strong>Compteurs</strong> : un graphique par compteur, avec filtres de période, vue temporelle ou journalière, statistiques et carte.</li>
@@ -659,19 +667,18 @@
           <li><strong>Vélo d'hiver</strong> : de décembre à mars, le vélo ne s'arrête pas pour l'hiver.</li>
           <li><strong>BIXI</strong> : la croissance du vélopartage, année après année.</li>
         </ul>
-        <p><strong>Données :</strong> données ouvertes de la Ville de Montréal (compteurs de cyclistes) et de BIXI, météo d'Open-Meteo. Page mise à jour le <span id="apropos-maj">—</span> UTC. Ces données sont affichées telles que publiées : certaines valeurs peuvent être incomplètes ou erronées. Détails : <a href="#" id="apropos-methodo">page Méthodologie</a>.</p>
+        <p><strong>Données :</strong> données ouvertes de la Ville de Montréal (compteurs de cyclistes) et de BIXI, météo d'Open-Meteo. <span data-copie-de="fraicheur">Données mises à jour automatiquement chaque jour</span>. Ces données sont affichées telles que publiées : certaines valeurs peuvent être incomplètes ou erronées. Détails : <a href="#" id="apropos-methodo" data-ferme-apropos>page Méthodologie</a>.</p>
         <p><strong>Initiative indépendante</strong> : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
         <p>Projet personnel et non commercial de <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a></p>
       </div>
     </div>
 
-    <div class="watermark">
-        <p>Développé par <a href="https://www.gabfortin.com" target="_blank">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a></p>
-        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">⚠️ Ces données proviennent directement des données ouvertes de la Ville de Montréal et de BIXI. Certaines valeurs peuvent être incomplètes ou erronées.</p>
-        <p style="font-size:0.75rem;color:#aaa;margin-top:6px;">Pour en savoir plus sur les sources de données et la méthodologie, consultez la <a href="#" onclick="openMethodoModal();return false;" style="color:rgba(29,184,96,0.7);text-decoration:none;" onmouseover="this.style.color='#1DB860'" onmouseout="this.style.color='rgba(29,184,96,0.7)'">page Méthodologie</a>.</p>
-        <p style="font-size:0.7rem;color:#aaa;margin-top:4px;">Page mise à jour le <span id="updated-at">—</span> UTC</p>
-    </div>
-    <div class="version-badge">v<span id="app-version"></span></div>
-    <script src="assets/boot.js"></script>
+    <footer class="watermark">
+        <p>Données : <a href="https://donnees.montreal.ca/fr/dataset/cyclistes" target="_blank" rel="noopener">données ouvertes de la Ville de Montréal</a> (CC BY 4.0), <a href="https://bixi.com/en/open-data/" target="_blank" rel="noopener">BIXI</a> et météo d'<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · <a href="#" id="pied-methodo">Méthodologie</a>. Certaines valeurs peuvent être incomplètes ou erronées.</p>
+        <p>Initiative indépendante : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
+        <p>Développé par <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a> · v<span id="app-version"></span></p>
+    </footer>
+    <script src="assets/apropos.js?v=2.2.0"></script>
+    <script src="assets/boot.js?v=2.2.0"></script>
 </body>
 </html>

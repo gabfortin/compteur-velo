@@ -1,0 +1,6 @@
+{
+  "fichier": "version.txt",
+  "donnees": ["data/", "hist_cache.json", "bixi_cache.json", "velo_meta_cache.json", "*.csv"],
+  "pages": ["index.html", "confidentialite.html"],
+  "json": ["data/site.json"]
+}

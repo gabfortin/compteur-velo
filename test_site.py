@@ -101,7 +101,8 @@ def main():
               f"{page.locator('.table-container').count()} blocs, {len(site['counters'])} attendus")
         check("Version et date de mise à jour affichées",
               page.text_content('#app-version') == site['version']
-              and page.text_content('#updated-at') == site['generatedAt'])
+              and page.get_attribute('#fraicheur', 'data-genere-le') == site['generatedAt']
+              and page.is_visible('#fraicheur'))
 
         mismatches = page.evaluate("""expected => Object.keys(expected).filter(id =>
             !allChartData[id] || JSON.stringify(allChartData[id].labels) !== JSON.stringify(expected[id]))""",

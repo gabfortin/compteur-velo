@@ -1,0 +1,12 @@
+{
+  "fichiers": {
+    "assets/apropos.js": "apropos.js",
+    "assets/titre-barre.js": "titre-barre.js"
+  },
+  "blocs": {
+    "assets/style.css": [
+      "apropos.css",
+      "titre-barre.css"
+    ]
+  }
+}

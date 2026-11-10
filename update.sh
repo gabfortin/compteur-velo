@@ -66,7 +66,7 @@ git add hist_cache.json
 if git diff --staged --quiet; then
     echo "$LOG Aucun changement dans data/site.json — rien à publier."
 else
-    git commit -m "Mise à jour automatique — $(date '+%Y-%m-%d')"
+    git commit -m "data: mise à jour quotidienne ($(date -u '+%Y-%m-%d'), v$(tr -d '[:space:]' < version.txt))"
     # Retry push (jusqu'à 3 tentatives) pour absorber les erreurs serveur GitHub transitoires
     PUSHED=false
     for attempt in 1 2 3; do

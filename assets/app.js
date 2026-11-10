@@ -2797,34 +2797,17 @@ document.getElementById('methodo-overlay').addEventListener('click', e => {
     if (e.target.id === 'methodo-overlay') closeMethodoModal();
 });
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeMethodoModal(); closeAproposModal(); }
+    if (e.key === 'Escape') closeMethodoModal();
 });
 
-// ── Popup À propos (bouton « i » de la barre du haut) ──
-function openAproposModal() {
-    // Même date que le pied de page (remplie par boot.js depuis data/site.json).
-    document.getElementById('apropos-maj').textContent = document.getElementById('updated-at').textContent;
-    document.getElementById('apropos-overlay').classList.add('open');
-    document.body.style.overflow = 'hidden';
-    document.getElementById('aproposCloseBtn').focus();
-}
-
-function closeAproposModal(rendreFocus = true) {
-    const overlay = document.getElementById('apropos-overlay');
-    if (!overlay.classList.contains('open')) return;
-    overlay.classList.remove('open');
-    document.body.style.overflow = '';
-    if (rendreFocus) document.getElementById('topbar-info').focus();
-}
-
-document.getElementById('topbar-info').addEventListener('click', openAproposModal);
-document.getElementById('aproposCloseBtn').addEventListener('click', () => closeAproposModal());
-document.getElementById('apropos-overlay').addEventListener('click', e => {
-    if (e.target.id === 'apropos-overlay') closeAproposModal();
+document.getElementById('pied-methodo').addEventListener('click', e => {
+    e.preventDefault();
+    openMethodoModal();
 });
+// Lien Méthodologie de la modale « À propos » : apropos.js ferme la modale
+// (data-ferme-apropos), on ouvre ensuite la Méthodologie.
 document.getElementById('apropos-methodo').addEventListener('click', e => {
     e.preventDefault();
-    closeAproposModal(false);
     openMethodoModal();
 });
 

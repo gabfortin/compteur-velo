@@ -46,7 +46,19 @@
         }).join('');
         document.getElementById('noDataMsg').insertAdjacentHTML('afterend', html);
 
-        document.getElementById('updated-at').textContent = data.generatedAt;
+        // Fraîcheur des données sous chaque grand titre (DESIGN-PAGES.md, point vert).
+        // generatedAt est en UTC (« AAAA-MM-JJ à HH:MM ») : affiché à l'heure de Montréal.
+        const m = /^(\d{4})-(\d{2})-(\d{2}) à (\d{2}):(\d{2})$/.exec(data.generatedAt || '');
+        const quand = m ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5])) : null;
+        const texteDate = quand
+            ? quand.toLocaleDateString('fr-CA', { timeZone: 'America/Toronto', day: 'numeric', month: 'long', year: 'numeric' })
+              + ' à ' + quand.toLocaleTimeString('fr-CA', { timeZone: 'America/Toronto', hour: 'numeric', minute: '2-digit' })
+            : data.generatedAt;
+        document.querySelectorAll('[data-fraicheur]').forEach(el => {
+            el.textContent = `Données à jour au ${texteDate} · mises à jour automatiquement chaque jour`;
+            el.dataset.genereLe = data.generatedAt;
+            el.hidden = false;
+        });
         document.getElementById('app-version').textContent = data.version;
     }
 
