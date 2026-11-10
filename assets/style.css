@@ -902,7 +902,7 @@ button.nav-link.active { background: #fff; }
     transition: transform 0.15s, background 0.15s;
 }
 .modal-close:hover { background: #f3f4f6; transform: scale(1.06); }
-#methodo-page {
+#methodo-page, #apropos-page {
     position: relative;
     max-width: 860px;
     margin: 0 auto;
@@ -935,7 +935,7 @@ button.nav-link.active { background: #fff; }
 @media (max-width: 600px) {
     .source-grid { grid-template-columns: 1fr; }
     .modal-overlay { padding: 56px 8px 24px; }
-    #methodo-page { padding: 40px 14px 40px; }
+    #methodo-page, #apropos-page { padding: 40px 14px 40px; }
     .modal-close { top: 10px; right: 10px; width: 38px; height: 38px; font-size: 22px; }
 }
 .source-card { background: var(--glass-soft); border: 1px solid var(--glass-border); border-radius: var(--r-md);
@@ -1004,6 +1004,24 @@ button.nav-link.active { background: #fff; }
     transition: color 0.25s, background 0.25s;
 }
 #topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
+/* Bouton « i » (À propos) : toujours visible, même allure que l'icône Instagram */
+#topbar-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--faint);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.25s, background 0.25s;
+}
+#topbar-info:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
+#topbar-info:focus-visible { outline: 2px solid #1DB860; outline-offset: 1px; }
 @media (min-width: 360px) and (max-width: 767px) {
     #topbar-instagram { display: flex; }
 }
@@ -1296,10 +1314,10 @@ button.nav-link.active { background: #fff; }
     .site-header img { box-shadow: 0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1) !important; }
     select:hover { background: rgba(44,57,51,0.9); }
     #topbar { background: rgba(18,26,23,0.72); }
-    .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover { background: rgba(255,255,255,0.07); }
+    .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover, #topbar-info:hover { background: rgba(255,255,255,0.07); }
     .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
     #nav-more-menu { background: rgba(24,33,29,0.97); }
-    #methodo-page { background: rgba(24,33,29,0.97); }
+    #methodo-page, #apropos-page { background: rgba(24,33,29,0.97); }
     .modal-close { background: rgba(44,57,51,0.95); color: var(--text); }
     .modal-close:hover { background: rgba(60,76,68,0.95); }
     #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }

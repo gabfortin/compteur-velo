@@ -2797,7 +2797,33 @@ document.getElementById('methodo-overlay').addEventListener('click', e => {
     if (e.target.id === 'methodo-overlay') closeMethodoModal();
 });
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeMethodoModal();
+    if (e.key === 'Escape') { closeMethodoModal(); closeAproposModal(); }
+});
+
+// ── Popup À propos (bouton « i » de la barre du haut) ──
+function openAproposModal() {
+    document.getElementById('apropos-overlay').hidden = false;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('aproposCloseBtn').focus();
+}
+
+function closeAproposModal(rendreFocus = true) {
+    const overlay = document.getElementById('apropos-overlay');
+    if (overlay.hidden) return;
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    if (rendreFocus) document.getElementById('topbar-info').focus();
+}
+
+document.getElementById('topbar-info').addEventListener('click', openAproposModal);
+document.getElementById('aproposCloseBtn').addEventListener('click', () => closeAproposModal());
+document.getElementById('apropos-overlay').addEventListener('click', e => {
+    if (e.target.id === 'apropos-overlay') closeAproposModal();
+});
+document.getElementById('apropos-methodo').addEventListener('click', e => {
+    e.preventDefault();
+    closeAproposModal(false);
+    openMethodoModal();
 });
 
 function showView(view) {
