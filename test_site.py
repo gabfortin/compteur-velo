@@ -131,7 +131,7 @@ def main():
 
         # Méthodologie : plus un onglet de nav, mais un popup ouvert depuis le lien du bas de page.
         n_errors = len(errors)
-        page.click('a[onclick^="openMethodoModal"]')
+        page.click('#pied-methodo')
         page.wait_for_timeout(500)
         check("Popup Méthodologie affiché sans erreur",
               page.locator('#methodo-page').is_visible() and len(errors) == n_errors, errors[n_errors:][:2])
