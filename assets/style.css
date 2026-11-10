@@ -1114,9 +1114,18 @@ button.nav-link.active { background: #fff; }
 @media print { .gf-info-btn, .gf-info-overlay { display: none !important; } }
 
 @media (min-width: 360px) and (max-width: 767px) {
-    #topbar-instagram { display: flex; }
+    #topbar-instagram { display: none; }  /* barre trop chargée sur mobile : Instagram est dans « À propos » */
 }
 #topbar-profile-wrap, #nav-more-wrap { position: relative; }
+/* Barre du haut sur téléphone : trois onglets, pastille pétition, « i » et photo
+   doivent tenir sur une ligne à 375 px. */
+.nav-link { white-space: nowrap; }
+@media (max-width: 767px) {
+    .nav-link { padding: 8px 10px; }
+    #petition-pill { width: 30px; height: 30px; font-size: 13px; margin-right: 4px; }
+    #topbar-profile { padding: 2px; }
+    #topbar-profile img { width: 30px; height: 30px; }
+}
 /* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
 #nav-more-menu {
     position: absolute;
