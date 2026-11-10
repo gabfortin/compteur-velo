@@ -42,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/style.css?v=2.1.11">
+    <link rel="stylesheet" href="assets/style.css?v=2.1.14">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
@@ -104,11 +104,12 @@
             </div>
         </div>
         <div id="topbar-profile-wrap">
-            <button type="button" id="topbar-info" aria-haspopup="dialog" aria-controls="apropos-overlay" aria-label="À propos de ce site" title="À propos">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="11"></line>
-                    <line x1="12" y1="8" x2="12" y2="8"></line>
+            <!-- Pastille pétition (bannière minimisée) : à gauche du bouton « i » -->
+            <button id="petition-pill" type="button" title="Pétition vélo" aria-label="Rouvrir la bannière pétition" hidden>📣</button>
+            <button type="button" id="topbar-info" class="gf-info-btn" aria-haspopup="dialog" aria-controls="apropos-overlay" aria-label="À propos de ce site" title="À propos">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="7.6" r="1.4" fill="currentColor"/>
+                    <path d="M12 11v6.2" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
                 </svg>
             </button>
             <a href="https://www.instagram.com/gabrielfortin.mtl" id="topbar-instagram" title="@gabrielfortin.mtl" target="_blank" rel="noopener">
@@ -118,7 +119,6 @@
                     <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"></line>
                 </svg>
             </a>
-            <button id="petition-pill" type="button" title="Pétition vélo" aria-label="Rouvrir la bannière pétition" hidden>📣</button>
             <a href="https://gabfortin.com" id="topbar-profile" title="gabfortin.com">
                 <span id="topbar-profile-name">gabfortin.com</span>
                 <img src="img/Gabriel%20Fortin.png" alt="Gabriel Fortin">
@@ -647,16 +647,11 @@
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
     <!-- ══ Popup À propos (bouton « i » de la barre du haut) ════════════════ -->
-    <div id="apropos-overlay" class="modal-overlay" hidden>
-    <div id="apropos-page" role="dialog" aria-modal="true" aria-labelledby="apropos-title">
-      <button type="button" id="aproposCloseBtn" class="modal-close" aria-label="Fermer « À propos »">×</button>
-      <div class="methodo-hero">
-        <h2 id="apropos-title">À propos</h2>
+    <div id="apropos-overlay" class="gf-info-overlay">
+      <div id="apropos-page" class="gf-info-panel" role="dialog" aria-modal="true" aria-labelledby="apropos-title">
+        <button type="button" id="aproposCloseBtn" class="gf-info-close" aria-label="Fermer « À propos »">✕</button>
+        <h2 id="apropos-title">À propos de ce site</h2>
         <p>Passages de cyclistes à Montréal, compteur par compteur : graphiques horaires et journaliers, carte et historique depuis 2009, à partir des données ouvertes de la Ville. Mis à jour chaque jour.</p>
-      </div>
-
-      <div class="methodo-section">
-        <h3>Ce que montre le site</h3>
         <ul>
           <li><strong>Compteurs</strong> : un graphique par compteur, avec filtres de période, vue temporelle ou journalière, statistiques et carte.</li>
           <li><strong>Vue Globale</strong> : passages agrégés de tous les compteurs actifs.</li>
@@ -664,19 +659,10 @@
           <li><strong>Vélo d'hiver</strong> : de décembre à mars, le vélo ne s'arrête pas pour l'hiver.</li>
           <li><strong>BIXI</strong> : la croissance du vélopartage, année après année.</li>
         </ul>
+        <p><strong>Données :</strong> données ouvertes de la Ville de Montréal (compteurs de cyclistes) et de BIXI, météo d'Open-Meteo. Page mise à jour le <span id="apropos-maj">—</span> UTC. Ces données sont affichées telles que publiées : certaines valeurs peuvent être incomplètes ou erronées. Détails : <a href="#" id="apropos-methodo">page Méthodologie</a>.</p>
+        <p><strong>Initiative indépendante</strong> : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
+        <p>Projet personnel et non commercial de <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a></p>
       </div>
-
-      <div class="methodo-section">
-        <h3>Sources</h3>
-        <p>Données ouvertes de la Ville de Montréal (compteurs de cyclistes) et de BIXI, météo d'Open-Meteo. Ces données sont affichées telles que publiées : certaines valeurs peuvent être incomplètes ou erronées.</p>
-        <p>Détails des sources et de la détection des anomalies : <a href="#" id="apropos-methodo">page Méthodologie</a>.</p>
-      </div>
-
-      <div class="methodo-section">
-        <h3>Qui</h3>
-        <p>Compteurs Vélo Montréal est un projet personnel et non commercial de <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a>. <a href="confidentialite.html">Confidentialité</a></p>
-      </div>
-    </div>
     </div>
 
     <div class="watermark">

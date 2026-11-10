@@ -829,6 +829,9 @@ html.has-petition-banner #topbar { top: calc(var(--petition-banner-h, 0px) + 22p
 }
 #petition-pill:hover { transform: scale(1.1); }
 #petition-pill[hidden] { display: none; }
+/* Espace entre la pastille pétition et le bouton « i » qui la suit */
+#petition-pill { margin-right: 8px; }
+@media (max-width: 760px) { #petition-pill { margin-right: 6px; } }
 @keyframes petitionPillPulse {
     0%, 100% { box-shadow: 0 2px 8px -2px rgba(15,40,28,0.3), 0 0 0 0 rgba(29,184,96,0.45); }
     50%      { box-shadow: 0 2px 8px -2px rgba(15,40,28,0.3), 0 0 0 6px rgba(29,184,96,0); }
@@ -902,7 +905,7 @@ button.nav-link.active { background: #fff; }
     transition: transform 0.15s, background 0.15s;
 }
 .modal-close:hover { background: #f3f4f6; transform: scale(1.06); }
-#methodo-page, #apropos-page {
+#methodo-page {
     position: relative;
     max-width: 860px;
     margin: 0 auto;
@@ -935,7 +938,7 @@ button.nav-link.active { background: #fff; }
 @media (max-width: 600px) {
     .source-grid { grid-template-columns: 1fr; }
     .modal-overlay { padding: 56px 8px 24px; }
-    #methodo-page, #apropos-page { padding: 40px 14px 40px; }
+    #methodo-page { padding: 40px 14px 40px; }
     .modal-close { top: 10px; right: 10px; width: 38px; height: 38px; font-size: 22px; }
 }
 .source-card { background: var(--glass-soft); border: 1px solid var(--glass-border); border-radius: var(--r-md);
@@ -1004,30 +1007,79 @@ button.nav-link.active { background: #fff; }
     transition: color 0.25s, background 0.25s;
 }
 #topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
-/* Bouton « i » (À propos) : toujours visible, même allure que l'icône Instagram */
-#topbar-info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: none;
-    color: var(--faint);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: color 0.25s, background 0.25s;
+/* ── Bouton « i » + modale « À propos » ─────────────────────────────
+   Patron des cartes (MAP-DESIGN-SYSTEM.md), aux couleurs du site : rond en
+   dégradé vert, modale centrée en fondu + zoom. Sans l'anneau qui pulse,
+   réservé aux cartes (DESIGN-PAGES.md). */
+.gf-info-btn {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    margin-right: 6px;
+    border: none; padding: 0;
+    background: linear-gradient(140deg, var(--accent), var(--accent-strong));
+    color: #fff; cursor: pointer;
+    box-shadow: 0 4px 14px -4px rgba(18,154,76,0.6), inset 0 1px 0 rgba(255,255,255,0.45);
+    transition: transform .2s var(--ease), box-shadow .2s var(--ease);
 }
-#topbar-info:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
-#topbar-info:focus-visible { outline: 2px solid #1DB860; outline-offset: 1px; }
+.gf-info-btn svg { width: 16px; height: 16px; position: relative; z-index: 1; }
+.gf-info-btn:hover {
+    box-shadow: 0 8px 22px -4px rgba(18,154,76,0.8), inset 0 1px 0 rgba(255,255,255,0.5);
+    transform: translateY(-1px) scale(1.1);
+}
+.gf-info-btn:active { transform: scale(0.94); }
+.gf-info-btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 4px; }
+.gf-info-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(10,16,13,0.45);
+    -webkit-backdrop-filter: blur(8px) saturate(140%); backdrop-filter: blur(8px) saturate(140%);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .25s var(--ease), visibility 0s .25s;
+}
+.gf-info-overlay.open {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .25s var(--ease), visibility 0s;
+}
+.gf-info-panel {
+    position: relative; width: min(480px, 100%); max-height: min(84vh, 680px); overflow-y: auto;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+    border: 1px solid var(--glass-border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg), var(--inner);
+    padding: 30px 26px 26px;
+    transform: scale(0.94) translateY(8px); opacity: 0;
+    transition: transform .28s var(--ease), opacity .28s var(--ease);
+}
+.gf-info-overlay.open .gf-info-panel { transform: scale(1) translateY(0); opacity: 1; }
+.gf-info-panel h2 { margin: 0 0 12px; padding-right: 36px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; color: var(--text); }
+.gf-info-panel h2::before { display: none; }
+.gf-info-panel p, .gf-info-panel li { font-size: .88rem; line-height: 1.6; color: var(--text-2); }
+.gf-info-panel p { margin: 0 0 14px; }
+.gf-info-panel p:last-child { margin-bottom: 0; }
+.gf-info-panel ul { margin: 0 0 14px; padding-left: 20px; }
+.gf-info-panel li + li { margin-top: 4px; }
+.gf-info-panel a { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
+.gf-info-panel a:hover { text-decoration: underline; }
+.gf-info-panel strong { color: var(--text); }
+.gf-info-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--glass-border); background: var(--glass);
+    color: var(--text); cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .18s var(--ease), transform .18s var(--ease);
+}
+.gf-info-close:hover { background: var(--glass-strong); transform: scale(1.08); }
+@media (max-width: 760px) {
+    .gf-info-btn { width: 28px; height: 28px; margin-right: 4px; }
+    .gf-info-btn svg { width: 14px; height: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gf-info-panel, .gf-info-overlay.open .gf-info-panel { transform: none; }
+}
 @media (min-width: 360px) and (max-width: 767px) {
     #topbar-instagram { display: flex; }
-}
-/* Pastille pétition avant l'icône Instagram (mobile seulement) */
-@media (max-width: 767px) {
-    #petition-pill { order: -1; }
 }
 #topbar-profile-wrap, #nav-more-wrap { position: relative; }
 /* Menu « Plus » : mobile seulement (Vue Globale, Arrondissements et BIXI y sont regroupés) */
@@ -1314,10 +1366,10 @@ button.nav-link.active { background: #fff; }
     .site-header img { box-shadow: 0 12px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1) !important; }
     select:hover { background: rgba(44,57,51,0.9); }
     #topbar { background: rgba(18,26,23,0.72); }
-    .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover, #topbar-info:hover { background: rgba(255,255,255,0.07); }
+    .nav-link:hover, #topbar-profile:hover, #topbar-instagram:hover { background: rgba(255,255,255,0.07); }
     .nav-link.active, button.nav-link.active { background: rgba(255,255,255,0.10); box-shadow: none; }
     #nav-more-menu { background: rgba(24,33,29,0.97); }
-    #methodo-page, #apropos-page { background: rgba(24,33,29,0.97); }
+    #methodo-page { background: rgba(24,33,29,0.97); }
     .modal-close { background: rgba(44,57,51,0.95); color: var(--text); }
     .modal-close:hover { background: rgba(60,76,68,0.95); }
     #topbar-profile img { box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4); }
