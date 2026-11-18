@@ -141,8 +141,8 @@ Aucun cookie ni compte.
 | Quand | Ce qui est envoyé | À qui |
 |---|---|---|
 | Chaque visite | Page, site d'origine, appareil, pays | GoatCounter (mesure d'audience anonyme) |
-| Chaque visite | Chart.js ; Leaflet ; polices | jsDelivr ; unpkg ; Google Fonts |
-| Carte | Requêtes de tuiles de la zone affichée | OpenStreetMap (et CyclOSM) |
+| Chaque visite | Chart.js ; polices | jsDelivr ; Google Fonts |
+| Carte | Fond de carte de la zone affichée | OpenFreeMap (et CyclOSM, si activé) |
 
 La météo est téléchargée par le robot, pas par le navigateur. Détails :
 [confidentialite.html](confidentialite.html), à mettre à jour (avec sa date)
@@ -151,10 +151,10 @@ si un service externe est ajouté.
 ## Crédits
 
 - [Chart.js](https://www.chartjs.org) 4.4.4 (MIT), chargé depuis jsDelivr
-- [Leaflet](https://leafletjs.com) 1.9.4 (BSD-2-Clause), chargé depuis unpkg
+- Composant de carte commun (`assets/vendor/carte/`, modèle `~/Developer/outils/communs/carte/`) : API de Leaflet dessinée par [MapLibre GL JS](https://maplibre.org) (BSD-3-Clause)
 - Météo © [Open-Meteo](https://open-meteo.com) (CC BY 4.0)
 - Données © Ville de Montréal (CC BY 4.0) et BIXI
-- Fond de carte © les contributeurs d'[OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL), CyclOSM
+- Fond de carte : [OpenFreeMap](https://openfreemap.org), © [OpenMapTiles](https://www.openmaptiles.org), données © les contributeurs d'[OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) ; CyclOSM
 
 ## Auteur
 

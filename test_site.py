@@ -8,8 +8,9 @@ et chaque onglet s'ouvre.
 
 Variables d'environnement facultatives :
   CHROMIUM_PATH  exécutable Chromium à utiliser au lieu de celui de Playwright
-  CDN_DIR        dossier node_modules contenant leaflet et chart.js, servis à
-                 la place des CDN (pour tester sans accès réseau)
+  CDN_DIR        dossier node_modules contenant chart.js, servi à la place
+                 du CDN (pour tester sans accès réseau ; la carte est dans
+                 assets/vendor/carte/, son fond OpenFreeMap reste bloqué)
 """
 import functools
 import http.server
@@ -50,10 +51,8 @@ def start_server():
 
 
 def route_offline(page, cdn_dir):
-    """Sert Leaflet et Chart.js depuis CDN_DIR ; bloque les autres hôtes externes."""
+    """Sert Chart.js depuis CDN_DIR ; bloque les autres hôtes externes."""
     files = {
-        'leaflet@1.9.4/dist/leaflet.js': 'leaflet/dist/leaflet.js',
-        'leaflet@1.9.4/dist/leaflet.css': 'leaflet/dist/leaflet.css',
         'chart.js@4.4.4/dist/chart.umd.min.js': 'chart.js/dist/chart.umd.js',
     }
 

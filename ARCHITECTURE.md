@@ -215,7 +215,7 @@ Toutes les données utilisées par la page sont réunies dans le dictionnaire `s
 
 ```
 <html>
-  <head>                 ← assets/style.css + Chart.js 4.4.4 + Leaflet 1.9.4 (CDN) + GoatCounter
+  <head>                 ← assets/style.css + Chart.js 4.4.4 (CDN) + carte (assets/vendor/carte/ : MapLibre, API de Leaflet) + GoatCounter
   <body>
     <nav #topbar>        ← Nom du site (apparaît au défilement, titre-barre.js), onglets Compteurs / Vue Globale /
                             Arrondissements / Vélo d'hiver / BIXI, puis pastille pétition, bouton « i », Instagram, profil

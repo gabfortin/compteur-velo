@@ -1,7 +1,12 @@
 {
   "fichiers": {
     "assets/apropos.js": "apropos.js",
-    "assets/titre-barre.js": "titre-barre.js"
+    "assets/titre-barre.js": "titre-barre.js",
+    "assets/vendor/carte/maplibre-gl.js": "carte/maplibre-gl.js",
+    "assets/vendor/carte/maplibre-gl.css": "carte/maplibre-gl.css",
+    "assets/vendor/carte/carte.js": "carte/carte.js",
+    "assets/vendor/carte/carte.css": "carte/carte.css",
+    "assets/vendor/carte/LICENSE-maplibre.txt": "carte/LICENSE-maplibre.txt"
   },
   "blocs": {
     "assets/style.css": [
