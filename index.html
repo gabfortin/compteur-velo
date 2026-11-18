@@ -7,10 +7,10 @@
     <script data-goatcounter="https://gabfortin.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.3.0"/>
-    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.3.0"/>
-    <script src="assets/vendor/carte/maplibre-gl.js?v=2.3.0"></script>
-    <script src="assets/vendor/carte/carte.js?v=2.3.0"></script>
+    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.4.0"/>
+    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.4.0"/>
+    <script src="assets/vendor/carte/maplibre-gl.js?v=2.4.0"></script>
+    <script src="assets/vendor/carte/carte.js?v=2.4.0"></script>
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/png" href="favico.png">
     <link rel="apple-touch-icon" href="favico.png">
@@ -44,7 +44,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/style.css?v=2.3.0">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
@@ -77,18 +77,6 @@
             setTimeout(remove, 20000);
         })();
     </script>
-    <!-- Bannière pétition -->
-    <div id="petition-banner" role="region" aria-label="Pétition">
-        <div id="petition-banner-inner">
-            <span id="petition-banner-icon" aria-hidden="true">📣</span>
-            <div id="petition-banner-text">
-                <strong>Pétition demandant la publication intégrale des données des consultations sur la place du vélo à Montréal</strong>
-                <span>Suite à la modification en cours de route du sondage sur le réseau cyclable, nous demandons à la Ville de Montréal de publier l'intégralité des questionnaires, des méthodologies et des données brutes des deux consultations. Signez notre pétition pour garantir un débat citoyen fondé sur la transparence avant son dépôt au conseil municipal par le conseiller Christopher McCray le 16 novembre 2026.</span>
-            </div>
-            <a id="petition-banner-cta" href="https://projetmontreal.org/petition/petition-pour-la-publication-des-donnees-des-consultations-velo" target="_blank" rel="noopener">Signer la pétition</a>
-            <button id="petition-banner-close" type="button" aria-label="Fermer la bannière">×</button>
-        </div>
-    </div>
     <nav id="topbar">
         <!-- Marque : le nom apparaît quand le grand titre sort de l'écran (titre-barre.js), sans emoji -->
         <a class="brand" href="./" aria-label="Compteurs Vélo Montréal"><span class="brand-texte">Compteurs Vélo Montréal</span></a>
@@ -108,8 +96,6 @@
             </div>
         </div>
         <div id="topbar-profile-wrap">
-            <!-- Pastille pétition (bannière minimisée) : à gauche du bouton « i » -->
-            <button id="petition-pill" type="button" title="Pétition vélo" aria-label="Rouvrir la bannière pétition" hidden>📣</button>
             <button type="button" id="gfInfoBtn" class="gf-info-btn" aria-haspopup="dialog" aria-controls="gfInfoOverlay" aria-label="À propos de ce site" title="À propos">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="7.6" r="1.4" fill="currentColor"/>
@@ -129,7 +115,7 @@
             </a>
         </div>
     </nav>
-    <script src="assets/titre-barre.js?v=2.3.0" data-barre="#topbar" data-titre="#main-header h1"></script>
+    <script src="assets/titre-barre.js?v=2.4.0" data-barre="#topbar" data-titre="#main-header h1"></script>
     <script>
         // « Plus » regroupe Vue Globale, Arrondissements et BIXI (mobile)
         const moreBtn = document.getElementById('nav-more');
@@ -151,43 +137,6 @@
         });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNavMenus(); });
         window.addEventListener('resize', () => { if (!isMobileNav()) closeNavMenus(); });
-    </script>
-    <script>
-        (function() {
-            var KEY = 'petitionBannerCollapsed_v1';
-            var banner = document.getElementById('petition-banner');
-            var pill = document.getElementById('petition-pill');
-            var collapsed = false;
-            try { collapsed = localStorage.getItem(KEY) === '1'; } catch (e) {}
-
-            function applyHeight() {
-                document.documentElement.style.setProperty('--petition-banner-h', banner.offsetHeight + 'px');
-            }
-            function expand() {
-                banner.hidden = false;
-                pill.hidden = true;
-                document.documentElement.classList.add('has-petition-banner');
-                applyHeight();
-                try { localStorage.removeItem(KEY); } catch (e) {}
-            }
-            function collapse() {
-                banner.hidden = true;
-                pill.hidden = false;
-                document.documentElement.classList.remove('has-petition-banner');
-                try { localStorage.setItem(KEY, '1'); } catch (e) {}
-            }
-
-            if (collapsed) {
-                banner.hidden = true;
-                pill.hidden = false;
-            } else {
-                document.documentElement.classList.add('has-petition-banner');
-                applyHeight();
-            }
-            window.addEventListener('resize', function() { if (!banner.hidden) applyHeight(); });
-            document.getElementById('petition-banner-close').addEventListener('click', collapse);
-            pill.addEventListener('click', expand);
-        })();
     </script>
     <div class="site-header" id="main-header">
         <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
@@ -680,7 +629,7 @@
         <p>Initiative indépendante : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
         <p>Développé par <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a> · v<span id="app-version"></span></p>
     </footer>
-    <script src="assets/apropos.js?v=2.3.0"></script>
-    <script src="assets/boot.js?v=2.3.0"></script>
+    <script src="assets/apropos.js?v=2.4.0"></script>
+    <script src="assets/boot.js?v=2.4.0"></script>
 </body>
 </html>
