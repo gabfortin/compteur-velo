@@ -218,7 +218,8 @@ Toutes les données utilisées par la page sont réunies dans le dictionnaire `s
   <head>                 ← assets/style.css + Chart.js 4.4.4 (CDN) + carte (assets/vendor/carte/ : MapLibre, API de Leaflet) + GoatCounter
   <body>
     <nav #topbar>        ← Nom du site (apparaît au défilement, titre-barre.js), onglets Compteurs / Vue Globale /
-                            Arrondissements / Vélo d'hiver / BIXI, puis pastille pétition, bouton « i », Instagram, profil
+                            Arrondissements / Vélo d'hiver / BIXI, puis pastille pétition, « Me supporter » (don.js), bouton « i »,
+                            Instagram, profil (photo seule : « gabfortin.com » masqué visuellement), 8 px entre chacun
     .site-header         ← Logo, titre, ligne de fraîcheur des données ([data-fraicheur], remplie par boot.js)
     .container
       .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / 365j)

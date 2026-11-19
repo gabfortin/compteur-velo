@@ -874,7 +874,7 @@ button.nav-link.active { background: #fff; }
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 4px 4px 10px;
+    padding: 2px;
     border-radius: 999px;
     text-decoration: none;
     color: var(--text-2);
@@ -882,7 +882,8 @@ button.nav-link.active { background: #fff; }
 }
 #topbar-profile:hover { color: var(--text); background: rgba(255,255,255,0.6); }
 #topbar-profile:hover img { box-shadow: 0 0 0 2px var(--accent); }
-#topbar-profile-name { font-size: 13px; font-weight: 500; display: none; }
+/* Seule la photo se voit ; « gabfortin.com » reste lu par les lecteurs d'écran (comme le style D). */
+#topbar-profile-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .nav-label-short { display: inline; }
 .nav-label-full  { display: none; }
 #topbar-profile img {
@@ -896,7 +897,7 @@ button.nav-link.active { background: #fff; }
     transition: box-shadow 0.25s;
 }
 /* Icône Instagram : mobile seulement, et seulement si la largeur le permet */
-#topbar-profile-wrap { display: flex; align-items: center; gap: 2px; }
+#topbar-profile-wrap { display: flex; align-items: center; gap: 8px; }
 #topbar-instagram {
     display: none;
     align-items: center;
@@ -920,9 +921,9 @@ button.nav-link.active { background: #fff; }
 /* Thème sombre forcé (futur bouton de thème : <html data-theme="dark">), mêmes règles que ci-dessus. */
  :root:where([data-theme="dark"]) { --gf-info-fond: rgba(24,33,29,.97); } 
 
-/* Le « i » suit la pastille pétition, avant Instagram et la photo. */
-#topbar-profile-wrap .gf-info-btn { margin-right: 6px; }
-@media (max-width: 760px) { #topbar-profile-wrap .gf-info-btn { margin-right: 4px; } }
+/* « Faire un don », « i » et photo : 8 px entre chacun, comme dans les sites du
+   style D (6 px sur téléphone pour tenir à 375 px). */
+@media (max-width: 760px) { #topbar-profile-wrap { gap: 6px; } }
 
 /* ── Bouton « i » + modale « À propos » ──────────────────────────────────────
    Patron des cartes (MAP-DESIGN-SYSTEM.md), sans l'anneau qui pulse : la
@@ -1034,7 +1035,6 @@ button.nav-link.active { background: #fff; }
 @media (min-width: 768px) {
     #nav-more-wrap { display: none !important; }
     #topbar { top: 14px; margin-top: 14px; padding: 0 8px 0 10px; }
-    #topbar-profile-name { display: inline; }
     .nav-label-short { display: none; }
     .nav-label-full  { display: inline; }
 }
