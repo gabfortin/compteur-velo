@@ -1,0 +1,58 @@
+/* ── Scène d’attente « compteur de passages » (base : assets/chargement.css, modèle outils/communs/) ──
+   Un vélo traverse la piste, passe sur la boucle de détection qui s'allume,
+   un « +1 » jaillit et l'afficheur du compteur roule. */
+.ch-velo .ch-scene { border-radius: 28px; }
+.v-ciel { inset: 0; background: linear-gradient(180deg, rgba(var(--ch-rgb), .05), rgba(var(--ch-rgb), .16)); }
+.v-piste {
+  left: -10%; right: -10%; bottom: 14%; height: 26%;
+  background: rgba(var(--ch-rgb), .18);
+  border-top: 2px solid rgba(var(--ch-rgb), .45); border-bottom: 2px solid rgba(var(--ch-rgb), .45);
+}
+.v-piste::after {                                   /* ligne pointillée qui défile */
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px;
+  background: repeating-linear-gradient(90deg, rgba(var(--ch-rgb), .7) 0 12px, transparent 12px 24px);
+  animation: v-defile .5s linear infinite;
+}
+.v-boucle {                                         /* boucle magnétique du compteur */
+  left: 50%; bottom: 17%; width: 22%; height: 20%; margin-left: -11%;
+  border: 2px dashed rgba(var(--ch-rgb), .6); border-radius: 6px;
+  animation: v-boucle 2s ease-out infinite;
+}
+.v-velo { left: 0; bottom: 21%; width: 58%; animation: v-roule 2s cubic-bezier(.45, .05, .55, .95) infinite; }
+.v-svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 0 4px rgba(var(--ch-rgb), .45)); }
+.v-svg * { fill: none; stroke: var(--ch-accent); stroke-linecap: round; stroke-linejoin: round; }
+.v-pneu { stroke-width: 3; }
+.v-roue line { stroke-width: .7; opacity: .75; }
+.v-moyeu { fill: var(--ch-accent); stroke-width: 1; }
+.v-roue, .v-pedalier { transform-box: fill-box; transform-origin: center; animation: v-tourne .45s linear infinite; }
+.v-pedalier { transform-box: view-box; transform-origin: 45px 41px; animation-duration: .9s; }
+.v-pedalier circle { stroke-width: 1.6; }
+.v-pedalier line { stroke-width: 1.8; }
+.v-cadre { stroke-width: 3; }
+.v-guidon { stroke-width: 2.4; }
+.v-selle { stroke-width: 2.6; }
+.v-plus {
+  left: 50%; top: 34%; margin-left: -14px;
+  font: 800 18px/1 inherit; color: var(--ch-accent); text-shadow: 0 0 10px var(--ch-clair);
+  opacity: 0; animation: v-plus 2s ease-out infinite;
+}
+.v-compteur {
+  left: 50%; top: 8%; transform: translateX(-50%);
+  display: flex; gap: 2px; padding: 3px 5px; border-radius: 6px;
+  background: rgba(10, 20, 14, .82); box-shadow: 0 0 12px rgba(var(--ch-rgb), .5);
+}
+.v-compteur b { display: block; width: 11px; height: 16px; overflow: hidden; }
+.v-compteur b i {
+  display: block; font: 700 13px/16px ui-monospace, monospace; font-style: normal; color: var(--ch-clair); text-align: center;
+  white-space: pre; animation: v-chiffres 2s steps(10) infinite;
+}
+.v-compteur b:nth-child(1) i { animation-duration: 20s; }
+.v-compteur b:nth-child(2) i { animation-duration: 6s; }
+.v-compteur b:nth-child(3) i { animation-duration: 2s; }
+@keyframes v-defile { to { background-position: -24px 0; } }
+@keyframes v-roule { 0% { transform: translateX(-120%); } 100% { transform: translateX(190%); } }
+@keyframes v-tourne { to { transform: rotate(360deg); } }
+@keyframes v-boucle { 0%, 38% { box-shadow: none; } 48% { box-shadow: 0 0 0 4px rgba(var(--ch-rgb), .25), 0 0 22px var(--ch-clair); border-color: var(--ch-clair); } 70%, 100% { box-shadow: none; } }
+@keyframes v-plus { 0%, 44% { opacity: 0; transform: translateY(10px) scale(.6); } 52% { opacity: 1; transform: translateY(0) scale(1.25); } 80% { opacity: 1; transform: translateY(-10px) scale(1); } 100% { opacity: 0; transform: translateY(-18px); } }
+@keyframes v-chiffres { to { transform: translateY(-160px); } }
+@media (prefers-reduced-motion: reduce) { .v-velo { transform: translateX(40%); } .v-plus { opacity: 1; } }

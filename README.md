@@ -117,6 +117,7 @@ modifier le style ou le code et publier sans relancer la génération.
 | `index.html`, `confidentialite.html` | Pages statiques |
 | `assets/boot.js`, `assets/app.js`, `assets/style.css` | Démarrage, logique de la page, styles |
 | `assets/apropos.js`, `assets/titre-barre.js` | Composants communs (bouton « i », nom dans la barre) |
+| `assets/chargement.css`, `assets/chargement-velo.css` | Écran d'attente : base commune (copie de `outils/communs/`) et scène (vélo sur la boucle du compteur) |
 | `data/site.json` | Généré chaque jour : ne pas modifier à la main |
 | `hist_cache.json`, `bixi_cache.json`, `velo_meta_cache.json` | Caches commités (historique, BIXI, rue et arrondissement) |
 | `test_*.py` | Tests et audit |
@@ -141,7 +142,6 @@ Aucun cookie ni compte.
 | Quand | Ce qui est envoyé | À qui |
 |---|---|---|
 | Chaque visite | Page, site d'origine, appareil, pays | GoatCounter (mesure d'audience anonyme) |
-| Chaque visite | Chart.js ; polices | jsDelivr ; Google Fonts |
 | Carte | Fond de carte de la zone affichée | OpenFreeMap (et CyclOSM, si activé) |
 
 La météo est téléchargée par le robot, pas par le navigateur. Détails :
@@ -150,7 +150,7 @@ si un service externe est ajouté.
 
 ## Crédits
 
-- [Chart.js](https://www.chartjs.org) 4.4.4 (MIT), chargé depuis jsDelivr
+- [Chart.js](https://www.chartjs.org) 4.4.4 (MIT), hébergé dans `assets/vendor/chartjs/` (modèle commun `outils/communs/chartjs/`) ; police Inter hébergée dans `fonts/`
 - Composant de carte commun (`assets/vendor/carte/`, modèle `~/Developer/outils/communs/carte/`) : API de Leaflet dessinée par [MapLibre GL JS](https://maplibre.org) (BSD-3-Clause)
 - Météo © [Open-Meteo](https://open-meteo.com) (CC BY 4.0)
 - Données © Ville de Montréal (CC BY 4.0) et BIXI

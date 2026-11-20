@@ -7,7 +7,17 @@
     "assets/vendor/carte/carte.js": "carte/carte.js",
     "assets/vendor/carte/carte.css": "carte/carte.css",
     "assets/vendor/carte/LICENSE-maplibre.txt": "carte/LICENSE-maplibre.txt",
-    "assets/don.js": "don.js"
+    "assets/don.js": "don.js",
+    "fonts/inter-latin.woff2": "polices/inter-latin.woff2",
+    "fonts/inter-latin-ext.woff2": "polices/inter-latin-ext.woff2",
+    "fonts/poppins-600-latin.woff2": "polices/poppins-600-latin.woff2",
+    "fonts/poppins-700-latin.woff2": "polices/poppins-700-latin.woff2",
+    "fonts/OFL-Inter.txt": "polices/OFL-Inter.txt",
+    "fonts/OFL-Poppins.txt": "polices/OFL-Poppins.txt",
+    "fonts/polices.css": "polices/polices.css",
+    "assets/vendor/chartjs/chart.umd.min.js": "chartjs/chart.umd.min.js",
+    "assets/vendor/chartjs/LICENSE-chartjs.md": "chartjs/LICENSE-chartjs.md",
+    "assets/chargement.css": "chargement.css"
   },
   "blocs": {
     "assets/style.css": [

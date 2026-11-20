@@ -6,10 +6,11 @@
     function showError(message) {
         const ld = document.getElementById('loading-screen');
         if (!ld) return;
+        ld.classList.add('ch-erreur');          // l'animation s'arrête, le message reste
+        const titre = ld.querySelector('.loading-title');
+        if (titre) titre.textContent = 'Données indisponibles';
         const sub = ld.querySelector('.loading-sub');
-        if (sub) sub.textContent = message;
-        const wheel = ld.querySelector('.loading-wheel');
-        if (wheel) wheel.style.display = 'none';
+        if (sub) { sub.textContent = message; sub.hidden = false; }
     }
 
     function escapeHtml(s) {

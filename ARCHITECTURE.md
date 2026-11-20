@@ -350,7 +350,7 @@ Selon `displayMode` :
 Lit les totaux journaliers de `allDailyData` pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
 
 #### Écran de chargement
-Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement de `data/site.json`. Il est retiré à la fin de `assets/app.js`, après l'initialisation de la carte, avec un repli (erreur JS ou 20 s) pour ne jamais bloquer la page. Si les données ne peuvent pas être chargées, `boot.js` y affiche un message d'erreur.
+Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement de `data/site.json` : animation d'attente « over the top » (base commune `assets/chargement.css`, copie de `outils/communs/` ; scène `assets/chargement-velo.css` : un vélo passe sur la boucle du compteur, « +1 », l'afficheur roule). Il est retiré à la fin de `assets/app.js`, après l'initialisation de la carte, avec un repli (erreur JS ou 20 s) pour ne jamais bloquer la page. Si les données ne peuvent pas être chargées, `boot.js` y affiche un message d'erreur.
 
 #### `createChart(id)`
 Crée le graphique Chart.js pour le compteur donné. Si `showBixi` est actif et que `bixiNearby[id]` contient des données pour la période affichée, un dataset BIXI est ajouté :

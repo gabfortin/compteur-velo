@@ -2872,6 +2872,9 @@ if ((location.hash || '').replace(/^#/, '')) showViewFromHash();
 setTimeout(() => {
     const ld = document.getElementById("loading-screen");
     if (!ld) return;
-    ld.classList.add("done");
+    ld.classList.add("done", "ch-sortie");   // sortie de la base commune (chargement.css)
     setTimeout(() => ld.remove(), 400);
+    // Arrivée : le contenu monte en sortant d'un flou
+    const contenu = document.querySelector("main") || document.querySelector(".container");
+    if (contenu && !matchMedia("(prefers-reduced-motion: reduce)").matches) contenu.classList.add("ch-arrivee");
 }, 0);

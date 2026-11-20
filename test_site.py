@@ -51,18 +51,13 @@ def start_server():
 
 
 def route_offline(page, cdn_dir):
-    """Sert Chart.js depuis CDN_DIR ; bloque les autres hôtes externes."""
-    files = {
-        'chart.js@4.4.4/dist/chart.umd.min.js': 'chart.js/dist/chart.umd.js',
-    }
+    """Bloque les hôtes externes (Chart.js et les polices sont servis par le
+    site lui-même, dans assets/vendor/ et fonts/)."""
 
     def handle(route):
         url = route.request.url
         if url.startswith('http://127.0.0.1'):
             return route.continue_()
-        for suffix, path in files.items():
-            if url.endswith(suffix):
-                return route.fulfill(path=os.path.join(cdn_dir, path))
         return route.abort()
     page.route('**/*', handle)
 
