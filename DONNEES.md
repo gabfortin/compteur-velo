@@ -158,6 +158,27 @@ Exécutée en Python dans `genMap.py` après le filtrage des 12 derniers mois. U
 |---------|-------------|
 | Bannière `#dataWarning` | S'affiche sous le titre du compteur avec un message d'avertissement |
 
+## Qualité des données — compteurs signalés comme brisés
+
+Certains problèmes ne se voient pas dans les données. Le compteur **`vf-100007390`**
+(Eco-Display - Métro Laurier, avenue Laurier Est) a été signalé comme **brisé et non
+fiable** par Éco-Compteur, le fabricant, directement à Gabriel Fortin (novembre 2026 ;
+pas de source publique) : il sous-compte, donc l'achalandage réel est probablement plus
+élevé que celui affiché. Ses données sont publiées telles quelles, sans correction.
+
+La liste est écrite à la main dans `assets/app.js` (`COMPTEUR_BRISE`). Pour ajouter ou
+retirer un compteur, modifier cette liste ; tout le reste suit :
+
+| Élément | Comportement |
+|---------|-------------|
+| Bannière rouge `#brokenCounterWarning` | Sous les statistiques du compteur sélectionné |
+| Infobulle des marqueurs (carte principale et carte par arrondissement) | Préfixe 🚨 et mention « (compteur brisé) » |
+| Liste des compteurs d'un arrondissement | Pastille rouge « brisé » à côté de la moyenne |
+| Vélo d'hiver | Ligne d'avertissement rouge en tête des mises en garde du compteur |
+| Compteur affiché au chargement | Exclu du tirage au hasard |
+
+Le compteur reste compté dans les totaux de la vue globale et des arrondissements.
+
 ## Qualité des données — détection d'anomalies
 
 En plus des lacunes, `genMap.py` détecte les jours dont le volume de passages est anormalement bas par rapport à l'historique du même jour de semaine. Ces jours correspondent probablement à un dysfonctionnement du capteur.

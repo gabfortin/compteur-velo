@@ -334,6 +334,20 @@ def test_counters_page(page):
     section("Total, moyenne et heure de pointe de chaque compteur sur 7, 30, 90, 180 et 365 jours", before)
 
 
+def test_logo(page):
+    print("\n=== Logo de la page d'accueil ===")
+    before = mark()
+    s = SITE['globalStats']['yesterday']
+    # L'afficheur roule jusqu'au total : on attend la fin de l'animation
+    page.wait_for_function("() => { const l = document.getElementById('logo-accueil'); const t = [...document.querySelectorAll('#logo-compteur text')]"
+                           ".map(e => e.textContent).join(''); return l && t && Number(t) === Number(l.dataset.total); }", timeout=8000)
+    shown = page.evaluate("() => [...document.querySelectorAll('#logo-compteur text')].map(e => e.textContent).join('')")
+    check("Afficheur du logo = total d'hier (tous les compteurs)", shown == str(s['total']), f"{shown!r} ≠ {s['total']}")
+    titre = page.evaluate("() => document.getElementById('logo-accueil-titre').textContent")
+    check("Infobulle du logo : total et date", str(s['total']) in re.sub(r'\s', '', titre) and s['subtitle'] in titre, titre)
+    section("Afficheur du logo (passages d'hier)", before)
+
+
 def test_global_page(page):
     print("\n=== Vue globale ===")
     before = mark()
@@ -719,6 +733,7 @@ def main():
             if (!el) return; el.dataset.value = target; el.textContent = target.toLocaleString('fr-CA'); }; }""")
         today = page.evaluate("() => { const d = new Date(); return d.getFullYear() + '-' + "
                               "String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }")
+        test_logo(page)
         test_counters_page(page)
         test_global_page(page)
         test_arr_page(page)

@@ -67,6 +67,9 @@ python3 test_data.py
 - Les compteurs ont des lacunes (pannes, retraits) et des anomalies (jours à
   zéro, pics) : le site les détecte et les signale, sans les corriger ;
   méthode dans [DONNEES.md](DONNEES.md).
+- Le compteur `vf-100007390` (Métro Laurier) est brisé selon Éco-Compteur :
+  il est signalé par un badge rouge, et son achalandage réel est probablement
+  plus élevé que celui affiché (liste `COMPTEUR_BRISE` dans `assets/app.js`).
 - Deux technologies de comptage coexistent (capteurs photo/vidéo et boucles
   magnétiques), avec des historiques différents.
 - Initiative indépendante : ni produite ni approuvée par la Ville de Montréal

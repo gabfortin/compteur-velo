@@ -33,7 +33,9 @@ compteur-velo/
 │   └── titre-barre.js       # Nom du site dans la barre au défilement (composant commun)
 ├── data/
 │   └── site.json            # Données générées chaque jour par genMap.py (ne pas modifier manuellement)
-├── favico.png               # Icône de l'application
+├── favicon.svg              # Icône d'onglet (scène de l'écran d'attente, version petite taille)
+├── favico.png               # Icône PNG de secours (256 px, même dessin en détail)
+├── apple-touch-icon.png     # Icône d'écran d'accueil (180 px, carrée : le téléphone l'arrondit)
 ├── og-image.png             # Image d’aperçu lors du partage (Open Graph, 1200×630)
 ├── test_data.py             # Validation des données (data/site.json ↔ CSV)
 ├── test_sources.py          # Audit : chaque valeur publiée recalculée depuis les sources
@@ -220,7 +222,7 @@ Toutes les données utilisées par la page sont réunies dans le dictionnaire `s
     <nav #topbar>        ← Nom du site (apparaît au défilement, titre-barre.js), onglets Compteurs / Vue Globale /
                             Arrondissements / Vélo d'hiver / BIXI, puis pastille pétition, « Me supporter » (don.js), bouton « i »,
                             Instagram, profil (photo seule : « gabfortin.com » masqué visuellement), 8 px entre chacun
-    .site-header         ← Logo, titre, ligne de fraîcheur des données ([data-fraicheur], remplie par boot.js)
+    .site-header         ← Logo (#logo-accueil, SVG en ligne avec afficheur), titre, ligne de fraîcheur des données ([data-fraicheur], remplie par boot.js)
     .container
       .period-buttons    ← Filtres de période (Jour spécifique / 7j / 30j / 90j / 180j / 365j)
       .select-wrapper.desktop-only
@@ -350,6 +352,8 @@ Selon `displayMode` :
 Lit les totaux journaliers de `allDailyData` pour le diagramme à barres. Même logique de filtrage et même respect de `displayMode` que `buildFilteredData`, mais produit une barre par jour au lieu d'un point par heure.
 
 #### Écran de chargement
+**Logo de la page d'accueil** (`#logo-accueil`, novembre 2026) : SVG en ligne qui reprend la scène de l'écran d'attente (vélo au trait sur la boucle de détection, piste), avec en haut un afficheur à cases comme celui de l'animation. `afficheurLogo()` de `assets/boot.js` y écrit le **total des passages d'hier, tous les compteurs** (`globalStats.yesterday.total`, le chiffre de la carte « Hier » de la Vue globale) : une case par chiffre, chiffres qui roulent jusqu'au total quand l'écran d'attente s'en va (affichage direct si `prefers-reduced-motion`), infobulle « 61 357 passages le 18 nov. 2026, tous les compteurs ». Vérifié par `test_logo()` de `test_site_values.py`. Les icônes fixes (`favicon.svg`, `favico.png`, `apple-touch-icon.png`) sont le même dessin, sans afficheur.
+
 Un overlay `#loading-screen` (HTML/CSS pur, placé en tête du `<body>`) s'affiche pendant le téléchargement de `data/site.json` : animation d'attente « over the top » (base commune `assets/chargement.css`, copie de `outils/communs/` ; scène `assets/chargement-velo.css` : un vélo passe sur la boucle du compteur, « +1 », l'afficheur roule). Il est retiré à la fin de `assets/app.js`, après l'initialisation de la carte, avec un repli (erreur JS ou 20 s) pour ne jamais bloquer la page. Si les données ne peuvent pas être chargées, `boot.js` y affiche un message d'erreur.
 
 #### `createChart(id)`

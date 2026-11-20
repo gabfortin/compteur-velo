@@ -7,13 +7,14 @@
     <script data-goatcounter="https://gabfortin.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.6.0"/>
-    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.6.0"/>
-    <script src="assets/vendor/carte/maplibre-gl.js?v=2.6.0"></script>
-    <script src="assets/vendor/carte/carte.js?v=2.6.0"></script>
+    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.7.0"/>
+    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.7.0"/>
+    <script src="assets/vendor/carte/maplibre-gl.js?v=2.7.0"></script>
+    <script src="assets/vendor/carte/carte.js?v=2.7.0"></script>
     <title>Compteurs Vélo Montréal</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/png" href="favico.png">
-    <link rel="apple-touch-icon" href="favico.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <meta name="description" content="Passages de cyclistes à Montréal, compteur par compteur : graphiques horaires et journaliers, carte et historique depuis 2009, à partir des données ouvertes de la Ville. Mis à jour chaque jour.">
     <meta name="author" content="Gabriel Fortin">
     <meta name="color-scheme" content="light dark">
@@ -41,11 +42,11 @@
      "description": "Passages de cyclistes à Montréal, compteur par compteur, à partir des données ouvertes de la Ville.",
      "author": {"@type": "Person", "name": "Gabriel Fortin", "url": "https://gabfortin.com"}}
     </script>
-    <link rel="stylesheet" href="fonts/polices.css?v=2.6.0">
-    <link rel="stylesheet" href="assets/chargement.css?v=2.6.0">
-    <link rel="stylesheet" href="assets/chargement-velo.css?v=2.6.0">
-    <link rel="stylesheet" href="assets/style.css?v=2.6.0">
-    <script src="assets/vendor/chartjs/chart.umd.min.js?v=2.6.0"></script>
+    <link rel="stylesheet" href="fonts/polices.css?v=2.7.0">
+    <link rel="stylesheet" href="assets/chargement.css?v=2.7.0">
+    <link rel="stylesheet" href="assets/chargement-velo.css?v=2.7.0">
+    <link rel="stylesheet" href="assets/style.css?v=2.7.0">
+    <script src="assets/vendor/chartjs/chart.umd.min.js?v=2.7.0"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
         (function() {
@@ -135,7 +136,7 @@
                     <path d="M12 11v6.2" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
                 </svg>
             </button>
-            <script src="assets/don.js?v=2.6.0"></script>
+            <script src="assets/don.js?v=2.7.0"></script>
             <a href="https://www.instagram.com/gabrielfortin.mtl" id="topbar-instagram" title="@gabrielfortin.mtl" target="_blank" rel="noopener">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -149,7 +150,7 @@
             </a>
         </div>
     </nav>
-    <script src="assets/titre-barre.js?v=2.6.0" data-barre="#topbar" data-titre="#main-header h1"></script>
+    <script src="assets/titre-barre.js?v=2.7.0" data-barre="#topbar" data-titre="#main-header h1"></script>
     <script>
         // « Plus » regroupe Vue Globale, Arrondissements et BIXI (mobile)
         const moreBtn = document.getElementById('nav-more');
@@ -173,7 +174,9 @@
         window.addEventListener('resize', () => { if (!isMobileNav()) closeNavMenus(); });
     </script>
     <div class="site-header" id="main-header">
-        <img src="favico.png" alt="Logo" style="width:72px;height:72px;border-radius:18px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
+        <!-- Logo : la scène de l'écran d'attente (vélo sur la boucle de détection) ; l'afficheur montre le total
+             d'hier, tous les compteurs (globalStats.yesterday, rempli par assets/boot.js) -->
+        <svg class="logo-accueil" id="logo-accueil" viewBox="0 0 512 512" role="img" aria-labelledby="logo-accueil-titre"><title id="logo-accueil-titre">Compteurs Vélo Montréal</title><defs><clipPath id="lc-tuile"><rect width="512" height="512" rx="112"/></clipPath><linearGradient id="lc-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2fbf5"/><stop offset="1" stop-color="#d4f1df"/></linearGradient><filter id="lc-velo" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="5" result="f"/><feFlood flood-color="#1DB860" flood-opacity=".55"/><feComposite in2="f" operator="in" result="l"/><feMerge><feMergeNode in="l"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="lc-chiffres" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="6" result="f"/><feFlood flood-color="#7cf7b4" flood-opacity=".55"/><feComposite in2="f" operator="in" result="l"/><feMerge><feMergeNode in="l"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g clip-path="url(#lc-tuile)"><rect width="512" height="512" fill="url(#lc-ciel)"/><rect x="0" y="392" width="512" height="84" fill="#1DB860" opacity="0.18"/><line x1="0" y1="392" x2="512" y2="392" stroke="#7fd6a3" stroke-width="6"/><line x1="0" y1="476" x2="512" y2="476" stroke="#7fd6a3" stroke-width="6"/><line x1="-10" y1="434.0" x2="522" y2="434.0" stroke="#3fc57a" stroke-width="9" stroke-dasharray="34 30"/><rect x="186.0" y="382" width="140" height="104" rx="18" fill="none" stroke="#3fc57a" stroke-width="7" stroke-dasharray="20 14"/><g filter="url(#lc-velo)" transform="translate(76 196) scale(3.6)"><g fill="none" stroke="#1DB860" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="40" r="15.5" stroke-width="3.4"/><line x1="5" y1="40" x2="35" y2="40" stroke-width=".9" opacity=".7"/><line x1="7" y1="32.5" x2="33" y2="47.5" stroke-width=".9" opacity=".7"/><line x1="12.5" y1="27" x2="27.5" y2="53" stroke-width=".9" opacity=".7"/><line x1="20" y1="25" x2="20" y2="55" stroke-width=".9" opacity=".7"/><line x1="27.5" y1="27" x2="12.5" y2="53" stroke-width=".9" opacity=".7"/><line x1="33" y1="32.5" x2="7" y2="47.5" stroke-width=".9" opacity=".7"/><circle cx="20" cy="40" r="2" fill="#1DB860" stroke-width="1"/><circle cx="80" cy="40" r="15.5" stroke-width="3.4"/><line x1="65" y1="40" x2="95" y2="40" stroke-width=".9" opacity=".7"/><line x1="67" y1="32.5" x2="93" y2="47.5" stroke-width=".9" opacity=".7"/><line x1="72.5" y1="27" x2="87.5" y2="53" stroke-width=".9" opacity=".7"/><line x1="80" y1="25" x2="80" y2="55" stroke-width=".9" opacity=".7"/><line x1="87.5" y1="27" x2="72.5" y2="53" stroke-width=".9" opacity=".7"/><line x1="93" y1="32.5" x2="67" y2="47.5" stroke-width=".9" opacity=".7"/><circle cx="80" cy="40" r="2" fill="#1DB860" stroke-width="1"/><path d="M20 40 L45 41 L39 17 Z M39 17 L71 17 M45 41 L72.5 22" stroke-width="3.4"/><path d="M71 14 L80 40" stroke-width="3.4"/><path d="M71 14 L69.5 9.5 L77 9 Q80 9 79 12.5" stroke-width="2.72"/><path d="M38.5 17 L37.8 13 M33 12.2 L43 12.2" stroke-width="2.8899999999999997"/><circle cx="45" cy="41" r="3.2" stroke-width="1.8"/></g></g><g id="logo-compteur"></g></g></svg>
         <h1>Compteurs Vélo Montréal</h1>
         <p class="freshness" id="fraicheur" data-fraicheur hidden></p>
     </div>
@@ -305,6 +308,7 @@
         </div>
         <div id="vfQualityWarning"><span class="warn-icon" id="vfQualityIcon"></span><span id="vfQualityText"></span></div>
         <div id="cityGapWarning"><span class="warn-icon">🏛️</span><span id="cityGapWarningText"></span></div>
+        <div id="brokenCounterWarning" role="alert"><span class="warn-icon">🚨</span><span id="brokenCounterWarningText"></span></div>
         <div id="noDataMsg"><span class="icon">🚴</span>Aucune donnée disponible pour cette période.</div>
 
         </div>
@@ -663,7 +667,7 @@
         <p>Initiative indépendante : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
         <p>Développé par <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a> · v<span id="app-version"></span></p>
     </footer>
-    <script src="assets/apropos.js?v=2.6.0"></script>
-    <script src="assets/boot.js?v=2.6.0"></script>
+    <script src="assets/apropos.js?v=2.7.0"></script>
+    <script src="assets/boot.js?v=2.7.0"></script>
 </body>
 </html>

@@ -66,6 +66,10 @@ const CITY_FUNDING_GAP = {
     'vf-100055268': ['2026-03-20', '2026-05-05'],
     'vf-300046833': ['2026-03-20', '2026-05-05'],
 };
+// Compteurs signalés comme brisés par le fabricant (Éco-Compteur) : leurs données ne
+// sont pas fiables et l'achalandage réel est probablement plus élevé que celui affiché.
+// Information transmise directement par Éco-Compteur (pas une source publique).
+const COMPTEUR_BRISE = new Set(['vf-100007390']);
 const weatherData = SITE_DATA.weatherData;
 const bixiNearby = SITE_DATA.bixiNearby;
 const bixiExceedsDays = SITE_DATA.bixiExceedsDays;
@@ -757,6 +761,16 @@ function updateCityGapWarning(instance) {
     el.style.display = 'flex';
 }
 
+function updateBrokenCounterWarning(instance) {
+    const el = document.getElementById('brokenCounterWarning');
+    if (!instance || !COMPTEUR_BRISE.has(instance)) { el.style.display = 'none'; return; }
+    document.getElementById('brokenCounterWarningText').innerHTML =
+        `<strong>Compteur brisé</strong> — Selon Éco-Compteur, le fabricant, ce compteur est brisé et ses données ne sont pas fiables. ` +
+        `<strong>L'achalandage réel est probablement plus élevé</strong> que celui affiché. ` +
+        `<span class="broken-src">Information transmise directement par Éco-Compteur.</span>`;
+    el.style.display = 'flex';
+}
+
 function selectCounter(instance) {
     // Reset combine state on counter switch
     combinedInstance = null;
@@ -783,12 +797,14 @@ function selectCounter(instance) {
         updateAnomalyWarning(instance);
         updateVfQualityWarning(instance);
         updateCityGapWarning(instance);
+        updateBrokenCounterWarning(instance);
     } else {
         noDataMsg.style.display = 'none';
         document.getElementById('dataWarning').style.display = 'none';
         document.getElementById('anomalyWarning').style.display = 'none';
         document.getElementById('vfQualityWarning').style.display = 'none';
         document.getElementById('cityGapWarning').style.display = 'none';
+        document.getElementById('brokenCounterWarning').style.display = 'none';
         updateStats(null);
         updateDayLabel(null);
         updateDirToggle(null);
@@ -979,7 +995,8 @@ const EXCLUDED_COMBINE_PAIRS = new Set([
         // moitié des compteurs admissibles (actifs, sans problème récent) qui ont
         // le plus de passages, pour éviter de tomber sur un compteur peu fréquenté.
         const healthyCounters = Object.keys(counterLocations).filter(id =>
-            counterLocations[id].type === 'boucle' && vfGroup(id) === 'A' && !gappyCounters.has(id) && arrOk(id));
+            counterLocations[id].type === 'boucle' && vfGroup(id) === 'A' && !gappyCounters.has(id)
+            && !COMPTEUR_BRISE.has(id) && arrOk(id));
         const avgDailyTotal = id => {
             const totals = Object.values(dailyTotalsFor(id));
             return totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
@@ -1157,13 +1174,14 @@ setTimeout(() => {
         const gappy = gappyCounters.has(instance);
         const grp = vfGroup(instance);
         const typeIcon = loc.type === 'boucle' ? '⬡ ' : '📍 ';
-        const tooltipPrefix = grp === 'C' ? '⛔ '
+        const tooltipPrefix = COMPTEUR_BRISE.has(instance) ? '🚨 '
+                            : grp === 'C' ? '⛔ '
                             : grp === 'B' ? '⚠ '
                             : gappy       ? '⚠ '
                             : typeIcon;
         const m = L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappy, loc.type, grp))
             .addTo(map)
-            .bindTooltip(tooltipPrefix + loc.label, { direction: 'top', offset: [0, -6] });
+            .bindTooltip(tooltipPrefix + loc.label + (COMPTEUR_BRISE.has(instance) ? ' (compteur brisé)' : ''), { direction: 'top', offset: [0, -6] });
         m.on('click', () => setCounterFromMap(instance));
         markers[instance] = m;
     });
@@ -1707,6 +1725,11 @@ function renderHiverCounterWarning(instance, stats) {
     const gapOverlapsWinter = gap && seasonStart && seasonEnd && gap[0] <= seasonEnd && gap[1] >= seasonStart;
     const rows = [];
 
+    if (COMPTEUR_BRISE.has(instance)) {
+        rows.push({ cls: 'stopped', icon: '🚨',
+            text: "<strong>Compteur brisé</strong> — selon Éco-Compteur, le fabricant, ce compteur est brisé et ses données ne sont pas fiables : <strong>l'achalandage hivernal réel est probablement plus élevé</strong> que celui affiché." });
+    }
+
     if (gapOverlapsWinter) {
         rows.push({ cls: 'stopped', icon: '🏛️',
             text: "<strong>Coupure de financement municipal</strong> — ce compteur n'a transmis aucune donnée valide du <strong>" + fmtDate(gap[0]) + "</strong> au <strong>" + fmtDate(gap[1]) + "</strong> (la Ville avait cessé de financer le traitement des données Éco-Compteur) : les statistiques de l'hiver " + season + " sont donc incomplètes pour cette période. <a href=\"" + CITY_FUNDING_GAP_SOURCE.url + "\" target=\"_blank\" rel=\"noopener\">Source : " + CITY_FUNDING_GAP_SOURCE.label + " ↗</a>" });
@@ -2045,7 +2068,7 @@ function arrRenderMap(s) {
         const loc = counterLocations[id];
         if (!loc) return;
         L.circleMarker([loc.lat, loc.lng], markerStyle(false, gappyCounters.has(id), loc.type, vfGroup(id)))
-            .bindTooltip(loc.label, { direction: "top", offset: [0, -6] })
+            .bindTooltip(COMPTEUR_BRISE.has(id) ? "🚨 " + loc.label + " (compteur brisé)" : loc.label, { direction: "top", offset: [0, -6] })
             .on("click", () => goToCounter(id))
             .addTo(arrLayer);
     });
@@ -2060,7 +2083,11 @@ function arrRenderCounters(s) {
         const type = loc.type || "fut";
         return "<div class=\"arr-row arr-counter-row\" onclick=\"goToCounter('" + c.id + "')\">" +
             "<span class=\"arr-name\" title=\"" + (loc.label || c.id).replace(/"/g, "&quot;") + "\">" +
-                "<span class=\"arr-type arr-type-" + type + "\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" + (loc.label || c.id) + "</span>" +
+                "<span class=\"arr-type arr-type-" + type + "\">" + (type === "fut" ? "Photo/vidéo" : "Au sol") + "</span>" +
+                // Pastille « brisé » dans le nom, pas dans .arr-vol : test_site_values.py lit .arr-vol
+                // et attend exactement « inactif » ou un nombre.
+                (COMPTEUR_BRISE.has(c.id) ? "<span class=\"arr-broken\" title=\"Compteur brisé selon Éco-Compteur : achalandage réel probablement plus élevé\">brisé</span>" : "") +
+                (loc.label || c.id) + "</span>" +
             "<div class=\"arr-bar-wrap\"><div class=\"arr-bar\" style=\"width:" + (c.avg / max * 100).toFixed(1) + "%\"></div></div>" +
             "<span class=\"arr-vol\">" + (c.stopped ? "<span class=\"arr-stopped\">inactif</span>" : arrFmt(c.avg) + " / j") + "</span></div>";
     }).join("");
