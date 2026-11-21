@@ -42,7 +42,7 @@
             const typeCls = isBoucle ? 'boucle' : 'fut';
             return `<div id="${escapeHtml(id)}" class="table-container">` +
                 `<h2>Compteur ${escapeHtml(id)} <a href="${typeUrl}" target="_blank" rel="noopener" class="counter-type-badge counter-type-${typeCls}">${typeLabel}</a></h2>` +
-                `<p><strong>Emplacement:</strong> ${escapeHtml(location)}</p>` +
+                `<p><strong>Emplacement :</strong> ${escapeHtml(location)}</p>` +
                 `<canvas id="chart-${escapeHtml(id)}"></canvas></div>`;
         }).join('');
         document.getElementById('noDataMsg').insertAdjacentHTML('afterend', html);

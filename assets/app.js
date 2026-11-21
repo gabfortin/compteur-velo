@@ -385,10 +385,12 @@ function updateStats(instance) {
     statsRow.style.display = 'grid';
     animateCount(document.getElementById('statTotal'), total);
     animateCount(document.getElementById('statAvg'), avg);
-    const fmtAvg = p => '~' + Math.round(p[1] / uniqueDays);
+    // Typographie française : « 8 h » (espace insécable), chaque moyenne à côté de son heure.
+    const fmtHeure = p => parseInt(p[0], 10) + '\u00a0h';
+    const fmtAvg = p => fmtHeure(p) + ' (≈\u00a0' + Math.round(p[1] / uniqueDays).toLocaleString('fr-CA') + '/h)';
     if (peak1) {
-        const hours = peak1[0] + 'h' + (peak2 ? ' · ' + peak2[0] + 'h' : '');
-        const avgs  = fmtAvg(peak1) + (peak2 ? ' · ' + fmtAvg(peak2) : '') + ' passages/heure';
+        const hours = fmtHeure(peak1) + (peak2 ? ' · ' + fmtHeure(peak2) : '');
+        const avgs  = fmtAvg(peak1) + (peak2 ? ' · ' + fmtAvg(peak2) : '');
         document.getElementById('statPeak').innerHTML =
             hours + '<br><span style="font-size:0.65em;opacity:0.65">' + avgs + '</span>';
     } else {
@@ -525,13 +527,21 @@ function createChart(id) {
                 }
             }
 
+            // Vue horaire sur plusieurs jours : une étiquette par jour (à minuit)
+            // et une ligne sans points, plus lisible ; les points restent au survol.
+            const hourlyMulti = !isDaily && currentPeriod !== 0
+                && data.labels.length > 0 && data.labels[0].length > 10;
+            if (hourlyMulti) {
+                data.datasets.forEach(ds => { if (ds.type !== 'bar') ds.pointRadius = 0; });
+            }
+
             // Points rouges sur les jours suspects (vue dans le temps)
             if (!isDaily && missingDaySet.size) {
                 data.datasets.forEach(ds => {
                     if (!Array.isArray(ds.data)) return;
                     ds.pointBackgroundColor = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 'rgba(220,38,38,0.85)' : (ds.borderColor || '#1DB860'));
                     ds.pointBorderColor    = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 'rgba(220,38,38,1)'    : (ds.borderColor || '#1DB860'));
-                    ds.pointRadius         = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 4 : 2);
+                    ds.pointRadius         = data.labels.map(lbl => anomalies[lbl.slice(0, 10)] ? 4 : (hourlyMulti ? 0 : 2));
                     ds.pointHoverRadius    = 6;
                 });
             }
@@ -599,9 +609,12 @@ function createChart(id) {
                             title: { display: true, text: 'Date', color: '#999', font: { size: 11 } },
                             ticks: {
                                 color: '#777',
-                                maxTicksLimit: 10,
+                                maxTicksLimit: hourlyMulti ? undefined : 10,
+                                autoSkip: !hourlyMulti,
                                 callback: function(value) {
                                     const label = this.getLabelForValue(value);
+                                    // null masque l'étiquette et sa ligne de grille
+                                    if (hourlyMulti && label.slice(11, 13) !== '00') return null;
                                     if (isDaily) {
                                         const d = new Date(label + 'T12:00:00');
                                         return d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });
@@ -1223,7 +1236,8 @@ function goToCounter(id) {
 
 // Type de capteur : photo/vidéo (det-) ou au sol (vf-), mêmes couleurs que les badges
 const isPhotoVideo = inst => inst.startsWith('det-');
-const TYPE_COLORS = { boucle: ['rgba(139,92,246,0.72)', '#7C3AED'], fut: ['rgba(29,184,96,0.75)', '#1DB860'] };
+// Capteurs au sol en gris (comme leur badge) : plus de mauve sur le site.
+const TYPE_COLORS = { boucle: ['rgba(100,116,110,0.62)', '#55635c'], fut: ['rgba(29,184,96,0.75)', '#1DB860'] };
 const TYPE_LEGEND = { display: true, position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, color: '#555', font: { size: 11 } } };
 // Série d'un graphique empilé ; `partial` éclaircit les barres de la période en cours
 function typeDataset(label, data, colors, partial) {
@@ -1240,7 +1254,7 @@ function renderGlobalPage() {
     if (!s || !s.yesterday) return;
 
     const fmt = n => (n || 0).toLocaleString('fr-CA');
-    const fmtPeak = h => h !== null && h !== undefined ? h + 'h–' + (h + 1) + 'h' : '—';
+    const fmtPeak = h => h !== null && h !== undefined ? h + '\u00a0h–' + (h + 1) + '\u00a0h' : '—';
 
     const periods = [
         { key: 'yesterday', label: 'Hier' },
@@ -2507,7 +2521,7 @@ function renderBixiYear(y) {
     const bar = { backgroundColor: "rgba(225,37,27,0.75)", borderRadius: 3 };
     charts["__bixi_hour__"] = new Chart(document.getElementById("bixi-hour-chart"), {
         type: "bar",
-        data: { labels: [...Array(24).keys()].map(h => h + "h"), datasets: [{ ...bar, data: s.hourly }] },
+        data: { labels: [...Array(24).keys()].map(h => h + "\u00a0h"), datasets: [{ ...bar, data: s.hourly }] },
         options: smallOpts(item => " " + bixiFmt(item.raw) + " trajets"),
     });
     const dowSum = new Array(7).fill(0), dowN = new Array(7).fill(0);

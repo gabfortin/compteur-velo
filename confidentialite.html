@@ -25,12 +25,13 @@
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://compteurvelo.com/og-image.png">
-    <link rel="stylesheet" href="fonts/polices.css?v=2.7.0">
+    <link rel="stylesheet" href="fonts/polices.css?v=2.8.0">
+    <link rel="stylesheet" href="fonts/plex-sans.css?v=2.8.0">
     <style>
         * { box-sizing: border-box; }
-        html { background: #eaf3ee; }
+        html { background: #f1f5f2; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
             background: transparent;
             color: #2b3a33;
@@ -40,14 +41,12 @@
         }
         body::before {
             content: '';
-            position: fixed;
-            inset: 0;
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 640px;
             z-index: -1;
-            background:
-                radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.34), transparent 62%),
-                radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.26), transparent 62%),
-                radial-gradient(40vmax 40vmax at 78% 92%, rgba(139,92,246,0.16), transparent 62%),
-                linear-gradient(160deg, #f3faf6 0%, #e9f4f1 50%, #eef1f8 100%);
+            /* Un seul dégradé vert derrière l'en-tête (sobriété, DESIGN-PAGES.md, B) */
+            background: linear-gradient(180deg, rgba(29,184,96,0.22) 0%, rgba(29,184,96,0.07) 55%, rgba(29,184,96,0) 100%);
         }
         .page {
             max-width: 760px;
@@ -74,7 +73,6 @@
             border-radius: 22px;
             -webkit-backdrop-filter: saturate(180%) blur(22px);
                     backdrop-filter: saturate(180%) blur(22px);
-            box-shadow: 0 10px 36px -8px rgba(15,40,28,0.14), inset 0 1px 0 rgba(255,255,255,0.85);
             padding: 28px 32px;
         }
         h1 {
@@ -113,14 +111,9 @@
             html { background: #0b1310; }
             body { color: #b4c4bb; }
             body::before {
-                background:
-                    radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.16), transparent 62%),
-                    radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.12), transparent 62%),
-                    radial-gradient(40vmax 40vmax at 78% 92%, rgba(139,92,246,0.10), transparent 62%),
-                    linear-gradient(160deg, #0b1411 0%, #0c1416 50%, #10131b 100%);
+                background: linear-gradient(180deg, rgba(61,220,132,0.14) 0%, rgba(61,220,132,0.04) 55%, rgba(61,220,132,0) 100%);
             }
             .back, .card { background: rgba(24,33,29,0.62); border-color: rgba(255,255,255,0.08); }
-            .card { box-shadow: 0 10px 36px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); }
             .back, a { color: #3ddc84; }
             h1, h2 { color: #e4eee8; }
             h2 { border-bottom-color: rgba(255,255,255,0.08); }
@@ -162,7 +155,7 @@
             <li><strong>GoatCounter</strong> : statistiques de visite (<a href="https://www.goatcounter.com/help/privacy" target="_blank" rel="noopener">politique</a>);</li>
             <li><strong>OpenFreeMap</strong> : fond de la carte (<a href="https://openfreemap.org/privacy/" target="_blank" rel="noopener">politique</a>) ; <strong>CyclOSM</strong> (OpenStreetMap France) : images du fond « Pistes cyclables », si vous l’activez (<a href="https://www.openstreetmap.fr/mentions-legales/" target="_blank" rel="noopener">mentions</a>).</li>
         </ul>
-        <p>La bibliothèque de graphiques (Chart.js) et la police de caractères (Inter) sont hébergées avec le site : elles ne font appel à aucun autre service.</p>
+        <p>La bibliothèque de graphiques (Chart.js) et la police de caractères (IBM Plex Sans) sont hébergées avec le site : elles ne font appel à aucun autre service.</p>
         <p>Les données météo (Open-Meteo), cyclistes (Ville de Montréal) et BIXI sont téléchargées par notre serveur lors de la mise à jour quotidienne : votre navigateur ne les contacte pas.</p>
 
         <h2>Vos droits</h2>

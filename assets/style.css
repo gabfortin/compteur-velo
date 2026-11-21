@@ -24,8 +24,8 @@
 * { box-sizing: border-box; }
 html { background: #eaf3ee; }
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-feature-settings: 'cv11', 'ss01', 'tnum';
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;   /* IBM Plex Sans : fonts/plex-sans.css */
+    font-feature-settings: 'tnum';
     -webkit-font-smoothing: antialiased;
     background: transparent;
     color: var(--text);
@@ -41,10 +41,10 @@ body::before {
     inset: -10vmax;
     z-index: -2;
     background:
-        radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.38), transparent 62%),
-        radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.30), transparent 62%),
-        radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.18), transparent 62%),
-        radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.20), transparent 62%),
+        radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.21), transparent 62%),
+        radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.17), transparent 62%),
+        radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.10), transparent 62%),
+        radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.11), transparent 62%),
         linear-gradient(160deg, #f3faf6 0%, #e9f4f1 50%, #eef1f8 100%);
     animation: meshDrift 28s ease-in-out infinite alternate;
 }
@@ -933,7 +933,7 @@ button.nav-link.active { background: #fff; }
 #topbar-instagram:hover { color: var(--muted); background: rgba(255,255,255,0.6); }
 /* Couleurs du bouton « i » et de la modale « À propos » (bloc commun ci-dessous) */
 :root {
-    --gf-info-1: #1DB860; --gf-info-2: #129a4c; --gf-info-glow: rgba(18,154,76,.6);
+    --gf-info-1: #1DB860; --gf-info-2: #129a4c; --gf-info-trait: var(--accent-strong);
     --gf-info-fond: rgba(255,255,255,.96); --gf-info-bordure: var(--glass-border);
     --gf-info-rayon: var(--r-lg); --gf-info-fermer: var(--glass);
     --gf-info-titre: var(--text); --gf-info-texte: var(--text-2); --gf-info-lien: var(--accent-strong);
@@ -947,27 +947,26 @@ button.nav-link.active { background: #fff; }
 @media (max-width: 760px) { #topbar-profile-wrap { gap: 6px; } }
 
 /* ── Bouton « i » + modale « À propos » ──────────────────────────────────────
-   Patron des cartes (MAP-DESIGN-SYSTEM.md), sans l'anneau qui pulse : la
-   pulsation est réservée aux cartes (DESIGN-PAGES.md). Bloc identique dans
-   tous les sites hors cartes ; seules les couleurs --gf-info-* (définies
-   juste au-dessus) changent d'un site à l'autre. Script : apropos.js. */
+   Version sobre (novembre 2026), la même que sur les cartes
+   (MAP-DESIGN-SYSTEM.md) : cercle à contour de 1,5 px, fond transparent, sans
+   dégradé, ombre, pulsation ni grossissement ; teinte légère au survol.
+   Bloc identique dans tous les sites hors cartes ; seules les variables
+   --gf-info-* (définies juste au-dessus) changent d'un site à l'autre.
+   --gf-info-trait : couleur du contour et du « i » (repli : --gf-info-2) ;
+   la faire suivre le mode sombre. Script : apropos.js. */
 .gf-info-btn {
   position: relative;
   display: flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-  border: none; padding: 0;
-  background: linear-gradient(140deg, var(--gf-info-1), var(--gf-info-2));
-  color: #fff; cursor: pointer;
-  box-shadow: 0 4px 14px -4px var(--gf-info-glow), inset 0 1px 0 rgba(255,255,255,.45);
-  transition: transform .2s cubic-bezier(.22,.68,0,1), box-shadow .2s cubic-bezier(.22,.68,0,1);
+  padding: 0;
+  border: 1.5px solid currentColor;   /* même épaisseur que « Me soutenir » (don.js) */
+  background: transparent;
+  color: var(--gf-info-trait, var(--gf-info-2)); cursor: pointer;
+  transition: background-color .2s ease;
 }
 .gf-info-btn svg { width: 16px; height: 16px; }
-.gf-info-btn:hover {
-  box-shadow: 0 8px 22px -4px var(--gf-info-glow), inset 0 1px 0 rgba(255,255,255,.5);
-  transform: translateY(-1px) scale(1.1);
-}
-.gf-info-btn:active { transform: scale(.94); }
-.gf-info-btn:focus-visible { outline: 2px solid var(--gf-info-2); outline-offset: 3px; }
+.gf-info-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.gf-info-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .gf-info-overlay {
   position: fixed; inset: 0; z-index: 2000;
   background: rgba(10,16,13,.45);
@@ -1015,7 +1014,6 @@ button.nav-link.active { background: #fff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .gf-info-btn, .gf-info-panel { transition: none; }
-  .gf-info-btn:hover { transform: none; }
   .gf-info-panel { transform: none; }
 }
 @media print { .gf-info-btn, .gf-info-overlay { display: none !important; } }
@@ -1158,10 +1156,10 @@ button.nav-link.active { background: #fff; }
     inset: -10vmax;
     z-index: -2;
     background:
-        radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.35), transparent 62%),
-        radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.28), transparent 62%),
-        radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.20), transparent 62%),
-        radial-gradient(36vmax 36vmax at 8% 92%,  rgba(165,243,252,0.32), transparent 62%),
+        radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.19), transparent 62%),
+        radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.15), transparent 62%),
+        radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.11), transparent 62%),
+        radial-gradient(36vmax 36vmax at 8% 92%,  rgba(165,243,252,0.18), transparent 62%),
         linear-gradient(160deg, #eef9fd 0%, #e4f3fb 50%, #eaf2fb 100%);
     animation: meshDrift 28s ease-in-out infinite alternate;
 }
@@ -1264,16 +1262,19 @@ button.nav-link.active { background: #fff; }
 /* Écran de chargement — visible pendant le téléchargement des données inline */
 /* Écran d'attente : mise en page et animation dans assets/chargement.css (base
    commune) et assets/chargement-velo.css (scène) ; ici, seulement le fond. */
+/* Voile léger : la page d'accueil reste visible derrière, sous un flou gaussien doux */
 #loading-screen {
     z-index: 10000;
-    background:
-        radial-gradient(40vmax 40vmax at 20% 15%, rgba(29,184,96,0.30), transparent 60%),
-        radial-gradient(36vmax 36vmax at 85% 85%, rgba(41,171,226,0.25), transparent 60%),
-        #eef6f2;
+    --ch-voile: rgba(238,243,240,0.35);
+    background: var(--ch-voile);
+    -webkit-backdrop-filter: blur(4px) saturate(120%);
+            backdrop-filter: blur(4px) saturate(120%);
     color: var(--text-2);
     transition: opacity 0.4s ease;
 }
 #loading-screen.done { opacity: 0; pointer-events: none; }
+/* Bouton « Me supporter » (don.js, commun) : même police que le reste du site */
+body .gf-don-btn { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
     body::before { animation: none; }
 }
@@ -1306,10 +1307,10 @@ button.nav-link.active { background: #fff; }
     html:where(:not([data-theme="light"])) { background: #0b1310; }
     :where(:root:not([data-theme="light"])) body::before {
         background:
-            radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.16), transparent 62%),
-            radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.12), transparent 62%),
-            radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.10), transparent 62%),
-            radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.06), transparent 62%),
+            radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.09), transparent 62%),
+            radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.07), transparent 62%),
+            radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.06), transparent 62%),
+            radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.03), transparent 62%),
             linear-gradient(160deg, #0b1411 0%, #0c1416 50%, #10131b 100%);
     }
     :where(:root:not([data-theme="light"])) body::after { background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); }
@@ -1375,9 +1376,9 @@ button.nav-link.active { background: #fff; }
     }
     :where(:root:not([data-theme="light"])) #hiver-page::before {
         background:
-            radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.14), transparent 62%),
-            radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.12), transparent 62%),
-            radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.08), transparent 62%),
+            radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.08), transparent 62%),
+            radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.07), transparent 62%),
+            radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.04), transparent 62%),
             linear-gradient(160deg, #0a1419 0%, #0b151c 50%, #0d1320 100%);
     }
     :where(:root:not([data-theme="light"])) #hiver-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #38bdf8 100%); }
@@ -1385,12 +1386,7 @@ button.nav-link.active { background: #fff; }
     :where(:root:not([data-theme="light"])) #bixi-page { --accent-strong: #f87171; }
     :where(:root:not([data-theme="light"])) #bixi-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #f87171 100%); }
     :where(:root:not([data-theme="light"])) #nav-bixi.active { color: #f87171; }
-    :where(:root:not([data-theme="light"])) #loading-screen {
-        background:
-            radial-gradient(40vmax 40vmax at 20% 15%, rgba(29,184,96,0.16), transparent 60%),
-            radial-gradient(36vmax 36vmax at 85% 85%, rgba(41,171,226,0.12), transparent 60%),
-            #0b1310;
-    }
+    :where(:root:not([data-theme="light"])) #loading-screen { --ch-voile: rgba(8,12,10,0.4); }
 }
 /* Thème sombre forcé (futur bouton de thème : <html data-theme="dark">), mêmes règles que ci-dessus. */
     :root:where([data-theme="dark"]) {
@@ -1413,10 +1409,10 @@ button.nav-link.active { background: #fff; }
     html:where([data-theme="dark"]) { background: #0b1310; }
     :where(:root[data-theme="dark"]) body::before {
         background:
-            radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.16), transparent 62%),
-            radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.12), transparent 62%),
-            radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.10), transparent 62%),
-            radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.06), transparent 62%),
+            radial-gradient(38vmax 38vmax at 12% 8%,  rgba(29,184,96,0.09), transparent 62%),
+            radial-gradient(34vmax 34vmax at 88% 12%, rgba(41,171,226,0.07), transparent 62%),
+            radial-gradient(40vmax 40vmax at 78% 88%, rgba(139,92,246,0.06), transparent 62%),
+            radial-gradient(36vmax 36vmax at 8% 92%,  rgba(250,204,21,0.03), transparent 62%),
             linear-gradient(160deg, #0b1411 0%, #0c1416 50%, #10131b 100%);
     }
     :where(:root[data-theme="dark"]) body::after { background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); }
@@ -1482,9 +1478,9 @@ button.nav-link.active { background: #fff; }
     }
     :where(:root[data-theme="dark"]) #hiver-page::before {
         background:
-            radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.14), transparent 62%),
-            radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.12), transparent 62%),
-            radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.08), transparent 62%),
+            radial-gradient(38vmax 38vmax at 15% 8%,  rgba(56,189,248,0.08), transparent 62%),
+            radial-gradient(34vmax 34vmax at 88% 12%, rgba(14,165,233,0.07), transparent 62%),
+            radial-gradient(40vmax 40vmax at 78% 90%, rgba(99,179,237,0.04), transparent 62%),
             linear-gradient(160deg, #0a1419 0%, #0b151c 50%, #0d1320 100%);
     }
     :where(:root[data-theme="dark"]) #hiver-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #38bdf8 100%); }
@@ -1492,12 +1488,7 @@ button.nav-link.active { background: #fff; }
     :where(:root[data-theme="dark"]) #bixi-page { --accent-strong: #f87171; }
     :where(:root[data-theme="dark"]) #bixi-page h1 { background-image: linear-gradient(120deg, #e4eee8 30%, #f87171 100%); }
     :where(:root[data-theme="dark"]) #nav-bixi.active { color: #f87171; }
-    :where(:root[data-theme="dark"]) #loading-screen {
-        background:
-            radial-gradient(40vmax 40vmax at 20% 15%, rgba(29,184,96,0.16), transparent 60%),
-            radial-gradient(36vmax 36vmax at 85% 85%, rgba(41,171,226,0.12), transparent 60%),
-            #0b1310;
-    }
+    :where(:root[data-theme="dark"]) #loading-screen { --ch-voile: rgba(8,12,10,0.4); }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     @media (prefers-color-scheme: dark) {

@@ -1,0 +1,26 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   IBM Plex Sans (variable, 100 à 700), hébergée sur le site : police du
+   style B « dashboard verre » (compteur-velo, requetes-311) depuis
+   novembre 2026. Aucune requête vers un tiers.
+
+   Modèle unique : ~/Developer/outils/communs/polices/plex-sans.css. Copier ce
+   fichier dans le dossier des polices du site (fonts/), à côté des .woff2 :
+   les url() sont relatives à ce fichier. Ne pas modifier la copie d'un site :
+   changer le modèle, puis python3 ~/Developer/outils/recopier_communs.py --appliquer
+
+   Utilisation : <link rel="stylesheet" href="fonts/plex-sans.css"> (ou
+   @import url("fonts/plex-sans.css") en tête d'une feuille).
+   Graisse maximale : 700 (un 750 ou 800 demandé s'affiche en 700).
+   Licence : OFL-IBMPlexSans.txt (SIL OFL 1.1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 100 700;
+  src: url('plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 100 700;
+  src: url('plex-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
