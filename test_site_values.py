@@ -327,7 +327,8 @@ def test_counters_page(page):
                 ok = bool(peak_hours) and hour_tot.get(int(peak_hours[0])) == best
                 check(f"{tag} Heure de pointe", ok,
                       f"affiché {got['peak']!r}, maximum {best} à {[h for h, v in hour_tot.items() if v == best]}")
-                avgs = [x for x in nums(got['peak'].split('\n')[-1])]
+                # Deuxième ligne : « 8 h (≈ 21/h) · 17 h (≈ 23/h) » ; la moyenne suit « ≈ »
+                avgs = [num(part) for part in got['peak'].split('\n')[-1].split('≈')[1:]]
                 if ok and avgs:
                     check(f"{tag} Passages/heure à la pointe", avgs[0] == jround(best / n_days),
                           f"affiché {avgs[0]}, attendu {jround(best / n_days)}")
@@ -367,7 +368,9 @@ def test_global_page(page):
                 check(f"[{key}] Top compteur {t['label']}", t['label'] in meta and
                       any(n == t['vol'] for n in nums(meta)), meta)
         if s['peak_hour'] is not None:
-            check(f"[{key}] Heure de pointe", f"{s['peak_hour']}h–{s['peak_hour'] + 1}h" in meta, meta)
+            # Typographie française : « 16 h–17 h » (espaces insécables)
+            check(f"[{key}] Heure de pointe",
+                  f"{s['peak_hour']} h–{s['peak_hour'] + 1} h" in re.sub(r'[  ]', ' ', meta), meta)
     check("Trois cartes (hier, 7 jours, mois)", len(shown) == 3, f"{len(shown)} cartes")
 
     rows = page.evaluate("""() => [...document.querySelectorAll('#global-arr .arr-row')]
