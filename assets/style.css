@@ -1175,6 +1175,7 @@ button.nav-link.active { background: #fff; }
 .hiver-chart-col { flex: 1; min-width: 0; }
 .hiver-chart-col > div:first-child { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-align: center; }
 .hiver-chart-canvas { position: relative; height: 220px; }
+.hiver-bixi-chart { position: relative; height: 200px; max-width: 560px; margin: 12px auto 0; }
 .net-grid-4 { grid-template-columns: repeat(2, 1fr); }
 @media (min-width: 768px) {
     #global-page { padding: 0 20px 40px; }

@@ -1929,10 +1929,11 @@ function renderHiverBixiChart(seasons) {
                 borderColor: '#B91C1C',
                 borderWidth: 1,
                 borderRadius: 4,
+                maxBarThickness: 64,
             }],
         },
         options: {
-            responsive: true,
+            responsive: true, maintainAspectRatio: false,
             animation: { duration: 500 },
             plugins: {
                 legend: { display: false },
