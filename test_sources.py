@@ -635,6 +635,33 @@ if os.path.exists('bixi.csv'):
 
     hour_local = {}
     live_daily, live_hourly = Counter(), [0] * 24
+    # BIXI par arrondissement : recompté ici, ligne par ligne, avec la colonne
+    # d'arrondissement de BIXI (polygones des districts si elle est vide)
+    import unicodedata
+    import bixi_stats
+    _arr_polys = bixi_stats.load_arrondissement_polygons()
+    _key = lambda t: re.sub(r'[^a-z]', '', unicodedata.normalize('NFKD', t).encode('ascii', 'ignore').decode().lower())
+    _official = {_key(n): n for n in bixi_stats.MTL_BOROUGHS}
+    _where = {}
+
+    def borough_of(raw, lat, lng):
+        k = (raw, lat, lng)
+        if k not in _where:
+            name = _official.get(_key(raw or ''))
+            if name is None and not (raw or '').strip():
+                try:
+                    la, lo = float(lat), float(lng)
+                    name = next((n for n, _, rings in _arr_polys if bixi_stats._in_ring(lo, la, rings[0])
+                                 and not any(bixi_stats._in_ring(lo, la, h) for h in rings[1:])), None)
+                except ValueError:
+                    pass
+            _where[k] = name
+        return _where[k]
+
+    arr_dep, arr_arr, arr_int = Counter(), Counter(), Counter()       # (mois, arrondissement)
+    arr_daily = defaultdict(Counter)                                    # arrondissement → jour → départs
+    arr_hour = defaultdict(lambda: [0] * 24)                            # (mois, arrondissement)
+    arr_st = defaultdict(Counter)                                       # (mois, arrondissement) → station
     nearby = defaultdict(Counter)
     unreadable = 0
     with open('bixi.csv', encoding='utf-8') as f:
@@ -651,6 +678,19 @@ if os.path.exists('bixi.csv'):
             d, h = hour_local[hk]
             live_daily[d] += 1
             live_hourly[h] += 1
+            sb = borough_of(r.get('STARTSTATIONARRONDISSEMENT'), r.get('STARTSTATIONLATITUDE'), r.get('STARTSTATIONLONGITUDE'))
+            eb = borough_of(r.get('ENDSTATIONARRONDISSEMENT'), r.get('ENDSTATIONLATITUDE'), r.get('ENDSTATIONLONGITUDE')) \
+                if (r.get('ENDSTATIONNAME') or '').strip() else None
+            if sb:
+                arr_dep[(d[:7], sb)] += 1
+                arr_daily[sb][d] += 1
+                arr_hour[(d[:7], sb)][h] += 1
+                if (r.get('STARTSTATIONNAME') or '').strip():
+                    arr_st[(d[:7], sb)][r['STARTSTATIONNAME'].strip()] += 1
+                if eb == sb:
+                    arr_int[(d[:7], sb)] += 1
+            if eb:
+                arr_arr[(d[:7], eb)] += 1
             try:
                 ids = near(r['STARTSTATIONLATITUDE'], r['STARTSTATIONLONGITUDE']) | \
                       near(r['ENDSTATIONLATITUDE'], r['ENDSTATIONLONGITUDE'])
@@ -685,7 +725,55 @@ if os.path.exists('bixi.csv'):
           next((f"{i} : {first_diff(SITE['bixiExceedsDays'].get(i, {}), exp_exceeds.get(i, {}))}"
                 for i in sorted(set(SITE['bixiExceedsDays']) | set(exp_exceeds))
                 if SITE['bixiExceedsDays'].get(i) != exp_exceeds.get(i)), "—"))
-summary("Cohérence des années BIXI, année en cours recomptée et trajets près des compteurs", start)
+
+    # Fenêtre de 12 mois : bixi.csv recompté + années passées du cache (auditées par --profond)
+    BA = SITE.get('bixiArr') or {}
+    cache = {y: c for y, c in bixi_stats.load_arr_cache().items() if y != ly}
+    for c in cache.values():
+        for m, bs in c['months'].items():
+            for b_, rec in bs.items():
+                arr_dep[(m, b_)] += rec['dep']
+                arr_arr[(m, b_)] += rec['arr']
+                arr_int[(m, b_)] += rec['int']
+                for dd, n in rec['daily'].items():
+                    arr_daily[b_][f"{m}-{dd}"] += n
+                arr_hour[(m, b_)] = [x + y for x, y in zip(arr_hour[(m, b_)], rec['hourly'])]
+                arr_st[(m, b_)].update(rec['st'])
+    last = max([c.get('lastDate') or '' for c in cache.values()] + [max(live_daily)])
+    check("[BIXI arr.] Dernier jour publié", BA.get('lastDate') == last, f"site={BA.get('lastDate')}, sources={last}")
+    win = []
+    y_, m_ = int(last[:4]), int(last[5:7])
+    for _ in range(12):
+        win.insert(0, f"{y_:04d}-{m_:02d}")
+        y_, m_ = (y_, m_ - 1) if m_ > 1 else (y_ - 1, 12)
+    exp_names = sorted({b_ for (m, b_) in arr_dep if m in win} | {b_ for (m, b_) in arr_arr if m in win})
+    check("[BIXI arr.] Arrondissements publiés", sorted(BA.get('boroughs', {})) == exp_names,
+          f"{sorted(BA.get('boroughs', {}))} ≠ {exp_names}")
+    for b_, got in BA.get('boroughs', {}).items():
+        tag = f"[BIXI arr. {b_}]"
+        exp_monthly = [[m, arr_dep[(m, b_)], arr_arr[(m, b_)]] for m in win]
+        check(f"{tag} départs et arrivées par mois", got['monthly'] == exp_monthly,
+              next((f"{g} ≠ {e}" for g, e in zip(got['monthly'], exp_monthly) if g != e), "longueur"), quiet=True)
+        check(f"{tag} trajets internes", got['int'] == sum(arr_int[(m, b_)] for m in win),
+              f"{got['int']} ≠ {sum(arr_int[(m, b_)] for m in win)}", quiet=True)
+        days = {d: n for d, n in arr_daily[b_].items() if d[:7] in win}
+        check(f"{tag} jours avec départs", got['days'] == len(days), f"{got['days']} ≠ {len(days)}", quiet=True)
+        wk = [n for d, n in days.items() if date.fromisoformat(d).weekday() < 5]
+        we = [n for d, n in days.items() if date.fromisoformat(d).weekday() >= 5]
+        check(f"{tag} semaine / fin de semaine", got['week'] == [sum(wk), len(wk)] and got['weekend'] == [sum(we), len(we)],
+              f"{got['week']} {got['weekend']}", quiet=True)
+        best = max(days.values()) if days else None
+        check(f"{tag} journée record", (got['record'] is None and best is None) or
+              (got['record'][1] == best and days.get(got['record'][0]) == best), f"{got['record']} ≠ {best}", quiet=True)
+        hours = [sum(arr_hour[(m, b_)][i] for m in win) for i in range(24)]
+        check(f"{tag} départs par heure", got['hourly'] == hours, "", quiet=True)
+        st = Counter()
+        for m in win:
+            st.update(arr_st[(m, b_)])
+        top = sorted(st.items(), key=lambda kv: (-kv[1], kv[0]))[:len(got['topStations'])]
+        check(f"{tag} stations de départ", got['stations'] == len(st) and [list(t) for t in top] == got['topStations'],
+              f"{got['stations']} ≠ {len(st)} ou {got['topStations'][:2]} ≠ {top[:2]}", quiet=True)
+summary("Cohérence des années BIXI, année en cours recomptée, trajets près des compteurs et BIXI par arrondissement", start)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 10. Audit profond (--profond) : années passées retéléchargées

@@ -263,11 +263,11 @@ BIXI_ANNEES=2024,2025 python3 test_sources.py --profond   # limite les ZIP BIXI 
 6. Vue globale : totaux d'hier, des 7 derniers jours et du mois, compteurs avec données, top 2, heure de pointe, classement des arrondissements, statut du réseau.
 7. Historique : données publiées = `hist_cache.json` ; mois des années récentes = données recalculées ; aucun mois ni aucune année perdus, et totaux du portail inchangés depuis le dernier commit.
 8. Météo : valeurs plausibles, complètes, identiques à Open-Meteo (revérifiées en ligne).
-9. BIXI : cohérence de chaque année, année en cours **recomptée trajet par trajet** depuis `bixi.csv` (jour de Montréal), trajets à moins de 150 m de chaque compteur.
+9. BIXI : cohérence de chaque année, année en cours **recomptée trajet par trajet** depuis `bixi.csv` (jour de Montréal), trajets à moins de 150 m de chaque compteur ; BIXI par arrondissement recompté depuis `bixi.csv` (départs, arrivées, trajets internes par mois, jours, record, heures, stations) et additionné aux années du cache `bixi_arr_cache.json`.
 10. `--profond` : totaux historiques retéléchargés depuis le portail de la Ville, années BIXI recomptées depuis les ZIP officiels.
 
 Les **avertissements** (non bloquants) signalent des limites de méthode — par exemple une année dont le réseau de compteurs diffère de l'année précédente.
 
 ### `test_site_values.py` — chiffres affichés par la page
 
-Ouvre la page dans Chromium (Playwright) et compare chaque chiffre affiché à sa valeur recalculée en Python depuis `data/site.json`, selon la définition affichée à l'utilisateur : statistiques de chaque compteur sur 7, 30, 90, 180 et 365 jours ; cartes, classement et graphique annuel de la Vue globale ; cartes, liste des compteurs, météo, jours record et moyennes mensuelles de **chaque arrondissement** ; cartes, saisons, BIXI l'hiver et explorateur de **chaque compteur** de l'onglet Vélo d'hiver ; cartes, tableau annuel et détail mensuel de **chaque année** BIXI (réseau et Montréal). Environ 4 700 vérifications.
+Ouvre la page dans Chromium (Playwright) et compare chaque chiffre affiché à sa valeur recalculée en Python depuis `data/site.json`, selon la définition affichée à l'utilisateur : statistiques de chaque compteur sur 7, 30, 90, 180 et 365 jours ; cartes, classement et graphique annuel de la Vue globale ; cartes, liste des compteurs, météo, jours record et moyennes mensuelles de **chaque arrondissement** ; cartes, saisons, BIXI l'hiver et explorateur de **chaque compteur** de l'onglet Vélo d'hiver ; cartes, tableau annuel et détail mensuel de **chaque année** BIXI (réseau et Montréal) ; cartes, chiffres clés, graphiques, destinations et stations de la sous-section BIXI de **chaque arrondissement**. Environ 5 000 vérifications.

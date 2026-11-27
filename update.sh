@@ -60,6 +60,7 @@ git add data/site.json
 # Persister le cache de géocodage Nominatim si de nouveaux compteurs ont été ajoutés
 [ -f velo_meta_cache.json ] && git add velo_meta_cache.json
 [ -f bixi_cache.json ] && git add bixi_cache.json
+[ -f bixi_arr_cache.json ] && git add bixi_arr_cache.json
 git add hist_cache.json
 [ -f version.txt ] && git add version.txt
 

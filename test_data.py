@@ -112,7 +112,7 @@ REQUIRED_KEYS = [
     'version', 'generatedAt', 'windowStart', 'counters', 'HOURLY_DAYS', 'allChartData', 'allDailyData',
     'hourProfile', 'countersByArrondissement', 'counterLocations', 'gappyCounters',
     'anomalyDays', 'vfDataQuality', 'weatherData', 'bixiNearby', 'bixiExceedsDays',
-    'bixiYearly', 'historicalYearlyTotals', 'historicalYearlyCounters',
+    'bixiYearly', 'bixiArr', 'historicalYearlyTotals', 'historicalYearlyCounters',
     'counterHistoricalData', 'globalStats',
 ]
 missing_keys = [k for k in REQUIRED_KEYS if k not in site]
@@ -263,6 +263,43 @@ check("Tous les arrondissements cyclistes.csv sont des optgroups",
       csv_groups.issubset(site_groups),
       f"Manquants dans les données : {csv_groups - site_groups}")
 # Les arrondissements supplémentaires viennent des boucles magnétiques (compteurs.csv) — c'est normal
+
+
+print("\n=== BIXI par arrondissement (12 derniers mois) ===")
+
+import bixi_stats  # noqa: E402
+
+BA = site.get('bixiArr')
+check("BIXI par arrondissement : données présentes", bool(BA and BA.get('boroughs')), "bixiArr vide")
+if BA and BA.get('boroughs'):
+    months = [r[0] for r in next(iter(BA['boroughs'].values()))['monthly']]
+    check("BIXI arr. : fenêtre de 12 mois consécutifs se terminant au mois du dernier trajet",
+          len(months) == 12 and months[0] == BA['start'] and months[-1] == BA['end'] == BA['lastDate'][:7]
+          and all(bixi_stats._shift_month(months[0], k) == m for k, m in enumerate(months)), f"{months}")
+    check("BIXI arr. : noms officiels des arrondissements", set(BA['boroughs']) <= set(bixi_stats.MTL_BOROUGHS),
+          set(BA['boroughs']) - set(bixi_stats.MTL_BOROUGHS))
+    for name, b in BA['boroughs'].items():
+        tag = f"[BIXI {name}]"
+        check(f"{tag} mois identiques partout", [r[0] for r in b['monthly']] == months)
+        check(f"{tag} départs = somme des mois", b['dep'] == sum(r[1] for r in b['monthly']),
+              f"{b['dep']} ≠ {sum(r[1] for r in b['monthly'])}")
+        check(f"{tag} arrivées = somme des mois", b['arr'] == sum(r[2] for r in b['monthly']),
+              f"{b['arr']} ≠ {sum(r[2] for r in b['monthly'])}")
+        check(f"{tag} départs = somme des heures", b['dep'] == sum(b['hourly']), f"{b['dep']} ≠ {sum(b['hourly'])}")
+        check(f"{tag} semaine + fin de semaine = départs et jours",
+              b['week'][0] + b['weekend'][0] == b['dep'] and b['week'][1] + b['weekend'][1] == b['days'],
+              f"{b['week']} + {b['weekend']} ≠ {b['dep']}, {b['days']} j")
+        check(f"{tag} trajets internes + destinations principales ≤ départs",
+              b['int'] + sum(n for _, n in b['topDest']) <= b['dep'], "")
+        check(f"{tag} destinations hors de l'arrondissement lui-même", all(k != name for k, _ in b['topDest']), b['topDest'])
+        for key in ('topStations', 'topDest'):
+            vals = [n for _, n in b[key]]
+            check(f"{tag} {key} triées", vals == sorted(vals, reverse=True), vals)
+        check(f"{tag} stations les plus populaires ≤ départs", sum(n for _, n in b['topStations']) <= b['dep'], "")
+        if b['record']:
+            check(f"{tag} journée record dans la fenêtre", BA['start'] <= b['record'][0][:7] <= BA['end'], b['record'])
+        if 'prevDep' in b:
+            check(f"{tag} 12 mois précédents seulement si couverts", BA['prevCovered'], "")
 
 # ─── Résumé ──────────────────────────────────────────────────────────────────
 

@@ -2166,7 +2166,118 @@ function arrDaysTable(s, list, avg) {
         }).join("") + "</tbody></table>";
 }
 
+// ── Sous-section BIXI (12 derniers mois publiés par BIXI) ──
+const arrMonthLabel = m => new Date(m + "-15T12:00:00").toLocaleDateString("fr-CA", { month: "long", year: "numeric" });
+function arrBixiPctHtml(p, suffix) {
+    if (p == null || !isFinite(p)) return "";
+    return "<span>" + bixiPctHtml(p) + " " + suffix + "</span>";
+}
+
+function renderArrBixi(arr) {
+    const section = document.getElementById("arr-bixi");
+    const all = SITE_DATA.bixiArr;
+    const b = all && all.boroughs ? all.boroughs[arr] : null;
+    ["__arr_bixi_monthly__", "__arr_bixi_hour__"].forEach(k => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+    if (!b) { section.hidden = true; return; }
+    section.hidden = false;
+    const pct = (a, t) => t ? (a / t * 100).toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " %" : "—";
+    document.getElementById("arr-bixi-period").textContent =
+        "De " + arrMonthLabel(all.start) + " à " + arrMonthLabel(all.end) + " (12 derniers mois publiés, jusqu’au " + bixiFmtDate(all.lastDate) + ")";
+
+    // Rang et part de Montréal : sur les 19 arrondissements, y compris ceux sans compteur
+    const deps = Object.values(all.boroughs).map(x => x.dep);
+    const mtlDep = deps.reduce((a, n) => a + n, 0);
+    const rank = deps.filter(n => n > b.dep).length + 1;
+    const avg = b.days ? b.dep / b.days : 0;
+    const prevMeta = b.prevDep != null
+        ? arrBixiPctHtml(bixiPct(b.dep, b.prevDep), "vs les 12 mois précédents")
+        : "";
+    const cards = [
+        { title: "Trajets partis d’ici", date: "12 derniers mois publiés", total: bixiFmt(b.dep), sub: "trajets",
+          meta: (prevMeta || "") + "<span>" + rank + "<sup>e</sup> arrondissement sur " + deps.length + " · " + pct(b.dep, mtlDep) + " des départs de Montréal</span>" },
+        { title: "Trajets arrivés ici", date: "D’où qu’ils partent", total: bixiFmt(b.arr), sub: "trajets",
+          meta: "<span>Dont <strong>" + bixiFmt(b.int) + "</strong> sans quitter l’arrondissement (" + pct(b.int, b.dep) + " des départs)</span>" },
+        { title: "Moyenne par jour", date: "Jours avec au moins un départ (" + b.days + " j)", total: bixiFmt(avg), sub: "départs / jour",
+          meta: "<span>Semaine : <strong>" + bixiFmt(b.week[1] ? b.week[0] / b.week[1] : 0) + "</strong> · Fin de semaine : <strong>" +
+                bixiFmt(b.weekend[1] ? b.weekend[0] / b.weekend[1] : 0) + "</strong></span>" },
+        { title: "Journée record", date: b.record ? arrFmtDay(b.record[0]) : "—", total: b.record ? bixiFmt(b.record[1]) : "—", sub: "départs",
+          // Météo seulement si le jour est dans la fenêtre météo du site (12 derniers mois de compteurs)
+          meta: b.record && typeof weatherData !== "undefined" && weatherData[b.record[0]] ? "<span>" + arrWeatherHtml(b.record[0]) + "</span>" : "" },
+    ];
+    document.getElementById("arr-bixi-cards").innerHTML = cards.map(c =>
+        "<div class=\"global-card\">" +
+            "<div class=\"global-card-title\">" + c.title + "</div>" +
+            "<div class=\"global-card-date\">" + c.date + "</div>" +
+            "<div class=\"global-card-total\">" + c.total + "</div>" +
+            "<div class=\"global-card-sub\">" + c.sub + "</div>" +
+            (c.meta ? "<div class=\"global-card-meta\">" + c.meta + "</div>" : "") +
+        "</div>"
+    ).join("");
+
+    const peak = b.hourly.indexOf(Math.max(...b.hourly));
+    const grid = [
+        { val: bixiFmt(b.stations), label: "Stations de départ" },
+        { val: b.avgDurationMin != null ? b.avgDurationMin.toLocaleString("fr-CA", { maximumFractionDigits: 1 }) + " min" : "—", label: "Durée moyenne" },
+        { val: pct(b.int, b.dep), label: "Trajets internes" },
+        { val: peak + " h", label: "Heure la plus achalandée" },
+    ];
+    document.getElementById("arr-bixi-grid").innerHTML = grid.map(g =>
+        "<div><div class=\"net-val\" style=\"font-size:26px\">" + g.val + "</div><div class=\"net-label\">" + g.label + "</div></div>").join("");
+
+    const axis = { grid: { color: "rgba(0,0,0,0.04)" }, border: { display: false }, beginAtZero: true, ticks: { color: "#777", callback: bixiShort } };
+    const xAxis = { grid: { display: false }, border: { display: false }, ticks: { color: "#777", font: { size: 11 } } };
+    charts["__arr_bixi_monthly__"] = new Chart(document.getElementById("arr-bixi-monthly-chart"), {
+        type: "bar",
+        data: {
+            labels: b.monthly.map(([m]) => new Date(m + "-15T12:00:00").toLocaleDateString("fr-CA", { month: "short", year: "2-digit" })),
+            datasets: [
+                { label: "Départs", data: b.monthly.map(r => r[1]), backgroundColor: "rgba(225,37,27,0.80)", borderRadius: 4 },
+                { label: "Arrivées", data: b.monthly.map(r => r[2]), backgroundColor: "rgba(225,37,27,0.30)", borderRadius: 4 },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+            plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { ...BIXI_TOOLTIP, callbacks: {
+                    title: items => arrMonthLabel(b.monthly[items[0].dataIndex][0]),
+                    label: item => " " + item.dataset.label + " : " + bixiFmt(item.raw) + " trajets",
+                } } },
+            scales: { x: xAxis, y: axis },
+        },
+    });
+    charts["__arr_bixi_hour__"] = new Chart(document.getElementById("arr-bixi-hour-chart"), {
+        type: "bar",
+        data: { labels: [...Array(24).keys()].map(h => h + " h"),
+                datasets: [{ data: b.hourly, backgroundColor: "rgba(225,37,27,0.75)", borderRadius: 3 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+            plugins: { legend: { display: false }, tooltip: { ...BIXI_TOOLTIP, callbacks: {
+                title: items => "De " + items[0].dataIndex + " h à " + (items[0].dataIndex + 1) + " h",
+                label: item => " " + bixiFmt(item.raw) + " départs (12 mois)",
+            } } },
+            scales: { x: xAxis, y: axis },
+        },
+    });
+
+    // Destinations : l'arrondissement lui-même, les principaux autres, puis le reste
+    const others = b.dep - b.int - b.topDest.reduce((a, [, n]) => a + n, 0);
+    const dest = [["Sans quitter l’arrondissement", b.int], ...b.topDest];
+    if (others > 0) dest.push(["Autres destinations", others]);
+    const rowsHtml = (list, total) => {
+        const max = Math.max(...list.map(([, n]) => n), 1);
+        return list.map(([name, n]) =>
+            "<div class=\"arr-row\"><span class=\"arr-name\" title=\"" + name.replace(/"/g, "&quot;") + "\">" + name + "</span>" +
+            "<div class=\"arr-bar-wrap\"><div class=\"arr-bar\" style=\"width:" + (n / max * 100).toFixed(1) + "%\"></div></div>" +
+            "<span class=\"arr-vol\">" + (total ? pct(n, total) : bixiFmt(n)) + "</span></div>").join("");
+    };
+    document.getElementById("arr-bixi-dest").innerHTML = rowsHtml(dest, b.dep) +
+        "<p class=\"arr-note\">Part des " + bixiFmt(b.dep) + " trajets partis de l’arrondissement, selon l’arrondissement (ou la ville) de la station d’arrivée.</p>";
+    document.getElementById("arr-bixi-stations").innerHTML = rowsHtml(b.topStations) +
+        "<p class=\"arr-note\">Départs sur 12 mois. " + bixiFmt(b.stations) + " stations ont eu au moins un départ.</p>";
+}
+
 function renderArrondissement(arr) {
+    renderArrBixi(arr);
     const s = arrStats(arr);
     // Jours comparables si possible ; sinon tous les jours avec des passages
     const strict = s.complete.length >= 14;

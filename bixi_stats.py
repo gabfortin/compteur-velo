@@ -381,5 +381,293 @@ def update_cache(path=BIXI_CACHE_FILE):
             json.dump(dict(sorted(cache.items())), f, ensure_ascii=False, separators=(',', ':'))
 
 
+
+
+# ── Trajets par arrondissement, mois par mois (page Arrondissements) ─────────
+# Chaque station est rattachée à l'arrondissement que BIXI lui donne
+# (colonnes STARTSTATIONARRONDISSEMENT / ENDSTATIONARRONDISSEMENT, format
+# 2022+), ramené au nom officiel de la Ville en ignorant accents et tirets
+# (« Rosemont - La Petite-Patrie » → « Rosemont–La Petite-Patrie »). Colonne
+# vide : polygones des districts électoraux, comme pour les compteurs. Hors des
+# 19 arrondissements (Westmount, Longueuil…), le nom de BIXI est gardé tel quel.
+#
+# Les années passées sont résumées une fois dans ARR_CACHE_FILE (années
+# courante − 2 et − 1, assez pour 12 mois glissants et les 12 mois d'avant) ;
+# l'année en cours vient de bixi.csv, dans genMap.py. Les mois de plusieurs
+# fichiers s'additionnent : un trajet n'est publié que dans un seul fichier.
+ARR_CACHE_FILE = 'bixi_arr_cache.json'
+ARR_TOP_STATIONS = 10
+ARR_TOP_DEST = 6
+ARR_UNKNOWN = 'Non précisé'
+_BOROUGH_BY_NORM = {_norm(b): b for b in MTL_BOROUGHS}
+
+
+def load_arrondissement_polygons():
+    """[(arrondissement, bbox, anneaux)] des districts électoraux, ou []."""
+    if not os.path.exists(LOCAL_DISTRICTS_FILE):
+        return []
+    with open(LOCAL_DISTRICTS_FILE, encoding='utf-8') as f:
+        geo = json.load(f)
+    out = []
+    for feat in geo.get('features', []):
+        geom = feat.get('geometry') or {}
+        polys = geom.get('coordinates', [])
+        if geom.get('type') == 'Polygon':
+            polys = [polys]
+        for rings in polys:
+            xs = [p[0] for p in rings[0]]
+            ys = [p[1] for p in rings[0]]
+            out.append((feat['properties']['NOM_ARR'], (min(xs), min(ys), max(xs), max(ys)), rings))
+    return out
+
+
+def _new_arr_rec():
+    return {'dep': 0, 'arr': 0, 'int': 0, 'daily': {}, 'hourly': [0] * 24,
+            'dur': [0, 0], 'dest': {}, 'st': {}}
+
+
+class BixiArrAggregator:
+    """Trajets partis de / arrivés dans chaque arrondissement, par mois."""
+
+    def __init__(self, polygons=None):
+        self.months = {}                  # 'AAAA-MM' -> {arrondissement: rec}
+        self.polygons = polygons or []
+        self._where = {}                  # (station, arrondissement BIXI) -> (nom, dans Montréal ?)
+        self._hour_cache = {}
+        self.last_date = None
+
+    def _local(self, ms):
+        key = ms // 3600000
+        hit = self._hour_cache.get(key)
+        if hit is None:
+            dt = datetime.fromtimestamp(key * 3600, tz=timezone.utc).astimezone(MTL_TZ)
+            hit = (dt.strftime('%Y-%m-%d'), dt.hour)
+            self._hour_cache[key] = hit
+        return hit
+
+    def _borough(self, station, raw, lat, lon):
+        key = (station, raw)
+        hit = self._where.get(key)
+        if hit is None:
+            raw = (raw or '').strip()
+            name = _BOROUGH_BY_NORM.get(_norm(raw)) if raw else None
+            if name is None and not raw and self.polygons:
+                try:
+                    la, lo = float(lat), float(lon)
+                    for nom, (x0, y0, x1, y1), rings in self.polygons:
+                        if x0 <= lo <= x1 and y0 <= la <= y1 and _in_ring(lo, la, rings[0]) \
+                                and not any(_in_ring(lo, la, h) for h in rings[1:]):
+                            name = nom
+                            break
+                except (TypeError, ValueError):
+                    pass
+            hit = (name, True) if name else (raw or ARR_UNKNOWN, False)
+            self._where[key] = hit
+        return hit
+
+    def _rec(self, month, borough):
+        m = self.months.setdefault(month, {})
+        rec = m.get(borough)
+        if rec is None:
+            rec = m[borough] = _new_arr_rec()
+        return rec
+
+    def add_row(self, row):
+        try:
+            start_ms = int(float(row['STARTTIMEMS']))
+        except (KeyError, ValueError, TypeError):
+            return
+        date, hour = self._local(start_ms)
+        try:
+            duration = (int(float(row['ENDTIMEMS'])) - start_ms) / 1000
+        except (KeyError, ValueError, TypeError):
+            duration = None
+        start = (row.get('STARTSTATIONNAME') or '').strip()
+        end = (row.get('ENDSTATIONNAME') or '').strip()
+        sb, s_in = self._borough(start, row.get('STARTSTATIONARRONDISSEMENT'),
+                                 row.get('STARTSTATIONLATITUDE'), row.get('STARTSTATIONLONGITUDE'))
+        eb, e_in = self._borough(end, row.get('ENDSTATIONARRONDISSEMENT'),
+                                 row.get('ENDSTATIONLATITUDE'), row.get('ENDSTATIONLONGITUDE'))
+        if not end:
+            eb, e_in = ARR_UNKNOWN, False
+        month = date[:7]
+        if self.last_date is None or date > self.last_date:
+            self.last_date = date
+        if s_in:
+            rec = self._rec(month, sb)
+            rec['dep'] += 1
+            day = date[8:]
+            rec['daily'][day] = rec['daily'].get(day, 0) + 1
+            rec['hourly'][hour] += 1
+            if duration is not None and MIN_DURATION_S <= duration <= MAX_DURATION_S:
+                rec['dur'][0] += int(duration)
+                rec['dur'][1] += 1
+            rec['dest'][eb] = rec['dest'].get(eb, 0) + 1
+            if start:
+                rec['st'][start] = rec['st'].get(start, 0) + 1
+            if e_in and eb == sb:
+                rec['int'] += 1
+        if e_in:
+            self._rec(month, eb)['arr'] += 1
+
+
+def _add_arr_rec(tgt, rec):
+    for k in ('dep', 'arr', 'int'):
+        tgt[k] += rec[k]
+    for i in range(24):
+        tgt['hourly'][i] += rec['hourly'][i]
+    tgt['dur'][0] += rec['dur'][0]
+    tgt['dur'][1] += rec['dur'][1]
+    for k in ('daily', 'dest', 'st'):
+        for key, n in rec[k].items():
+            tgt[k][key] = tgt[k].get(key, 0) + n
+
+
+def merge_arr_months(*sources):
+    """Additionne les mois de plusieurs fichiers ({mois: {arrondissement: rec}})."""
+    out = {}
+    for months in sources:
+        for month, boroughs in months.items():
+            for b, rec in boroughs.items():
+                _add_arr_rec(out.setdefault(month, {}).setdefault(b, _new_arr_rec()), rec)
+    return out
+
+
+def _shift_month(month, k):
+    y, m = int(month[:4]), int(month[5:7]) - 1 + k
+    return f"{y + m // 12:04d}-{m % 12 + 1:02d}"
+
+
+def arr_window(months, last_date, years_available):
+    """Résumé des 12 derniers mois disponibles, par arrondissement.
+
+    `months` : mois fusionnés ; `last_date` : dernier jour avec des trajets ;
+    `years_available` : années dont un fichier BIXI a été lu (pour savoir si
+    les 12 mois précédents sont couverts).
+    """
+    if not last_date:
+        return None
+    end = last_date[:7]
+    window = [_shift_month(end, k) for k in range(-11, 1)]
+    prev = [_shift_month(end, k) for k in range(-23, -11)]
+    prev_ok = all(int(m[:4]) in years_available for m in prev)
+    boroughs = {}
+    for b in MTL_BOROUGHS:
+        tot = _new_arr_rec()
+        daily = {}
+        for m in window:
+            rec = months.get(m, {}).get(b)
+            if not rec:
+                continue
+            _add_arr_rec(tot, rec)
+            for dd, n in rec['daily'].items():
+                daily[f"{m}-{dd}"] = n
+        if not tot['dep'] and not tot['arr']:
+            continue
+        week = [n for d, n in daily.items() if datetime.strptime(d, '%Y-%m-%d').weekday() < 5]
+        weekend = [n for d, n in daily.items() if datetime.strptime(d, '%Y-%m-%d').weekday() >= 5]
+        record = max(sorted(daily.items()), key=lambda kv: kv[1]) if daily else None
+        dest = sorted(((k, n) for k, n in tot['dest'].items() if k != b), key=lambda kv: (-kv[1], kv[0]))
+        top = sorted(tot['st'].items(), key=lambda kv: (-kv[1], kv[0]))
+        out = {
+            'dep': tot['dep'], 'arr': tot['arr'], 'int': tot['int'],
+            'days': len(daily),
+            'week': [sum(week), len(week)], 'weekend': [sum(weekend), len(weekend)],
+            'record': list(record) if record else None,
+            'hourly': tot['hourly'],
+            'avgDurationMin': round(tot['dur'][0] / tot['dur'][1] / 60, 1) if tot['dur'][1] else None,
+            'monthly': [[m, months.get(m, {}).get(b, {}).get('dep', 0), months.get(m, {}).get(b, {}).get('arr', 0)]
+                        for m in window],
+            'stations': len(tot['st']),
+            'topStations': [[k, n] for k, n in top[:ARR_TOP_STATIONS]],
+            'topDest': [[k, n] for k, n in dest[:ARR_TOP_DEST]],
+        }
+        if prev_ok:
+            out['prevDep'] = sum(months.get(m, {}).get(b, {}).get('dep', 0) for m in prev)
+        boroughs[b] = out
+    return {'start': window[0], 'end': end, 'lastDate': last_date, 'prevStart': prev[0],
+            'prevCovered': prev_ok, 'boroughs': boroughs}
+
+
+def load_arr_cache(path=ARR_CACHE_FILE):
+    if os.path.exists(path):
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+
+def aggregate_zip_arr(path, polygons=None):
+    agg = BixiArrAggregator(polygons)
+    with zipfile.ZipFile(path) as zf:
+        for z, name in _iter_csv_members(zf):
+            with z.open(name) as f:
+                header = io.TextIOWrapper(f, encoding='utf-8-sig', errors='replace').readline().lower()
+            if 'starttimems' not in header:
+                continue
+            print(f"  {name}", flush=True)
+            with z.open(name) as f:
+                for row in csv.DictReader(io.TextIOWrapper(f, encoding='utf-8-sig', errors='replace')):
+                    agg.add_row(row)
+    return agg
+
+
+def update_arr_cache(path=ARR_CACHE_FILE):
+    """Résume par arrondissement les deux années précédentes.
+
+    Une année est refaite si le ZIP publié par BIXI a changé de nom (ex. ZIP
+    partiel remplacé par l'année complète) ; les années trop anciennes sont
+    retirées.
+    """
+    cache = load_arr_cache(path)
+    current_year = datetime.now(MTL_TZ).year
+    needed = [current_year - 2, current_year - 1]
+    try:
+        urls = find_zip_urls()
+    except Exception as e:
+        print(f"BIXI arrondissements : page inaccessible ({e}) — cache inchangé.")
+        return
+    polygons = load_arrondissement_polygons()
+    changed = False
+    for y in list(cache):
+        if int(y) not in needed:
+            del cache[y]
+            changed = True
+    for year in needed:
+        url = urls.get(year)
+        if not url:
+            print(f"BIXI arrondissements {year} : aucun ZIP trouvé sur la page.")
+            continue
+        fname = url.rsplit('/', 1)[-1]
+        if cache.get(str(year), {}).get('source') == fname:
+            print(f"BIXI arrondissements {year} : à jour ({fname}).")
+            continue
+        print(f"BIXI arrondissements {year} : téléchargement de {url}", flush=True)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
+                tmp_path = tmp.name
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=120) as resp, open(tmp_path, 'wb') as out:
+                while chunk := resp.read(1 << 20):
+                    out.write(chunk)
+            agg = aggregate_zip_arr(tmp_path, polygons)
+        except Exception as e:
+            print(f"BIXI arrondissements {year} : échec ({e})")
+            continue
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        if not agg.months:
+            print(f"BIXI arrondissements {year} : aucun trajet reconnu (format 2022+ attendu).")
+            continue
+        cache[str(year)] = {'source': fname, 'lastDate': agg.last_date, 'months': agg.months}
+        changed = True
+        print(f"BIXI arrondissements {year} : {len(agg.months)} mois, jusqu'au {agg.last_date}.")
+    if changed:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(dict(sorted(cache.items())), f, ensure_ascii=False, separators=(',', ':'))
+
+
 if __name__ == '__main__':
     update_cache(sys.argv[1] if len(sys.argv) > 1 else BIXI_CACHE_FILE)
+    update_arr_cache()

@@ -7,10 +7,10 @@
     <script data-goatcounter="https://gabfortin.goatcounter.com/count"
             async src="//gc.zgo.at/count.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.8.6"/>
-    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.8.6"/>
-    <script src="assets/vendor/carte/maplibre-gl.js?v=2.8.6"></script>
-    <script src="assets/vendor/carte/carte.js?v=2.8.6"></script>
+    <link rel="stylesheet" href="assets/vendor/carte/maplibre-gl.css?v=2.9.0"/>
+    <link rel="stylesheet" href="assets/vendor/carte/carte.css?v=2.9.0"/>
+    <script src="assets/vendor/carte/maplibre-gl.js?v=2.9.0"></script>
+    <script src="assets/vendor/carte/carte.js?v=2.9.0"></script>
     <title>Compteurs Vélo Montréal</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/png" href="favico.png">
@@ -42,13 +42,13 @@
      "description": "Passages de cyclistes à Montréal, compteur par compteur, à partir des données ouvertes de la Ville.",
      "author": {"@type": "Person", "name": "Gabriel Fortin", "url": "https://gabfortin.com"}}
     </script>
-    <link rel="stylesheet" href="fonts/polices.css?v=2.8.6">
-    <link rel="stylesheet" href="fonts/plex-sans.css?v=2.8.6">
-    <link rel="stylesheet" href="assets/chargement.css?v=2.8.6">
-    <link rel="stylesheet" href="assets/chargement-velo.css?v=2.8.6">
-    <link rel="stylesheet" href="assets/style.css?v=2.8.6">
-    <link rel="stylesheet" href="assets/sobriete.css?v=2.8.6" />
-    <script src="assets/vendor/chartjs/chart.umd.min.js?v=2.8.6"></script>
+    <link rel="stylesheet" href="fonts/polices.css?v=2.9.0">
+    <link rel="stylesheet" href="fonts/plex-sans.css?v=2.9.0">
+    <link rel="stylesheet" href="assets/chargement.css?v=2.9.0">
+    <link rel="stylesheet" href="assets/chargement-velo.css?v=2.9.0">
+    <link rel="stylesheet" href="assets/style.css?v=2.9.0">
+    <link rel="stylesheet" href="assets/sobriete.css?v=2.9.0" />
+    <script src="assets/vendor/chartjs/chart.umd.min.js?v=2.9.0"></script>
     <script>
         // Thème sombre : couleurs par défaut des graphiques (texte, grilles), mises à jour si le mode change
         (function() {
@@ -139,7 +139,7 @@
                     <path d="M12 11v6.2" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
                 </svg>
             </button>
-            <script src="assets/don.js?v=2.8.6"></script>
+            <script src="assets/don.js?v=2.9.0"></script>
             <a href="https://www.instagram.com/gabrielfortin.mtl" id="topbar-instagram" title="@gabrielfortin.mtl" target="_blank" rel="noopener">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -153,7 +153,7 @@
             </a>
         </div>
     </nav>
-    <script src="assets/titre-barre.js?v=2.8.6" data-barre="#topbar" data-titre="#main-header h1"></script>
+    <script src="assets/titre-barre.js?v=2.9.0" data-barre="#topbar" data-titre="#main-header h1"></script>
     <script>
         // « Plus » regroupe Vue Globale, Arrondissements et BIXI (mobile)
         const moreBtn = document.getElementById('nav-more');
@@ -583,6 +583,37 @@
         </div>
       </div>
       <p class="arr-note" id="arr-days-note" style="text-align:center;"></p>
+
+      <section id="arr-bixi" aria-labelledby="arr-bixi-title">
+        <div class="arr-subhead">
+          <h2 id="arr-bixi-title">BIXI sur le territoire</h2>
+          <p id="arr-bixi-period"></p>
+        </div>
+        <div id="arr-bixi-cards"></div>
+        <div class="global-section">
+          <div id="arr-bixi-grid" class="net-grid net-grid-4"></div>
+        </div>
+        <div class="global-section">
+          <div class="global-section-title">Trajets par mois</div>
+          <div class="arr-chart"><canvas id="arr-bixi-monthly-chart"></canvas></div>
+          <p class="arr-note">Trajets partis d’une station de l’arrondissement et trajets qui s’y terminent, selon le mois du départ. L’hiver, seule une partie des stations reste ouverte.</p>
+        </div>
+        <div class="arr-days-grid">
+          <div class="global-section">
+            <div class="global-section-title">Heure de départ</div>
+            <div class="arr-chart"><canvas id="arr-bixi-hour-chart"></canvas></div>
+          </div>
+          <div class="global-section">
+            <div class="global-section-title">Où vont les trajets partis d’ici</div>
+            <div id="arr-bixi-dest"></div>
+          </div>
+        </div>
+        <div class="global-section">
+          <div class="global-section-title">Stations de départ les plus populaires</div>
+          <div id="arr-bixi-stations"></div>
+        </div>
+        <p class="arr-note" style="text-align:center;">Source : <a href="https://bixi.com/en/open-data/" target="_blank" rel="noopener">données ouvertes de BIXI</a>, publiées avec un délai de quelques mois. Chaque station est rattachée à l’arrondissement que lui donne BIXI. Durée moyenne : trajets de 1 min à 4 h. Stations comptées par leur nom (une station renommée compte deux fois).</p>
+      </section>
     </div>
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
@@ -655,7 +686,7 @@
         <ul>
           <li><strong>Compteurs</strong> : un graphique par compteur, avec filtres de période, vue temporelle ou journalière, statistiques et carte.</li>
           <li><strong>Vue Globale</strong> : passages agrégés de tous les compteurs actifs.</li>
-          <li><strong>Arrondissements</strong> : statistiques, carte et compteurs de chaque arrondissement, effet de la météo, jours les plus et les moins achalandés.</li>
+          <li><strong>Arrondissements</strong> : statistiques, carte et compteurs de chaque arrondissement, effet de la météo, jours les plus et les moins achalandés, et l’usage de BIXI sur le territoire pendant les 12 derniers mois publiés.</li>
           <li><strong>Vélo d'hiver</strong> : de décembre à mars, le vélo ne s'arrête pas pour l'hiver.</li>
           <li><strong>BIXI</strong> : la croissance du vélopartage, année après année.</li>
         </ul>
@@ -670,7 +701,7 @@
         <p>Initiative indépendante : ni produite ni approuvée par la Ville de Montréal ni par BIXI.</p>
         <p>Développé par <a href="https://gabfortin.com" target="_blank" rel="noopener">Gabriel Fortin</a> · <a href="confidentialite.html">Confidentialité</a> · v<span id="app-version"></span></p>
     </footer>
-    <script src="assets/apropos.js?v=2.8.6"></script>
-    <script src="assets/boot.js?v=2.8.6"></script>
+    <script src="assets/apropos.js?v=2.9.0"></script>
+    <script src="assets/boot.js?v=2.9.0"></script>
 </body>
 </html>

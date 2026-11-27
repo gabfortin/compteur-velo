@@ -494,8 +494,67 @@ def test_arr_page(page):
         note = page.inner_text('#arr-days-note')
         if s['strict']:
             check(f"{tag} Note : nombre de jours comparables", f"Classement sur {len(s['days'])} jours" in note, note)
+        test_arr_bixi(page, arr)
     section(f"Cartes, liste des compteurs, météo, jours record et moyennes mensuelles — {len(names)} arrondissements",
             before)
+
+
+def test_arr_bixi(page, arr):
+    """Sous-section BIXI de la page Arrondissements : chaque chiffre affiché."""
+    BA = SITE.get('bixiArr') or {}
+    b = BA.get('boroughs', {}).get(arr)
+    tag = f"[{arr} BIXI]"
+    hidden = page.evaluate("() => document.getElementById('arr-bixi').hidden")
+    if not b:
+        check(f"{tag} Sous-section masquée faute de données", hidden)
+        return
+    check(f"{tag} Sous-section affichée", not hidden)
+    bc = cards(page, '#arr-bixi-cards')
+    deps = [x['dep'] for x in BA['boroughs'].values()]
+    check(f"{tag} Trajets partis", num(bc[0]['total']) == b['dep'], f"{bc[0]['total']} ≠ {b['dep']}")
+    rank = sum(1 for n in deps if n > b['dep']) + 1
+    meta = nums(bc[0]['meta'])
+    if 'prevDep' in b:
+        p = (b['dep'] - b['prevDep']) / b['prevDep'] * 100
+        check(f"{tag} Variation vs 12 mois précédents", close(abs(meta[0]), abs(p), 0.051), f"{bc[0]['meta']} ≠ {p:.1f} %")
+        meta = meta[2:]                    # « ▲ +x % vs les 12 mois précédents »
+    check(f"{tag} Rang parmi les arrondissements", meta[:2] == [rank, len(deps)], f"{bc[0]['meta']} ≠ {rank}/{len(deps)}")
+    share = b['dep'] / sum(deps) * 100
+    check(f"{tag} Part des départs de Montréal", close(meta[2], share, 0.051), f"{bc[0]['meta']} ≠ {share:.1f} %")
+    check(f"{tag} Trajets arrivés", num(bc[1]['total']) == b['arr'], f"{bc[1]['total']} ≠ {b['arr']}")
+    check(f"{tag} Trajets internes", num(bc[1]['meta']) == b['int'], f"{bc[1]['meta']} ≠ {b['int']}")
+    check(f"{tag} Moyenne par jour", num(bc[2]['total']) == jround(b['dep'] / b['days']) and num(bc[2]['date']) == b['days'],
+          f"{bc[2]['total']} ({bc[2]['date']}) ≠ {b['dep'] / b['days']} ({b['days']} j)")
+    exp = [jround(b['week'][0] / b['week'][1]) if b['week'][1] else 0,
+           jround(b['weekend'][0] / b['weekend'][1]) if b['weekend'][1] else 0]
+    check(f"{tag} Semaine / fin de semaine", nums(bc[2]['meta'])[:2] == exp, f"{bc[2]['meta']} ≠ {exp}")
+    if b['record']:
+        check(f"{tag} Journée record", num(bc[3]['total']) == b['record'][1]
+              and bc[3]['date'] == page.evaluate("d => arrFmtDay(d)", b['record'][0]), f"{bc[3]} ≠ {b['record']}")
+    grid = page.evaluate("() => [...document.querySelectorAll('#arr-bixi-grid .net-val')].map(e => e.innerText)")
+    check(f"{tag} Stations de départ", num(grid[0]) == b['stations'], f"{grid[0]} ≠ {b['stations']}")
+    if b['avgDurationMin'] is not None:
+        check(f"{tag} Durée moyenne", close(num(grid[1]), b['avgDurationMin'], 1e-9), f"{grid[1]} ≠ {b['avgDurationMin']}")
+    check(f"{tag} Part des trajets internes", close(num(grid[2]), b['int'] / b['dep'] * 100, 0.051), grid[2])
+    check(f"{tag} Heure la plus achalandée", num(grid[3]) == b['hourly'].index(max(b['hourly'])), grid[3])
+    monthly = chart_data(page, '__arr_bixi_monthly__')
+    arrivals = chart_data(page, '__arr_bixi_monthly__', 1)
+    check(f"{tag} Graphique mensuel (départs, arrivées)",
+          monthly and monthly['data'] == [r[1] for r in b['monthly']] and arrivals['data'] == [r[2] for r in b['monthly']],
+          f"{monthly and monthly['data']}")
+    hourly = chart_data(page, '__arr_bixi_hour__')
+    check(f"{tag} Graphique des heures de départ", hourly and hourly['data'] == b['hourly'], "")
+    rows = page.evaluate("""() => [...document.querySelectorAll('#arr-bixi-stations .arr-row')]
+        .map(r => [r.querySelector('.arr-name').innerText, r.querySelector('.arr-vol').innerText])""")
+    ws = lambda t: ' '.join(t.split())     # le navigateur réduit les espaces multiples des noms BIXI
+    check(f"{tag} Stations les plus populaires",
+          [[ws(n), num(v)] for n, v in rows] == [[ws(n), v] for n, v in b['topStations']],
+          f"{rows[:2]} ≠ {b['topStations'][:2]}")
+    dest = page.evaluate("""() => [...document.querySelectorAll('#arr-bixi-dest .arr-row .arr-vol')].map(e => e.innerText)""")
+    others = b['dep'] - b['int'] - sum(n for _, n in b['topDest'])
+    exp_d = [b['int']] + [n for _, n in b['topDest']] + ([others] if others > 0 else [])
+    check(f"{tag} Destinations (parts)", len(dest) == len(exp_d) and
+          all(close(num(g), n / b['dep'] * 100, 0.051) for g, n in zip(dest, exp_d)), f"{dest} ≠ {exp_d}")
 
 
 def test_hiver_page(page, today):

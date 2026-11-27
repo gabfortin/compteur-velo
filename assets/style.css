@@ -1203,7 +1203,18 @@ button.nav-link.active { background: #fff; }
 .arr-days-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .arr-weather { color: var(--muted); font-size: 12px; }
 .arr-note { font-size: 11px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+/* Sous-section BIXI de la page Arrondissements (accent rouge de l'onglet BIXI) */
+.arr-subhead { margin: 36px 0 16px; padding-top: 24px; border-top: 1px solid var(--hairline); text-align: center; }
+.arr-subhead h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #B91C1C; }
+.arr-subhead p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+#arr-bixi-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 20px; }
+#arr-bixi .arr-bar { background: linear-gradient(to right, #FCA5A5, #E1251B); }
+@media (min-width: 768px) {
+    #arr-bixi-cards { grid-template-columns: repeat(4, 1fr); }
+}
 @media (max-width: 767px) {
+    #arr-bixi .arr-row { flex-wrap: wrap; row-gap: 4px; }
+    #arr-bixi .arr-name { width: 100%; white-space: normal; }
     .arr-counter-row { flex-wrap: wrap; row-gap: 4px; }
     .arr-counter-row .arr-name { width: 100%; white-space: normal; }
 }
@@ -1365,6 +1376,7 @@ body .gf-don-btn { font-family: inherit; }
     :where(:root:not([data-theme="light"])) #methodo-page code, :where(:root:not([data-theme="light"])) .source-card-desc code { background: rgba(255,255,255,0.08) !important; color: var(--text-2); }
     :where(:root:not([data-theme="light"])) .bixi-up { color: #4ade80; }
     :where(:root:not([data-theme="light"])) .bixi-down { color: #f87171; }
+    :where(:root:not([data-theme="light"])) .arr-subhead h2 { color: #f87171; }
     
     /* Thèmes des pages Hiver et BIXI */
     
@@ -1467,6 +1479,7 @@ body .gf-don-btn { font-family: inherit; }
     :where(:root[data-theme="dark"]) #methodo-page code, :where(:root[data-theme="dark"]) .source-card-desc code { background: rgba(255,255,255,0.08) !important; color: var(--text-2); }
     :where(:root[data-theme="dark"]) .bixi-up { color: #4ade80; }
     :where(:root[data-theme="dark"]) .bixi-down { color: #f87171; }
+    :where(:root[data-theme="dark"]) .arr-subhead h2 { color: #f87171; }
     
     /* Thèmes des pages Hiver et BIXI */
     

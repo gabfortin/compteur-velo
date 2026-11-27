@@ -892,6 +892,8 @@ BIXI_PROXIMITY_CACHE_FILE = '.bixi_proximity_cache.json'
 bixi_near_counter = defaultdict(lambda: defaultdict(int))
 _bixi_live_summary = None
 _bixi_live_year = None
+_bixi_arr_months = {}
+_bixi_arr_last = None
 
 if os.path.exists('bixi.csv'):
     # bixi.csv ne change que lorsque BIXI publie un nouveau ZIP (fetch_data.sh
@@ -908,17 +910,21 @@ if os.path.exists('bixi.csv'):
             prox_cache = json.load(f)
 
     if (prox_cache and prox_cache.get('fingerprint') == bixi_fingerprint
-            and prox_cache.get('counters') == sorted_counters):
+            and prox_cache.get('counters') == sorted_counters and 'arr_months' in prox_cache):
         print("BIXI : bixi.csv inchangé — réutilisation du cache de proximité.")
         for inst, days in prox_cache['bixi_near_counter'].items():
             bixi_near_counter[inst] = defaultdict(int, days)
         _bixi_live_summary = prox_cache['live_summary']
         _bixi_live_year = prox_cache['live_year']
+        _bixi_arr_months = prox_cache['arr_months']
+        _bixi_arr_last = prox_cache['arr_last']
     else:
         bixi_live = bixi_stats.BixiYearAggregator(bixi_stats.load_montreal_polygons())
+        bixi_arr = bixi_stats.BixiArrAggregator(bixi_stats.load_arrondissement_polygons())
         with open('bixi.csv', encoding='utf-8') as f:
             for row in tqdm(csv.DictReader(f), desc="Données Bixi"):
                 bixi_live.add_row(row)
+                bixi_arr.add_row(row)
                 try:
                     slat = float(row['STARTSTATIONLATITUDE'])
                     slng = float(row['STARTSTATIONLONGITUDE'])
@@ -942,6 +948,8 @@ if os.path.exists('bixi.csv'):
                     pass
         _bixi_live_year = bixi_live.live_year()
         _bixi_live_summary = bixi_live.summary(_bixi_live_year)
+        _bixi_arr_months = bixi_arr.months
+        _bixi_arr_last = bixi_arr.last_date
         with open(BIXI_PROXIMITY_CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump({
                 'fingerprint': bixi_fingerprint,
@@ -949,6 +957,8 @@ if os.path.exists('bixi.csv'):
                 'bixi_near_counter': {k: dict(v) for k, v in bixi_near_counter.items()},
                 'live_summary': _bixi_live_summary,
                 'live_year': _bixi_live_year,
+                'arr_months': _bixi_arr_months,
+                'arr_last': _bixi_arr_last,
             }, f, ensure_ascii=False, separators=(',', ':'))
 
 site_data['bixiNearby'] = {k: dict(v) for k, v in bixi_near_counter.items()}
@@ -980,6 +990,14 @@ site_data['bixiExceedsDays'] = bixi_exceeds_days
 bixi_years = bixi_stats.merge_live(bixi_stats.load_cache(), _bixi_live_summary,
                                    _bixi_live_year, datetime.now().year)
 site_data['bixiYearly'] = bixi_years
+
+# BIXI par arrondissement : 12 derniers mois disponibles. Années passées depuis
+# bixi_arr_cache.json (bixi_stats.py), année de bixi.csv calculée ci-dessus.
+_arr_cache = {y: c for y, c in bixi_stats.load_arr_cache().items() if y != _bixi_live_year}
+_arr_sources = [c['months'] for c in _arr_cache.values()] + [_bixi_arr_months]
+_arr_years = {int(y) for y in _arr_cache} | ({int(_bixi_live_year)} if _bixi_arr_months and _bixi_live_year else set())
+_arr_last = max([c.get('lastDate') or '' for c in _arr_cache.values()] + [_bixi_arr_last or '']) or None
+site_data['bixiArr'] = bixi_stats.arr_window(bixi_stats.merge_arr_months(*_arr_sources), _arr_last, _arr_years)
 # Données historiques
 site_data['historicalYearlyTotals'] = hist_yearly
 site_data['historicalYearlyCounters'] = hist_yearly_counters

@@ -18,7 +18,7 @@ l'hiver.
 |---|---|
 | **Compteurs** | Un graphique par compteur : filtres de période (jour, 7 à 365 jours), vue dans le temps ou par jour, par direction, statistiques, carte ; historique multi-années et comparaison de deux années ; superposition BIXI ; combinaison de deux compteurs voisins |
 | **Vue Globale** | Passages agrégés de tous les compteurs actifs : totaux, classement, évolution annuelle depuis 2009 |
-| **Arrondissements** | Statistiques, carte et compteurs de chaque arrondissement, effet de la météo, jours les plus et les moins achalandés |
+| **Arrondissements** | Statistiques, carte et compteurs de chaque arrondissement, effet de la météo, jours les plus et les moins achalandés ; sous-section BIXI : trajets partis et arrivés sur le territoire pendant les 12 derniers mois publiés, par mois et par heure, destinations, stations les plus populaires |
 | **Vélo d'hiver** | De décembre à mars : saisons comparées, BIXI l'hiver, explorateur par compteur |
 | **BIXI** | La croissance du vélopartage, année après année (réseau et Montréal seulement) |
 | **Méthodologie** (fenêtre) | Sources, détection des anomalies, validation croisée avec BIXI |
@@ -31,7 +31,7 @@ l'hiver.
 |---|---|---|
 | [Cyclistes](https://donnees.montreal.ca/fr/dataset/cyclistes) (`cyclistes.csv`, capteurs photo/vidéo, et `compteurs.csv`, boucles magnétiques) | Ville de Montréal, CC BY 4.0 | Passages, depuis 2009 (`hist_cache.json` pour les années passées) |
 | Districts électoraux 2025 (`data/districts-electoraux-2025.json`) | Ville de Montréal, CC BY 4.0 | Arrondissement de chaque compteur |
-| [Données ouvertes de BIXI](https://bixi.com/en/open-data/) | BIXI | Trajets près des compteurs, onglet BIXI (`bixi_cache.json`) |
+| [Données ouvertes de BIXI](https://bixi.com/en/open-data/) | BIXI | Trajets près des compteurs, onglet BIXI (`bixi_cache.json`), BIXI par arrondissement (`bixi_arr_cache.json`) |
 | [Open-Meteo](https://open-meteo.com) | Open-Meteo, CC BY 4.0 | Météo quotidienne |
 
 Colonnes, filtres, historique, caches et détection des anomalies :
@@ -115,14 +115,14 @@ modifier le style ou le code et publier sans relancer la génération.
 |---|---|
 | `genMap.py` | Génération de `data/site.json` (Python, `tqdm` seulement) |
 | `site_format.py` | Format de `data/site.json`, partagé avec les tests |
-| `bixi_stats.py` | Agrégats BIXI par année (`bixi_cache.json`) |
+| `bixi_stats.py` | Agrégats BIXI par année (`bixi_cache.json`) et par arrondissement, mois par mois (`bixi_arr_cache.json`) |
 | `fetch_data.sh` | Téléchargement des trois CSV (robot et Docker) |
 | `index.html`, `confidentialite.html` | Pages statiques |
 | `assets/boot.js`, `assets/app.js`, `assets/style.css` | Démarrage, logique de la page, styles |
 | `assets/apropos.js`, `assets/titre-barre.js` | Composants communs (bouton « i », nom dans la barre) |
 | `assets/chargement.css`, `assets/chargement-velo.css` | Écran d'attente : base commune (copie de `outils/communs/`) et scène (vélo sur la boucle du compteur) |
 | `data/site.json` | Généré chaque jour : ne pas modifier à la main |
-| `hist_cache.json`, `bixi_cache.json`, `velo_meta_cache.json` | Caches commités (historique, BIXI, rue et arrondissement) |
+| `hist_cache.json`, `bixi_cache.json`, `bixi_arr_cache.json`, `velo_meta_cache.json` | Caches commités (historique, BIXI, BIXI par arrondissement, rue et arrondissement) |
 | `test_*.py` | Tests et audit |
 
 Style B de **référence** de [DESIGN-PAGES.md](../DESIGN-PAGES.md). Structure

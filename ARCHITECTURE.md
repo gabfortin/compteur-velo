@@ -11,6 +11,7 @@ compteur-velo/
 ├── bixi.csv                 # Données BIXI de l'année en cours (bixi.com/en/open-data) — ignoré par git
 ├── bixi_stats.py            # Agrégats BIXI par année (onglet BIXI) — construit bixi_cache.json
 ├── bixi_cache.json          # Statistiques BIXI des années passées (2014 → année précédente) — commité
+├── bixi_arr_cache.json      # BIXI par arrondissement et par mois, années courante − 2 et − 1 — commité
 ├── hist_cache.json          # Données historiques (2009 → année en cours), enrichies chaque jour — commité
 ├── historique/              # CSV historiques bruts (2009–2025) — ignoré par git, non nécessaire en prod
 │   ├── comptage_velo_2009.csv
@@ -163,6 +164,14 @@ Vue calculée entièrement côté navigateur à partir de `allDailyData`, `count
 `bixi_stats.py` télécharge les ZIP annuels publiés sur [bixi.com/en/open-data](https://bixi.com/en/open-data/) (formats 2014–2021 et 2022+) et en tire, pour chaque année : trajets par jour, répartition horaire, durée moyenne et répartition des durées, part des membres (jusqu'en 2021), nombre de stations actives et stations de départ les plus populaires. Le résultat est stocké dans `bixi_cache.json` (commité) ; seules les années absentes du cache sont téléchargées, donc l'exécution quotidienne (étape « Historique BIXI » du workflow) ne fait normalement rien, sauf en début d'année.
 
 Chaque année est résumée pour tout le réseau et pour « Montréal seulement » (clé `mtl`) : les trajets partis d'une station située dans l'un des 19 arrondissements de la Ville. Les stations sont situées par point-dans-polygone avec `data/districts-electoraux-2025.json` (même fichier local que `resolve_arrondissement()`, voir Étape 2 — aucun appel réseau) ; si ce fichier est absent, la colonne `STARTSTATIONARRONDISSEMENT` (2022+) sert de repli. Une année du cache sans clé `mtl` est recalculée.
+
+### Page Arrondissements — sous-section BIXI
+
+`bixi_stats.BixiArrAggregator` résume les trajets (format 2022+) par mois et par arrondissement : départs, arrivées, trajets internes (départ et arrivée dans le même arrondissement), départs par jour et par heure, durée (1 min à 4 h), arrondissement ou ville d'arrivée, départs par station. Chaque station est rattachée à l'arrondissement que BIXI lui donne (`STARTSTATIONARRONDISSEMENT` / `ENDSTATIONARRONDISSEMENT`), ramené au nom officiel de la Ville en ignorant accents et tirets (« Rosemont - La Petite-Patrie » → « Rosemont–La Petite-Patrie ») ; colonne vide : polygones des districts. Hors des 19 arrondissements, le nom de BIXI est gardé (Westmount, Longueuil…). En novembre 2026, la colonne et les polygones concordaient pour 99,94 % des trajets de 2026 (écart : une station de la rue Guy, Ville-Marie pour BIXI, Côte-des-Neiges–Notre-Dame-de-Grâce pour le polygone).
+
+- Années courante − 2 et − 1 : `update_arr_cache()` (lancé par `python3 bixi_stats.py`) les stocke dans `bixi_arr_cache.json`. Une année est refaite quand le nom du ZIP publié change (ZIP partiel remplacé par l'année complète).
+- Année en cours : calculée par `genMap.py` dans la même lecture de `bixi.csv` que le croisement avec les compteurs, et gardée dans `.bixi_proximity_cache.json`.
+- `arr_window()` additionne les mois des deux sources et publie `bixiArr` dans `data/site.json` : 12 mois se terminant au mois du dernier trajet publié (BIXI publie avec quelques mois de délai), et les départs des 12 mois précédents quand ces années ont été lues (`prevCovered`).
 
 `genMap.py` ajoute l'année en cours (calculée depuis `bixi.csv`, marquée `partial`) et injecte le tout dans `const bixiYearly`. L'onglet propose un filtre « Tout le réseau / Montréal seulement » et affiche les trajets par année, le cumul depuis le 1er janvier, les trajets par mois, un tableau annuel et un explorateur par année (tableau mensuel, heures, jours de semaine, durées, stations).
 
